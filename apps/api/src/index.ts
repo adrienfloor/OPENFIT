@@ -1,0 +1,40 @@
+import Fastify from 'fastify';
+import { prismaPlugin } from './plugins/prisma.js';
+import { corsPlugin } from './plugins/cors.js';
+import { jwtPlugin } from './plugins/jwt.js';
+import { authRoutes } from './routes/auth/index.js';
+import { terraRoutes } from './routes/terra/index.js';
+import { workoutRoutes } from './routes/workouts/index.js';
+import { runRoutes } from './routes/runs/index.js';
+import { healthRoutes } from './routes/health/index.js';
+
+const server = Fastify({
+  logger: {
+    level: process.env['NODE_ENV'] === 'test' ? 'silent' : 'info',
+  },
+});
+
+async function bootstrap(): Promise<void> {
+  await server.register(prismaPlugin);
+  await server.register(corsPlugin);
+  await server.register(jwtPlugin);
+
+  await server.register(authRoutes, { prefix: '/auth' });
+  await server.register(terraRoutes, { prefix: '/terra' });
+  await server.register(workoutRoutes, { prefix: '/workouts' });
+  await server.register(runRoutes, { prefix: '/runs' });
+  await server.register(healthRoutes, { prefix: '/health' });
+
+  server.get('/healthz', async () => ({ status: 'ok' }));
+
+  const port = Number(process.env['PORT'] ?? 3001);
+  const host = '0.0.0.0';
+
+  await server.listen({ port, host });
+  server.log.info(`OpenFit API running on http://${host}:${port}`);
+}
+
+bootstrap().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

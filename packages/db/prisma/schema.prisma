@@ -1,0 +1,266 @@
+// Prisma schema for OpenFit
+// Each user-owned model has a userId FK to enforce multi-tenancy at the DB layer.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  user
+  admin
+}
+
+enum MuscleGroup {
+  chest
+  back
+  shoulders
+  biceps
+  triceps
+  forearms
+  core
+  quads
+  hamstrings
+  glutes
+  calves
+  full_body
+}
+
+enum Equipment {
+  barbell
+  dumbbell
+  kettlebell
+  cable
+  machine
+  bodyweight
+  resistance_band
+  other
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  dateOfBirth  DateTime
+  weightKg     Float
+  role         Role     @default(user)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  refreshTokens    RefreshToken[]
+  terraConnections TerraConnection[]
+  programs         Program[]
+  workoutLogs      WorkoutLog[]
+  runSessions      RunSession[]
+  dailyHealth      DailyHealth[]
+}
+
+model RefreshToken {
+  id          String   @id @default(cuid())
+  hashedToken String   @unique
+  userId      String
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model TerraConnection {
+  id          String   @id @default(cuid())
+  userId      String
+  terraUserId String   @unique
+  provider    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Exercise {
+  id           String        @id @default(cuid())
+  name         String        @unique
+  muscleGroups MuscleGroup[]
+  equipment    Equipment
+
+  plannedExercises PlannedExercise[]
+  exerciseLogs     ExerciseLog[]
+}
+
+model Program {
+  id     String @id @default(cuid())
+  userId String
+  name   String
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weeks Week[]
+
+  @@index([userId])
+}
+
+model Week {
+  id         String @id @default(cuid())
+  programId  String
+  weekNumber Int
+
+  program  Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
+  sessions Session[]
+
+  @@unique([programId, weekNumber])
+}
+
+model Session {
+  id     String @id @default(cuid())
+  weekId String
+  name   String
+
+  week             Week              @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  plannedExercises PlannedExercise[]
+  workoutLogs      WorkoutLog[]
+}
+
+model PlannedExercise {
+  id         String @id @default(cuid())
+  sessionId  String
+  exerciseId String
+  orderIndex Int
+
+  session  Session      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  exercise Exercise     @relation(fields: [exerciseId], references: [id])
+  sets     PlannedSet[]
+
+  @@unique([sessionId, orderIndex])
+}
+
+model PlannedSet {
+  id                String  @id @default(cuid())
+  plannedExerciseId String
+  setIndex          Int
+  reps              Int
+  weight            Float?
+  rpe               Float?
+  restSeconds       Int
+
+  plannedExercise PlannedExercise @relation(fields: [plannedExerciseId], references: [id], onDelete: Cascade)
+
+  @@unique([plannedExerciseId, setIndex])
+}
+
+model WorkoutLog {
+  id          String    @id @default(cuid())
+  userId      String
+  sessionId   String?
+  startedAt   DateTime
+  completedAt DateTime?
+
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session          Session?          @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  heartRateSamples HeartRateSample[]
+  exerciseLogs     ExerciseLog[]
+
+  @@index([userId])
+  @@index([userId, startedAt])
+}
+
+model ExerciseLog {
+  id           String @id @default(cuid())
+  workoutLogId String
+  exerciseId   String
+
+  workoutLog    WorkoutLog     @relation(fields: [workoutLogId], references: [id], onDelete: Cascade)
+  exercise      Exercise       @relation(fields: [exerciseId], references: [id])
+  completedSets CompletedSet[]
+
+  @@index([workoutLogId])
+}
+
+model CompletedSet {
+  id                    String  @id @default(cuid())
+  exerciseLogId         String
+  setIndex              Int
+  reps                  Int
+  weight                Float
+  rpe                   Float?
+  restTaken             Int
+  heartRateAtCompletion Int?
+
+  exerciseLog ExerciseLog @relation(fields: [exerciseLogId], references: [id], onDelete: Cascade)
+
+  @@unique([exerciseLogId, setIndex])
+}
+
+model RunSession {
+  id                   String    @id @default(cuid())
+  userId               String
+  startedAt            DateTime
+  completedAt          DateTime?
+  distanceMeters       Float
+  durationSeconds      Int
+  avgPaceSecondsPerKm  Float?
+  bestPaceSecondsPerKm Float?
+  elevationGainMeters  Float
+
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  heartRateSamples HeartRateSample[]
+  gpsPoints        GPSPoint[]
+
+  @@index([userId])
+  @@index([userId, startedAt])
+}
+
+model GPSPoint {
+  id             String   @id @default(cuid())
+  runSessionId   String
+  lat            Float
+  lng            Float
+  altitudeMeters Float
+  timestamp      DateTime
+  speedMps       Float
+
+  runSession RunSession @relation(fields: [runSessionId], references: [id], onDelete: Cascade)
+
+  @@index([runSessionId])
+}
+
+model HeartRateSample {
+  id           String   @id @default(cuid())
+  timestamp    DateTime
+  bpm          Int
+  zone         String
+  workoutLogId String?
+  runSessionId String?
+
+  workoutLog WorkoutLog? @relation(fields: [workoutLogId], references: [id], onDelete: Cascade)
+  runSession RunSession? @relation(fields: [runSessionId], references: [id], onDelete: Cascade)
+
+  @@index([workoutLogId])
+  @@index([runSessionId])
+}
+
+model DailyHealth {
+  id                   String   @id @default(cuid())
+  date                 DateTime @db.Date
+  userId               String
+  steps                Int?
+  caloriesActive       Float?
+  caloriesTotal        Float?
+  heartRateResting     Int?
+  hrvRmssd             Float?
+  sleepDurationMinutes Int?
+  sleepScore           Float?
+  recoveryScore        Float?
+  strainScore          Float?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId])
+}

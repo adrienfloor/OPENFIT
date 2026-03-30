@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "OpenFit",
+    "slug": "openfit",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#22c55e"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "dev.openfit.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#22c55e"
+      },
+      "package": "dev.openfit.app"
+    },
+    "plugins": ["expo-router", "expo-secure-store"],
+    "scheme": "openfit"
+  }
+}

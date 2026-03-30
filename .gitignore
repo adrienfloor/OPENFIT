@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+.next/
+.expo/
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.development
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Testing
+coverage/
+
+# Turborepo
+.turbo/
+
+# Prisma
+packages/db/prisma/migrations/
+
+# Lock files are committed, but generated clients are not
+packages/db/node_modules/.prisma/
+
+# Mobile build artifacts
+apps/mobile/ios/
+apps/mobile/android/
+apps/mobile/assets/icon.png

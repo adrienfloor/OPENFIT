@@ -3,41 +3,48 @@
 ## System Overview
 
 ```
-                    +------------------+
-                    |   Helio Strap /  |
-                    |   Wearable HW    |
-                    +--------+---------+
-                             |
-                             | BLE / Terra RT SDK
-                             v
-+----------------+   +------+-------+   +----------------+
-|                |   |              |   |                |
-|  Mobile App    +<->+  Terra API   +-->+  Webhook       |
-|  (Expo/RN)     |   |  (Cloud)     |   |  Endpoint      |
-|                |   |              |   |                |
-+-------+--------+   +--------------+   +-------+--------+
-        |                                        |
-        | REST API                               | POST /terra/webhook
-        v                                        v
-+-------+----------------------------------------+--------+
-|                                                         |
-|                    Fastify API Server                   |
-|                    (apps/api)                           |
-|                                                         |
-|   +----------+  +-----------+  +-----------+            |
-|   |  Auth    |  | Workout   |  |  Health   |            |
-|   |  Service |  | Service   |  |  Service  |            |
-|   +----+-----+  +-----+-----+  +-----+-----+           |
-|        |              |              |                   |
-|        +------+-------+------+-------+                   |
-|               |                                          |
-|               v                                          |
-|        +------+------+                                   |
-|        |   Prisma    |                                   |
-|        |   ORM       |                                   |
-|        +------+------+                                   |
-|               |                                          |
-+---------------+------------------------------------------+
++------------------+                +------------------+
+|   Helio Strap    |                |   Helio Strap    |
+|   (passive)      |                |   (workout)      |
++--------+---------+                +--------+---------+
+         |                                   |
+         | Zepp background service           | BLE GATT HR (0x180D)
+         v                                   v
++--------+---------+                +--------+---------+
+|  Health Connect  |                | react-native-    |
+|  (Android)       |                | ble-plx          |
++--------+---------+                +--------+---------+
+         |                                   |
+         | react-native-health-connect       |
+         v                                   v
++--------+-----------------------------------+---------+
+|                                                      |
+|                   Mobile App (Expo/RN)               |
+|                   Android only                       |
+|                                                      |
++------------------------+-----------------------------+
+                         |
+                         | REST API
+                         v
++------------------------+-----------------------------+
+|                                                      |
+|                 Fastify API Server                   |
+|                 (apps/api)                           |
+|                                                      |
+|   +----------+  +-----------+  +-----------+         |
+|   |  Auth    |  | Workout   |  |  Health   |         |
+|   |  Service |  | Service   |  |  Service  |         |
+|   +----+-----+  +-----+-----+  +-----+-----+        |
+|        |              |              |                |
+|        +------+-------+------+-------+                |
+|               |                                       |
+|               v                                       |
+|        +------+------+                                |
+|        |   Prisma    |                                |
+|        |   ORM       |                                |
+|        +------+------+                                |
+|               |                                       |
++---------------+---------------------------------------+
                 |
                 v
          +------+------+
@@ -50,6 +57,38 @@
 |  (Next.js 15)  |
 +----------------+
 ```
+
+## Wearable Integration
+
+**Platform: Android only.**
+
+### Passive daily data (sleep, HRV, steps, resting HR, calories, SpO2)
+Helio Strap → Zepp (background service) → Health Connect → OpenFit via react-native-health-connect
+
+Zepp does not need to be open. It runs as an Android background service and syncs
+Helio data into Health Connect automatically. One-time setup: set Zepp to
+"Unrestricted" battery in Android Settings → Apps → Zepp → Battery.
+
+Health Connect must be installed on the device (pre-installed on Android 14+,
+available on the Play Store for Android 9+).
+
+### Real-time workout data (live heart rate)
+Helio Strap BLE (GATT Heart Rate Service 0x180D) → react-native-ble-plx
+→ useRealtimeHeartRate hook → workout screens
+
+Only active during workout sessions. Connects on workout start, disconnects on end.
+
+### GPS
+Phone GPS via expo-location. No wearable involved.
+
+### Why not Terra API?
+Terra costs $399-499/month. Health Connect + direct BLE achieves identical
+functionality for free.
+
+### Why not iOS?
+Android-first. iOS support can be added later by reimplementing
+src/services/healthConnect.ts using react-native-health (HealthKit).
+The BLE service and all hooks are already platform-agnostic.
 
 ## Authentication Flow
 
@@ -127,17 +166,20 @@ Client                          API                           DB
 ## Data Flow: Wearable -> Dashboard
 
 ```
-1. User pairs wearable in mobile app
-2. Mobile app calls POST /terra/auth-token (authenticated)
-3. API generates Terra session token, stores TerraConnection mapping
-4. Terra SDK initializes on mobile with session token
-5. Background: Terra cloud syncs wearable data
-6. Terra sends webhook POST /terra/webhook with health data
-7. API validates webhook signature (TERRA_WEBHOOK_SECRET)
-8. API maps Terra user_id -> OpenFit userId via TerraConnection
-9. API upserts data into DailyHealth / HeartRateSample tables
-10. Web dashboard fetches GET /health (scoped to userId)
-11. Mobile app fetches on foreground via useDailyStats hook
+Passive data (daily):
+1. Helio Strap syncs to Zepp app (background, automatic)
+2. Zepp writes data into Health Connect (background, automatic)
+3. Mobile app reads from Health Connect via healthConnect.ts service
+4. useDailyStats hook presents data in the UI
+5. Mobile app syncs to API via POST /health (offline queue)
+6. Web dashboard fetches GET /health (scoped to userId)
+
+Real-time data (workout):
+1. User starts a workout in the app
+2. useRealtimeHeartRate hook creates BLE service, scans for HR device
+3. BLE connects to Helio Strap (GATT Heart Rate Service 0x180D)
+4. HR samples stream into the workout screen in real time
+5. On workout end, accumulated samples are saved with the workout log
 ```
 
 ## Multi-Tenancy Model
@@ -149,7 +191,6 @@ User (1) ---> (*) Program
 User (1) ---> (*) WorkoutLog
 User (1) ---> (*) RunSession
 User (1) ---> (*) DailyHealth
-User (1) ---> (*) TerraConnection
 User (1) ---> (*) RefreshToken
 ```
 
@@ -180,9 +221,10 @@ across platforms. Argon2 is theoretically stronger but introduces build
 complexity. We use 12 rounds (cost factor) which takes ~250ms on modern hardware.
 
 ### Expo bare workflow
-Bare workflow gives us access to native modules (Terra RT BLE SDK, Secure Store
-native keychain) that managed workflow cannot support. The tradeoff is more
-complex build configuration, which is acceptable for a production app.
+Bare workflow gives us access to native modules (BLE via react-native-ble-plx,
+Health Connect, Secure Store native keychain) that managed workflow cannot
+support. The tradeoff is more complex build configuration, which is acceptable
+for a production app.
 
 ### Drizzle (local SQLite) + Prisma (remote PostgreSQL)
 Two ORMs for two different databases with different requirements:

@@ -1,6 +1,6 @@
 # OpenFit
 
-Open-source fitness platform that connects wearables via Terra API, tracks workouts (strength training, runs, jiu-jitsu), and displays health analytics on a web dashboard.
+Open-source fitness platform that connects wearables via Health Connect + BLE (Android only), tracks workouts (strength training, runs, jiu-jitsu), and displays health analytics on a web dashboard.
 
 ## Tech Stack
 
@@ -8,7 +8,7 @@ Open-source fitness platform that connects wearables via Terra API, tracks worko
 |-------|-----------|
 | API | Fastify v5, TypeScript, Prisma, PostgreSQL |
 | Web | Next.js 15 (App Router), Tailwind CSS, Recharts |
-| Mobile | React Native, Expo (bare workflow), Expo Router |
+| Mobile | React Native, Expo (bare workflow), Expo Router — Android only |
 | Shared | Turborepo, Zod schemas, shared types + business logic |
 
 ## Monorepo Structure
@@ -63,8 +63,6 @@ cp apps/mobile/.env.example apps/mobile/.env
 Edit `apps/api/.env` and set real values for:
 - `JWT_ACCESS_SECRET` — any random 32+ char string
 - `JWT_REFRESH_SECRET` — a different random 32+ char string
-
-Terra keys are optional until you integrate a wearable device.
 
 ### 4. Set up the database
 
@@ -146,7 +144,7 @@ cd apps/api && npx vitest run                # 11 tests (auth flows, multi-tenan
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for:
 - System diagram
 - Auth flow (register, login, refresh rotation, logout)
-- Data flow (wearable -> Terra -> webhook -> API -> DB -> clients)
+- Data flow (wearable -> Health Connect / BLE -> mobile -> API -> DB -> clients)
 - Multi-tenancy model
 - Key technical decisions with rationale
 - Offline-first strategy
@@ -161,13 +159,13 @@ Every user-owned model has a `userId` foreign key. Every database query is scope
 - [x] Monorepo with Turborepo
 - [x] Shared types (Zod schemas)
 - [x] Fitness-core business logic with tests
-- [x] Prisma schema (14 models)
+- [x] Prisma schema (13 models)
 - [x] JWT auth with refresh token rotation
 - [x] Web auth pages + dashboard layout
 - [x] Mobile auth screens + tab navigation
 
 ### Phase 1 — Core Features
-- [ ] Terra API integration (webhooks, real-time BLE)
+- [ ] Health Connect + BLE integration (implemented, needs UI wiring)
 - [ ] Workout CRUD (programs, sessions, logs)
 - [ ] Run tracking (GPS, pace, elevation)
 - [ ] Health dashboard with charts (Recharts)

@@ -1,13 +1,13 @@
 # CLAUDE.md — OpenFit Project Context
 
 ## What is OpenFit?
-Full-stack open-source fitness platform. Connects wearables via Terra API, tracks workouts (strength, runs, jiu-jitsu), displays health analytics. Multi-tenant — each user has their own data, devices, and programs.
+Full-stack open-source fitness platform. Connects wearables via Health Connect + BLE (Android only), tracks workouts (strength, runs, jiu-jitsu), displays health analytics. Multi-tenant — each user has their own data, devices, and programs.
 
 ## Tech Stack
 - **Monorepo**: Turborepo with npm workspaces
 - **API**: Fastify v5 + TypeScript + Prisma + PostgreSQL (port 3001)
 - **Web**: Next.js 15 App Router + Tailwind + Recharts (port 3000)
-- **Mobile**: React Native + Expo (bare workflow) + Expo Router
+- **Mobile**: React Native + Expo (bare workflow) + Expo Router (Android only)
 - **Shared packages**: `@openfit/types` (Zod schemas), `@openfit/db` (Prisma), `@openfit/fitness-core` (pure business logic), `@openfit/ui` (shared components)
 
 ## Node Version
@@ -59,19 +59,22 @@ All steps complete:
 1. Monorepo scaffolded with Turborepo
 2. Shared types package with Zod schemas
 3. Fitness-core pure functions with tests
-4. Prisma schema with 14 models
+4. Prisma schema with 13 models
 5. Fastify API with full auth implementation
 6. Next.js web app with auth pages
 7. Expo mobile app with auth screens
 8. ARCHITECTURE.md populated
 
 ## What's Next (Phase 1)
-- Terra API integration (webhook processing, auth token generation)
 - Workout CRUD (create/read/update programs and workout logs)
 - Run tracking (GPS, pace, elevation)
 - Health dashboard with Recharts visualizations
 - Mobile offline sync with Drizzle/SQLite
-- Real-time heart rate via Terra RT SDK
+- Real-time heart rate via BLE (react-native-ble-plx) — service implemented
+- Health Connect daily data integration — service implemented
+
+## Workflow
+- Always write specific and clean commits and push to the repo after completing work.
 
 ## Code Style
 - TypeScript strict mode everywhere. No `any` types.

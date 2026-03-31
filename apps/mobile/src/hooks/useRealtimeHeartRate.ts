@@ -1,32 +1,61 @@
-import { useState, useEffect, useRef } from 'react';
-import type { HeartRateSample } from '@openfit/types';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import type { HeartRateSample, HeartRateZone } from '@openfit/types';
+import {
+  createBLEService,
+  type BLEConnectionState,
+  type BLEService,
+} from '../services/ble';
 
-export function useRealtimeHeartRate(): {
-  sample: HeartRateSample | null;
-  isConnected: boolean;
-  error: Error | null;
+export function useRealtimeHeartRate(maxHR: number): {
+  bpm: number | null;
+  zone: HeartRateZone | null;
+  connectionState: BLEConnectionState;
+  samples: HeartRateSample[];
 } {
-  const [sample, setSample] = useState<HeartRateSample | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const [error] = useState<Error | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [bpm, setBpm] = useState<number | null>(null);
+  const [zone, setZone] = useState<HeartRateZone | null>(null);
+  const [connectionState, setConnectionState] =
+    useState<BLEConnectionState>('idle');
 
-  useEffect(() => {
-    // Simulate BLE data for development without a physical device
-    setIsConnected(true);
-    intervalRef.current = setInterval(() => {
-      const bpm = Math.floor(60 + Math.random() * 80);
-      setSample({
-        timestamp: new Date(),
-        bpm,
-        zone: bpm < 95 ? 'rest' : bpm < 123 ? 'fat_burn' : bpm < 152 ? 'cardio' : bpm < 171 ? 'peak' : 'max',
-      });
-    }, 1000);
+  const samplesRef = useRef<HeartRateSample[]>([]);
+  const serviceRef = useRef<BLEService | null>(null);
 
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
+  const handleSample = useCallback((sample: HeartRateSample) => {
+    samplesRef.current.push(sample);
+    setBpm(sample.bpm);
+    setZone(sample.zone);
   }, []);
 
-  return { sample, isConnected, error };
+  useEffect(() => {
+    const service = createBLEService();
+    serviceRef.current = service;
+
+    let unsubscribeHR: (() => void) | null = null;
+
+    service
+      .connect((newState) => {
+        setConnectionState(newState);
+
+        if (newState === 'connected' && !unsubscribeHR) {
+          unsubscribeHR = service.subscribeToHeartRate(maxHR, handleSample);
+        }
+      })
+      .catch(() => {
+        setConnectionState('error');
+      });
+
+    return () => {
+      unsubscribeHR?.();
+      service.disconnect();
+    };
+  }, [maxHR, handleSample]);
+
+  return {
+    bpm,
+    zone,
+    connectionState,
+    get samples() {
+      return samplesRef.current;
+    },
+  };
 }

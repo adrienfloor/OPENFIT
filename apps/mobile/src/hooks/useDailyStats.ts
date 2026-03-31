@@ -1,41 +1,57 @@
-import { useState, useEffect } from 'react';
-import { apiClient } from '../services/api';
-import { useAuthStore } from '../stores/auth.store';
+import { useState, useEffect, useCallback } from 'react';
 import type { DailyHealth } from '@openfit/types';
+import {
+  getDailyStats,
+  HealthConnectError,
+} from '../services/healthConnect';
+
+const STALE_TIME_MS = 5 * 60 * 1000;
 
 export function useDailyStats(): {
-  today: DailyHealth | null;
-  loading: boolean;
+  data: DailyHealth | null;
+  isLoading: boolean;
   error: Error | null;
   refetch: () => void;
 } {
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const [today, setToday] = useState<DailyHealth | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState<DailyHealth | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [lastFetchedAt, setLastFetchedAt] = useState(0);
   const [tick, setTick] = useState(0);
 
-  useEffect(() => {
-    if (!isAuthenticated) return;
+  const fetchStats = useCallback(async () => {
+    const now = Date.now();
+    if (now - lastFetchedAt < STALE_TIME_MS && data !== null) return;
 
-    let cancelled = false;
-    setLoading(true);
+    setIsLoading(true);
     setError(null);
 
-    apiClient
-      .get<DailyHealth[]>('/health?limit=1')
-      .then((res) => {
-        if (!cancelled) setToday(res.data[0] ?? null);
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err : new Error('Failed to fetch daily stats'));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+    try {
+      const today = new Date();
+      const results = await getDailyStats(today, today);
+      setData(results[0] ?? null);
+      setLastFetchedAt(Date.now());
+    } catch (err) {
+      if (err instanceof HealthConnectError) {
+        setError(err);
+      } else {
+        setError(
+          err instanceof Error ? err : new Error('Failed to fetch daily stats'),
+        );
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [lastFetchedAt, data]);
 
-    return () => { cancelled = true; };
-  }, [isAuthenticated, tick]);
+  useEffect(() => {
+    fetchStats();
+  }, [tick, fetchStats]);
 
-  return { today, loading, error, refetch: () => setTick((t) => t + 1) };
+  return {
+    data,
+    isLoading,
+    error,
+    refetch: () => setTick((t) => t + 1),
+  };
 }

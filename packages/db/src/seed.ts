@@ -19,7 +19,6 @@ async function main(): Promise<void> {
   await prisma.week.deleteMany();
   await prisma.program.deleteMany();
   await prisma.dailyHealth.deleteMany();
-  await prisma.terraConnection.deleteMany();
   await prisma.refreshToken.deleteMany();
   await prisma.user.deleteMany();
   await prisma.exercise.deleteMany();

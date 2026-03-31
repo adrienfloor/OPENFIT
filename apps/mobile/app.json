@@ -9,17 +9,36 @@
       "resizeMode": "contain",
       "backgroundColor": "#22c55e"
     },
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "dev.openfit.app"
-    },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#22c55e"
       },
-      "package": "dev.openfit.app"
+      "package": "dev.openfit.app",
+      "permissions": [
+        "android.permission.health.READ_HEART_RATE",
+        "android.permission.health.READ_SLEEP",
+        "android.permission.health.READ_STEPS",
+        "android.permission.health.READ_ACTIVE_CALORIES_BURNED",
+        "android.permission.health.READ_TOTAL_CALORIES_BURNED",
+        "android.permission.health.READ_OXYGEN_SATURATION",
+        "android.permission.health.READ_RESTING_HEART_RATE",
+        "android.permission.health.READ_HEART_RATE_VARIABILITY",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.BLUETOOTH_CONNECT"
+      ]
     },
-    "plugins": ["expo-router", "expo-secure-store"],
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "react-native-health-connect",
+        {
+          "requestPermissionsRationale": {
+            "action": "androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE"
+          }
+        }
+      ]
+    ],
     "scheme": "openfit"
   }
 }

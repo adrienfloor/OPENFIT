@@ -23,6 +23,27 @@ export const DailyHealthSchema = z.object({
   strainScore: z.number().min(0).max(21).nullable(),
 });
 
+// --- Input schemas for CRUD operations ---
+
+export const UpsertDailyHealthInputSchema = z.object({
+  date: z.coerce.date(),
+  steps: z.number().int().nonnegative().nullable().optional(),
+  caloriesActive: z.number().nonnegative().nullable().optional(),
+  caloriesTotal: z.number().nonnegative().nullable().optional(),
+  heartRateResting: z.number().int().positive().nullable().optional(),
+  hrvRmssd: z.number().nonnegative().nullable().optional(),
+  sleepDurationMinutes: z.number().int().nonnegative().nullable().optional(),
+  sleepScore: z.number().min(0).max(100).nullable().optional(),
+  recoveryScore: z.number().min(0).max(100).nullable().optional(),
+  strainScore: z.number().min(0).max(21).nullable().optional(),
+});
+
+export const BulkUpsertDailyHealthInputSchema = z.object({
+  entries: z.array(UpsertDailyHealthInputSchema).min(1).max(90),
+});
+
 export type HeartRateZone = z.infer<typeof HeartRateZoneSchema>;
 export type HeartRateSample = z.infer<typeof HeartRateSampleSchema>;
 export type DailyHealth = z.infer<typeof DailyHealthSchema>;
+export type UpsertDailyHealthInput = z.infer<typeof UpsertDailyHealthInputSchema>;
+export type BulkUpsertDailyHealthInput = z.infer<typeof BulkUpsertDailyHealthInputSchema>;

@@ -43,37 +43,41 @@ export class RunService {
   }
 
   async createRun(userId: string, input: CreateRunSessionInput) {
+    const data: Parameters<typeof this.prisma.runSession.create>[0]['data'] = {
+      userId,
+      startedAt: input.startedAt,
+      completedAt: input.completedAt ?? null,
+      distanceMeters: input.distanceMeters,
+      durationSeconds: input.durationSeconds,
+      avgPaceSecondsPerKm: input.avgPaceSecondsPerKm ?? null,
+      bestPaceSecondsPerKm: input.bestPaceSecondsPerKm ?? null,
+      elevationGainMeters: input.elevationGainMeters,
+    };
+
+    if (input.gpsPoints) {
+      data.gpsPoints = {
+        create: input.gpsPoints.map((p) => ({
+          lat: p.lat,
+          lng: p.lng,
+          altitudeMeters: p.altitudeMeters,
+          timestamp: p.timestamp,
+          speedMps: p.speedMps,
+        })),
+      };
+    }
+
+    if (input.heartRateSamples) {
+      data.heartRateSamples = {
+        create: input.heartRateSamples.map((s) => ({
+          timestamp: s.timestamp,
+          bpm: s.bpm,
+          zone: s.zone,
+        })),
+      };
+    }
+
     return this.prisma.runSession.create({
-      data: {
-        userId,
-        startedAt: input.startedAt,
-        completedAt: input.completedAt ?? null,
-        distanceMeters: input.distanceMeters,
-        durationSeconds: input.durationSeconds,
-        avgPaceSecondsPerKm: input.avgPaceSecondsPerKm ?? null,
-        bestPaceSecondsPerKm: input.bestPaceSecondsPerKm ?? null,
-        elevationGainMeters: input.elevationGainMeters,
-        gpsPoints: input.gpsPoints
-          ? {
-              create: input.gpsPoints.map((p) => ({
-                lat: p.lat,
-                lng: p.lng,
-                altitudeMeters: p.altitudeMeters,
-                timestamp: p.timestamp,
-                speedMps: p.speedMps,
-              })),
-            }
-          : undefined,
-        heartRateSamples: input.heartRateSamples
-          ? {
-              create: input.heartRateSamples.map((s) => ({
-                timestamp: s.timestamp,
-                bpm: s.bpm,
-                zone: s.zone,
-              })),
-            }
-          : undefined,
-      },
+      data,
       include: {
         gpsPoints: { orderBy: { timestamp: 'asc' } },
         heartRateSamples: { orderBy: { timestamp: 'asc' } },
@@ -90,16 +94,17 @@ export class RunService {
       throw new RunError('Run session not found', 404);
     }
 
+    const data: Parameters<typeof this.prisma.runSession.update>[0]['data'] = {};
+    if (input.completedAt !== undefined) data.completedAt = input.completedAt;
+    if (input.distanceMeters !== undefined) data.distanceMeters = input.distanceMeters;
+    if (input.durationSeconds !== undefined) data.durationSeconds = input.durationSeconds;
+    if (input.avgPaceSecondsPerKm !== undefined) data.avgPaceSecondsPerKm = input.avgPaceSecondsPerKm;
+    if (input.bestPaceSecondsPerKm !== undefined) data.bestPaceSecondsPerKm = input.bestPaceSecondsPerKm;
+    if (input.elevationGainMeters !== undefined) data.elevationGainMeters = input.elevationGainMeters;
+
     return this.prisma.runSession.update({
       where: { id: runId },
-      data: {
-        completedAt: input.completedAt !== undefined ? input.completedAt : undefined,
-        distanceMeters: input.distanceMeters,
-        durationSeconds: input.durationSeconds,
-        avgPaceSecondsPerKm: input.avgPaceSecondsPerKm !== undefined ? input.avgPaceSecondsPerKm : undefined,
-        bestPaceSecondsPerKm: input.bestPaceSecondsPerKm !== undefined ? input.bestPaceSecondsPerKm : undefined,
-        elevationGainMeters: input.elevationGainMeters,
-      },
+      data,
       include: {
         gpsPoints: { orderBy: { timestamp: 'asc' } },
         heartRateSamples: { orderBy: { timestamp: 'asc' } },

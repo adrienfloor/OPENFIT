@@ -104,8 +104,8 @@ describe('RunService.createRun', () => {
     });
 
     expect(result.distanceMeters).toBe(5000);
-    expect(result.gpsPoints).toHaveLength(1);
-    expect(result.heartRateSamples).toHaveLength(1);
+    expect((result as Record<string, unknown>)['gpsPoints']).toHaveLength(1);
+    expect((result as Record<string, unknown>)['heartRateSamples']).toHaveLength(1);
     expect(prisma.runSession.create).toHaveBeenCalledOnce();
   });
 

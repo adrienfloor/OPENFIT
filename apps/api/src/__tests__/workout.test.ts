@@ -273,7 +273,7 @@ describe('WorkoutService.createWorkoutLog', () => {
       ],
     });
 
-    expect(result.exerciseLogs).toHaveLength(1);
+    expect((result as Record<string, unknown>)['exerciseLogs']).toHaveLength(1);
     expect(prisma.workoutLog.create).toHaveBeenCalledOnce();
   });
 

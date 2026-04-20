@@ -155,7 +155,7 @@ export class WorkoutService {
 
     return this.prisma.program.update({
       where: { id: programId },
-      data: { name: input.name },
+      data: { ...(input.name !== undefined ? { name: input.name } : {}) },
       include: {
         weeks: {
           orderBy: { weekNumber: 'asc' },
@@ -267,37 +267,40 @@ export class WorkoutService {
       }
     }
 
-    return this.prisma.workoutLog.create({
-      data: {
-        userId,
-        sessionId: input.sessionId ?? null,
-        startedAt: input.startedAt,
-        completedAt: input.completedAt ?? null,
-        exerciseLogs: {
-          create: input.exerciseLogs.map((el) => ({
-            exerciseId: el.exerciseId,
-            completedSets: {
-              create: el.sets.map((set) => ({
-                setIndex: set.setIndex,
-                reps: set.reps,
-                weight: set.weight,
-                rpe: set.rpe ?? null,
-                restTaken: set.restTaken,
-                heartRateAtCompletion: set.heartRateAtCompletion ?? null,
-              })),
-            },
-          })),
-        },
-        heartRateSamples: input.heartRateSamples
-          ? {
-              create: input.heartRateSamples.map((sample) => ({
-                timestamp: sample.timestamp,
-                bpm: sample.bpm,
-                zone: sample.zone,
-              })),
-            }
-          : undefined,
+    const data: Parameters<typeof this.prisma.workoutLog.create>[0]['data'] = {
+      userId,
+      sessionId: input.sessionId ?? null,
+      startedAt: input.startedAt,
+      completedAt: input.completedAt ?? null,
+      exerciseLogs: {
+        create: input.exerciseLogs.map((el) => ({
+          exerciseId: el.exerciseId,
+          completedSets: {
+            create: el.sets.map((set) => ({
+              setIndex: set.setIndex,
+              reps: set.reps,
+              weight: set.weight,
+              rpe: set.rpe ?? null,
+              restTaken: set.restTaken,
+              heartRateAtCompletion: set.heartRateAtCompletion ?? null,
+            })),
+          },
+        })),
       },
+    };
+
+    if (input.heartRateSamples) {
+      data.heartRateSamples = {
+        create: input.heartRateSamples.map((sample) => ({
+          timestamp: sample.timestamp,
+          bpm: sample.bpm,
+          zone: sample.zone,
+        })),
+      };
+    }
+
+    return this.prisma.workoutLog.create({
+      data,
       include: {
         session: true,
         exerciseLogs: {

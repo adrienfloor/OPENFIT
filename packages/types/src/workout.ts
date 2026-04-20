@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { HeartRateSampleSchema } from './health.js';
+import { HeartRateSampleSchema } from './health';
 
 export const MuscleGroupSchema = z.enum([
   'chest',

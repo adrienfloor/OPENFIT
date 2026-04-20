@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { HeartRateSampleSchema } from './health.js';
+import { HeartRateSampleSchema } from './health';
 
 export const GPSPointSchema = z.object({
   lat: z.number().min(-90).max(90),

@@ -7,9 +7,6 @@ const nextConfig: NextConfig = {
     // Lint errors are caught by `npm run lint` in CI — don't block dev builds
     ignoreDuringBuilds: true,
   },
-  experimental: {
-    typedRoutes: true,
-  },
 };
 
 export default nextConfig;

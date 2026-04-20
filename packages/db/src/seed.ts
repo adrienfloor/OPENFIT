@@ -189,10 +189,10 @@ async function main(): Promise<void> {
 
   console.log('Created 3 programs');
 
-  // Seed 2 weeks of fake health data per user
+  // Seed 30 days of health data per user
   const users = [alice, bob];
   for (const user of users) {
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < 30; i++) {
       const date = new Date();
       date.setDate(date.getDate() - i);
       date.setHours(0, 0, 0, 0);
@@ -215,7 +215,141 @@ async function main(): Promise<void> {
     }
   }
 
-  console.log('Created 28 daily health records (14 per user)');
+  console.log('Created 60 daily health records (30 per user)');
+
+  // Seed workout logs (8 per user, spread over last 4 weeks)
+  for (const user of users) {
+    for (let i = 0; i < 8; i++) {
+      const startedAt = new Date();
+      startedAt.setDate(startedAt.getDate() - i * 3 - Math.floor(Math.random() * 2));
+      startedAt.setHours(7 + Math.floor(Math.random() * 10), Math.floor(Math.random() * 60), 0, 0);
+
+      const durationMinutes = 40 + Math.floor(Math.random() * 30);
+      const completedAt = new Date(startedAt.getTime() + durationMinutes * 60 * 1000);
+
+      // Pick 3-4 random exercises
+      const numExercises = 3 + Math.floor(Math.random() * 2);
+      const shuffled = [...exercises].sort(() => Math.random() - 0.5).slice(0, numExercises);
+
+      const hrSamples: Array<{ timestamp: Date; bpm: number; zone: string }> = [];
+      for (let m = 0; m < durationMinutes; m += 2) {
+        const bpm = 100 + Math.floor(Math.random() * 60);
+        const zone = bpm < 120 ? 'fat_burn' : bpm < 150 ? 'cardio' : 'peak';
+        hrSamples.push({
+          timestamp: new Date(startedAt.getTime() + m * 60 * 1000),
+          bpm,
+          zone,
+        });
+      }
+
+      await prisma.workoutLog.create({
+        data: {
+          userId: user.id,
+          startedAt,
+          completedAt,
+          exerciseLogs: {
+            create: shuffled.map((ex) => {
+              const numSets = 3 + Math.floor(Math.random() * 2);
+              return {
+                exerciseId: ex.id,
+                completedSets: {
+                  create: Array.from({ length: numSets }, (_, setIdx) => ({
+                    setIndex: setIdx,
+                    reps: 5 + Math.floor(Math.random() * 8),
+                    weight: 20 + Math.floor(Math.random() * 60),
+                    rpe: Math.random() > 0.3 ? 6 + Math.floor(Math.random() * 4) : null,
+                    restTaken: 60 + Math.floor(Math.random() * 120),
+                    heartRateAtCompletion: Math.random() > 0.4 ? 120 + Math.floor(Math.random() * 40) : null,
+                  })),
+                },
+              };
+            }),
+          },
+          heartRateSamples: {
+            create: hrSamples,
+          },
+        },
+      });
+    }
+  }
+
+  console.log('Created 16 workout logs (8 per user) with HR samples');
+
+  // Seed run sessions (6 per user, spread over last 3 weeks)
+  for (const user of users) {
+    for (let i = 0; i < 6; i++) {
+      const startedAt = new Date();
+      startedAt.setDate(startedAt.getDate() - i * 4 - Math.floor(Math.random() * 2));
+      startedAt.setHours(6 + Math.floor(Math.random() * 4), Math.floor(Math.random() * 60), 0, 0);
+
+      const distanceMeters = 3000 + Math.floor(Math.random() * 7000);
+      const paceBase = 280 + Math.floor(Math.random() * 120);
+      const durationSeconds = Math.round((distanceMeters / 1000) * paceBase);
+      const completedAt = new Date(startedAt.getTime() + durationSeconds * 1000);
+
+      // Generate GPS points (one every ~100m)
+      const numPoints = Math.floor(distanceMeters / 100);
+      const baseLat = 48.8566 + (Math.random() - 0.5) * 0.02;
+      const baseLng = 2.3522 + (Math.random() - 0.5) * 0.02;
+
+      const gpsPoints: Array<{
+        lat: number;
+        lng: number;
+        altitudeMeters: number;
+        timestamp: Date;
+        speedMps: number;
+      }> = [];
+
+      let altitude = 30 + Math.random() * 20;
+      for (let p = 0; p < numPoints; p++) {
+        const angle = (p / numPoints) * Math.PI * 2 * (0.5 + Math.random() * 0.5);
+        const radius = 0.002 + Math.random() * 0.003;
+        altitude += (Math.random() - 0.45) * 3;
+        gpsPoints.push({
+          lat: baseLat + Math.sin(angle) * radius,
+          lng: baseLng + Math.cos(angle) * radius,
+          altitudeMeters: Math.max(0, altitude),
+          timestamp: new Date(startedAt.getTime() + (p / numPoints) * durationSeconds * 1000),
+          speedMps: 1000 / paceBase + (Math.random() - 0.5) * 0.5,
+        });
+      }
+
+      // HR samples every 30s
+      const runHR: Array<{ timestamp: Date; bpm: number; zone: string }> = [];
+      for (let s = 0; s < durationSeconds; s += 30) {
+        const bpm = 135 + Math.floor(Math.random() * 35);
+        const zone = bpm < 145 ? 'fat_burn' : bpm < 165 ? 'cardio' : 'peak';
+        runHR.push({
+          timestamp: new Date(startedAt.getTime() + s * 1000),
+          bpm,
+          zone,
+        });
+      }
+
+      const elevationGain = gpsPoints.reduce((gain, point, idx) => {
+        if (idx === 0) return 0;
+        const diff = point.altitudeMeters - gpsPoints[idx - 1]!.altitudeMeters;
+        return gain + (diff > 0 ? diff : 0);
+      }, 0);
+
+      await prisma.runSession.create({
+        data: {
+          userId: user.id,
+          startedAt,
+          completedAt,
+          distanceMeters,
+          durationSeconds,
+          avgPaceSecondsPerKm: paceBase,
+          bestPaceSecondsPerKm: paceBase - 15 - Math.floor(Math.random() * 20),
+          elevationGainMeters: Math.round(elevationGain),
+          gpsPoints: { create: gpsPoints },
+          heartRateSamples: { create: runHR },
+        },
+      });
+    }
+  }
+
+  console.log('Created 12 run sessions (6 per user) with GPS + HR data');
   console.log('Seed complete!');
 }
 

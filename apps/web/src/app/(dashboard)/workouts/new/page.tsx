@@ -59,7 +59,7 @@ export default function NewProgramPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiClient.get<Exercise[]>('/workouts/exercises').then((res) => setExercises(res.data)).catch(() => {});
+    void apiClient.get<Exercise[]>('/workouts/exercises').then((res) => { setExercises(res.data); }).catch(() => {});
   }, []);
 
   // Week helpers

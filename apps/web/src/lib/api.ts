@@ -18,6 +18,6 @@ export function setAccessToken(token: string | null): void {
   if (token) {
     apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
   } else {
-    delete apiClient.defaults.headers.common['Authorization'];
+    apiClient.defaults.headers.common['Authorization'] = '';
   }
 }

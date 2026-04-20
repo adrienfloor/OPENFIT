@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 
 const PROTECTED_PREFIXES = ['/dashboard'];
 const AUTH_PAGES = ['/login', '/register'];

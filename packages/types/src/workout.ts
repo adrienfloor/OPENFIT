@@ -95,6 +95,78 @@ export type PlannedExercise = z.infer<typeof PlannedExerciseSchema>;
 export type Session = z.infer<typeof SessionSchema>;
 export type Week = z.infer<typeof WeekSchema>;
 export type Program = z.infer<typeof ProgramSchema>;
+// --- Input schemas for CRUD operations ---
+
+export const CreateExerciseInputSchema = z.object({
+  name: z.string().min(1).max(200),
+  muscleGroups: z.array(MuscleGroupSchema).min(1),
+  equipment: EquipmentSchema,
+});
+
+export const CreatePlannedSetInputSchema = z.object({
+  reps: z.number().int().positive(),
+  weight: z.number().nonnegative().optional(),
+  rpe: z.number().min(1).max(10).optional(),
+  restSeconds: z.number().int().nonnegative(),
+});
+
+export const CreatePlannedExerciseInputSchema = z.object({
+  exerciseId: z.string(),
+  sets: z.array(CreatePlannedSetInputSchema).min(1),
+});
+
+export const CreateSessionInputSchema = z.object({
+  name: z.string().min(1).max(200),
+  exercises: z.array(CreatePlannedExerciseInputSchema),
+});
+
+export const CreateWeekInputSchema = z.object({
+  weekNumber: z.number().int().positive(),
+  sessions: z.array(CreateSessionInputSchema).min(1),
+});
+
+export const CreateProgramInputSchema = z.object({
+  name: z.string().min(1).max(200),
+  weeks: z.array(CreateWeekInputSchema).min(1),
+});
+
+export const UpdateProgramInputSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+});
+
+export const LogCompletedSetInputSchema = z.object({
+  setIndex: z.number().int().nonnegative(),
+  reps: z.number().int().positive(),
+  weight: z.number().nonnegative(),
+  rpe: z.number().min(1).max(10).nullable().optional(),
+  restTaken: z.number().int().nonnegative(),
+  heartRateAtCompletion: z.number().int().positive().nullable().optional(),
+});
+
+export const LogExerciseInputSchema = z.object({
+  exerciseId: z.string(),
+  sets: z.array(LogCompletedSetInputSchema).min(1),
+});
+
+export const CreateWorkoutLogInputSchema = z.object({
+  sessionId: z.string().nullable().optional(),
+  startedAt: z.coerce.date(),
+  completedAt: z.coerce.date().nullable().optional(),
+  exerciseLogs: z.array(LogExerciseInputSchema).min(1),
+  heartRateSamples: z.array(HeartRateSampleSchema).optional(),
+});
+
+export type CreateExerciseInput = z.infer<typeof CreateExerciseInputSchema>;
+export type CreatePlannedSetInput = z.infer<typeof CreatePlannedSetInputSchema>;
+export type CreatePlannedExerciseInput = z.infer<typeof CreatePlannedExerciseInputSchema>;
+export type CreateSessionInput = z.infer<typeof CreateSessionInputSchema>;
+export type CreateWeekInput = z.infer<typeof CreateWeekInputSchema>;
+export type CreateProgramInput = z.infer<typeof CreateProgramInputSchema>;
+export type UpdateProgramInput = z.infer<typeof UpdateProgramInputSchema>;
+export type LogCompletedSetInput = z.infer<typeof LogCompletedSetInputSchema>;
+export type LogExerciseInput = z.infer<typeof LogExerciseInputSchema>;
+export type CreateWorkoutLogInput = z.infer<typeof CreateWorkoutLogInputSchema>;
+
 export type CompletedSet = z.infer<typeof CompletedSetSchema>;
 export type ExerciseLog = z.infer<typeof ExerciseLogSchema>;
 export type WorkoutLog = z.infer<typeof WorkoutLogSchema>;

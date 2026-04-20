@@ -19,13 +19,16 @@ export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: false,
 
   setTokens: (tokens, user) => {
-    // Access token stored in memory only; refresh token is in HttpOnly cookie (set by API)
     setAccessToken(tokens.accessToken);
+    // Set lightweight session indicator cookie so middleware can gate protected routes
+    document.cookie = 'of_session=1; path=/; max-age=2592000; SameSite=Lax';
     set({ accessToken: tokens.accessToken, user, isAuthenticated: true });
   },
 
   clearAuth: () => {
     setAccessToken(null);
+    // Clear session indicator cookie
+    document.cookie = 'of_session=; path=/; max-age=0';
     set({ accessToken: null, user: null, isAuthenticated: false });
   },
 }));

@@ -1,9 +1,9 @@
-import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
 import { useDailyStats } from '../../hooks/useDailyStats';
-import { useAuthStore } from '../../stores/auth.store';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function TodayScreen() {
-  const user = useAuthStore((s) => s.user);
+  const { user, logout } = useAuth();
   const { today, loading, refetch } = useDailyStats();
 
   const stats = [
@@ -17,8 +17,15 @@ export default function TodayScreen() {
 
   return (
     <ScrollView style={styles.container} refreshControl={<RefreshControl refreshing={loading} onRefresh={refetch} />}>
-      <Text style={styles.greeting}>Hello, {user?.name ?? 'athlete'}</Text>
-      <Text style={styles.date}>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</Text>
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.greeting}>Hello, {user?.name ?? 'athlete'}</Text>
+          <Text style={styles.date}>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</Text>
+        </View>
+        <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
+          <Text style={styles.logoutText}>Log out</Text>
+        </TouchableOpacity>
+      </View>
       <View style={styles.grid}>
         {stats.map((stat) => (
           <View key={stat.label} style={styles.card}>
@@ -33,8 +40,11 @@ export default function TodayScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb', paddingHorizontal: 16, paddingTop: 56 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 },
   greeting: { fontSize: 24, fontWeight: 'bold', marginBottom: 4 },
-  date: { fontSize: 14, color: '#6b7280', marginBottom: 24 },
+  date: { fontSize: 14, color: '#6b7280' },
+  logoutBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: '#f3f4f6' },
+  logoutText: { fontSize: 13, color: '#6b7280', fontWeight: '500' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   card: { width: '47%', backgroundColor: '#fff', borderRadius: 12, padding: 16 },
   cardLabel: { fontSize: 12, color: '#6b7280', marginBottom: 6 },

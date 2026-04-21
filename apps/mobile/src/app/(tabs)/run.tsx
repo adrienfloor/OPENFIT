@@ -8,41 +8,64 @@ import {
   Alert,
 } from 'react-native';
 import { apiClient } from '../../services/api';
+import {
+  startRunTracking,
+  stopRunTracking,
+  getRunData,
+  resetRunData,
+  setOnUpdateCallback,
+} from '../../services/runTracker';
 import { formatDuration } from '../../utils';
-import { useAuthStore } from '../../stores/auth.store';
-
-interface GPSPoint {
-  lat: number;
-  lng: number;
-  altitudeMeters: number;
-  timestamp: string;
-  speedMps: number;
-}
 
 type RunState = 'idle' | 'running' | 'paused' | 'finished';
 
 export default function RunScreen() {
-  const user = useAuthStore((s) => s.user);
   const [runState, setRunState] = useState<RunState>('idle');
   const [elapsed, setElapsed] = useState(0);
   const [distance, setDistance] = useState(0);
-  const [gpsPoints, setGpsPoints] = useState<GPSPoint[]>([]);
+  const [pointCount, setPointCount] = useState(0);
 
   const startTimeRef = useRef<Date | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const locationWatchRef = useRef<{ remove: () => void } | null>(null);
   const elapsedBeforePauseRef = useRef(0);
   const segmentStartRef = useRef<number | null>(null);
 
   const pace = distance > 0 ? elapsed / (distance / 1000) : 0;
   const distanceKm = (distance / 1000).toFixed(2);
 
-  // Calculate elevation gain from GPS points
-  const elevationGain = gpsPoints.reduce((gain, point, i) => {
-    if (i === 0) return 0;
-    const diff = point.altitudeMeters - gpsPoints[i - 1]!.altitudeMeters;
-    return gain + (diff > 0 ? diff : 0);
-  }, 0);
+  // Sync UI with background GPS data
+  const syncFromTracker = useCallback(() => {
+    const data = getRunData();
+    setDistance(data.distance);
+    setPointCount(data.gpsPoints.length);
+  }, []);
+
+  // Register callback so background task can trigger UI updates
+  useEffect(() => {
+    if (runState === 'running') {
+      setOnUpdateCallback(syncFromTracker);
+    } else {
+      setOnUpdateCallback(null);
+    }
+    return () => setOnUpdateCallback(null);
+  }, [runState, syncFromTracker]);
+
+  // Also poll every second when running (in case background callback is delayed)
+  useEffect(() => {
+    if (runState !== 'running') return;
+    const interval = setInterval(syncFromTracker, 1000);
+    return () => clearInterval(interval);
+  }, [runState, syncFromTracker]);
+
+  // Calculate elevation gain from current GPS data
+  const getElevationGain = useCallback(() => {
+    const { gpsPoints } = getRunData();
+    return gpsPoints.reduce((gain, point, i) => {
+      if (i === 0) return 0;
+      const diff = point.altitudeMeters - gpsPoints[i - 1]!.altitudeMeters;
+      return gain + (diff > 0 ? diff : 0);
+    }, 0);
+  }, []);
 
   const startTimer = useCallback(() => {
     segmentStartRef.current = Date.now();
@@ -56,7 +79,6 @@ export default function RunScreen() {
 
   const stopTimer = useCallback(() => {
     if (timerRef.current) {
-      // Save accumulated time before clearing
       if (segmentStartRef.current !== null) {
         elapsedBeforePauseRef.current += Math.floor((Date.now() - segmentStartRef.current) / 1000);
         segmentStartRef.current = null;
@@ -66,76 +88,26 @@ export default function RunScreen() {
     }
   }, []);
 
-  const startLocationTracking = useCallback(async () => {
-    try {
-      const Location = await import('expo-location');
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission required', 'Location permission is needed for run tracking.');
-        return;
-      }
-
-      const subscription = await Location.watchPositionAsync(
-        {
-          accuracy: Location.Accuracy.BestForNavigation,
-          distanceInterval: 5,
-          timeInterval: 3000,
-        },
-        (location) => {
-          const point: GPSPoint = {
-            lat: location.coords.latitude,
-            lng: location.coords.longitude,
-            altitudeMeters: location.coords.altitude ?? 0,
-            timestamp: new Date(location.timestamp).toISOString(),
-            speedMps: Math.max(0, location.coords.speed ?? 0),
-          };
-
-          setGpsPoints((prev) => {
-            const updated = [...prev, point];
-            // Calculate distance from last point
-            if (prev.length > 0) {
-              const last = prev[prev.length - 1]!;
-              const d = haversine(last.lat, last.lng, point.lat, point.lng);
-              setDistance((prevDist) => prevDist + d);
-            }
-            return updated;
-          });
-        },
-      );
-
-      locationWatchRef.current = subscription;
-    } catch {
-      // Location tracking unavailable
-    }
-  }, []);
-
-  const stopLocationTracking = useCallback(() => {
-    locationWatchRef.current?.remove();
-    locationWatchRef.current = null;
-  }, []);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      stopTimer();
-      stopLocationTracking();
-    };
-  }, [stopTimer, stopLocationTracking]);
-
   const handleStart = async () => {
+    const started = await startRunTracking();
+    if (!started) {
+      Alert.alert('Permission required', 'Location permission is needed for run tracking.');
+      return;
+    }
+
     startTimeRef.current = new Date();
     elapsedBeforePauseRef.current = 0;
     setRunState('running');
     setElapsed(0);
     setDistance(0);
-    setGpsPoints([]);
+    setPointCount(0);
     startTimer();
-    await startLocationTracking();
   };
 
   const handlePause = () => {
     setRunState('paused');
     stopTimer();
+    // Keep GPS tracking running in background even when paused
   };
 
   const handleResume = () => {
@@ -143,16 +115,19 @@ export default function RunScreen() {
     startTimer();
   };
 
-  const handleStop = () => {
+  const handleStop = async () => {
     stopTimer();
-    stopLocationTracking();
+    await stopRunTracking();
+    syncFromTracker();
     setRunState('finished');
   };
 
   const handleSave = async () => {
     if (!startTimeRef.current) return;
 
-    // Best pace: lowest pace (fastest) from GPS segments
+    const { gpsPoints } = getRunData();
+
+    // Best pace from GPS speed data
     let bestPace: number | null = null;
     for (const point of gpsPoints) {
       if (point.speedMps > 0.5) {
@@ -170,7 +145,7 @@ export default function RunScreen() {
       durationSeconds: elapsed,
       avgPaceSecondsPerKm: distance > 0 ? Math.round(elapsed / (distance / 1000)) : null,
       bestPaceSecondsPerKm: bestPace ? Math.round(bestPace) : null,
-      elevationGainMeters: Math.round(elevationGain),
+      elevationGainMeters: Math.round(getElevationGain()),
       gpsPoints,
     };
 
@@ -184,6 +159,7 @@ export default function RunScreen() {
     setRunState('idle');
     startTimeRef.current = null;
     elapsedBeforePauseRef.current = 0;
+    resetRunData();
   };
 
   const handleDiscard = () => {
@@ -197,7 +173,8 @@ export default function RunScreen() {
           startTimeRef.current = null;
           setElapsed(0);
           setDistance(0);
-          setGpsPoints([]);
+          setPointCount(0);
+          resetRunData();
         },
       },
     ]);
@@ -209,6 +186,7 @@ export default function RunScreen() {
       <View style={styles.centered}>
         <Text style={styles.title}>Run</Text>
         <Text style={styles.subtitle}>Track your run with GPS</Text>
+        <Text style={styles.subtitleSmall}>Works with screen locked</Text>
         <TouchableOpacity style={styles.startBtn} onPress={handleStart}>
           <Text style={styles.startBtnText}>Start Run</Text>
         </TouchableOpacity>
@@ -236,11 +214,11 @@ export default function RunScreen() {
         </View>
         <View style={styles.statCard}>
           <Text style={styles.statLabel}>Elevation</Text>
-          <Text style={styles.statValue}>{Math.round(elevationGain)} m</Text>
+          <Text style={styles.statValue}>{Math.round(getElevationGain())} m</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={styles.statLabel}>GPS Points</Text>
-          <Text style={styles.statValue}>{gpsPoints.length}</Text>
+          <Text style={styles.statValue}>{pointCount}</Text>
         </View>
       </View>
 
@@ -287,25 +265,13 @@ function formatPace(secondsPerKm: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371000;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
 const styles = StyleSheet.create({
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb' },
   container: { flex: 1, backgroundColor: '#f9fafb' },
   content: { paddingHorizontal: 16, paddingTop: 56, paddingBottom: 40 },
   title: { fontSize: 24, fontWeight: 'bold', marginBottom: 8 },
-  subtitle: { fontSize: 14, color: '#6b7280', marginBottom: 32 },
+  subtitle: { fontSize: 14, color: '#6b7280', marginBottom: 4 },
+  subtitleSmall: { fontSize: 12, color: '#9ca3af', marginBottom: 32 },
   timer: { fontSize: 56, fontWeight: 'bold', textAlign: 'center', marginBottom: 24, color: '#111827' },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 32 },
   statCard: { width: '47%', backgroundColor: '#fff', borderRadius: 12, padding: 16 },

@@ -6,6 +6,7 @@
  */
 
 import { BleManager, type Device, type Subscription } from 'react-native-ble-plx';
+import { PermissionsAndroid, Platform } from 'react-native';
 import { getHeartRateZone } from '@openfit/fitness-core';
 import type { HeartRateSample, HeartRateZone } from '@openfit/types';
 import { Buffer } from 'buffer';
@@ -57,6 +58,30 @@ function parseHeartRate(base64Value: string): number {
     return bytes.readUInt16LE(1);
   }
   return bytes[1] as number;
+}
+
+async function requestBLEPermissions(): Promise<boolean> {
+  if (Platform.OS !== 'android') return true;
+
+  const apiLevel = Platform.Version;
+
+  if (apiLevel >= 31) {
+    // Android 12+: need BLUETOOTH_SCAN and BLUETOOTH_CONNECT
+    const result = await PermissionsAndroid.requestMultiple([
+      PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+      PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+    ]);
+    return (
+      result[PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN] === PermissionsAndroid.RESULTS.GRANTED &&
+      result[PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT] === PermissionsAndroid.RESULTS.GRANTED
+    );
+  }
+
+  // Android < 12: need ACCESS_FINE_LOCATION for BLE scanning
+  const result = await PermissionsAndroid.request(
+    PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+  );
+  return result === PermissionsAndroid.RESULTS.GRANTED;
 }
 
 export function createBLEService(): BLEService {
@@ -114,7 +139,15 @@ export function createBLEService(): BLEService {
   return {
     async connect(onStateChange): Promise<void> {
       stateCallback = onStateChange;
+
+      const granted = await requestBLEPermissions();
+      if (!granted) {
+        setState('error');
+        throw new Error('Bluetooth permissions not granted');
+      }
+
       setState('scanning');
+      console.log('[BLE] Starting scan for Heart Rate Service...');
 
       return new Promise<void>((resolve, reject) => {
         let found = false;
@@ -124,12 +157,14 @@ export function createBLEService(): BLEService {
           { allowDuplicates: false },
           async (error, device) => {
             if (error) {
+              console.log('[BLE] Scan error:', error.message);
               setState('error');
               reject(error);
               return;
             }
 
             if (device && !found) {
+              console.log('[BLE] Found device:', device.name ?? device.id);
               found = true;
               manager.stopDeviceScan();
 

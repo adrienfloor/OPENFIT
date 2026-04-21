@@ -18,7 +18,7 @@ export function useDailyStats(): {
   const [fetchTrigger, setFetchTrigger] = useState(0);
   const initializedRef = useRef(false);
 
-  // Check availability on mount
+  // Check availability and existing permissions on mount
   useEffect(() => {
     async function checkAvailability() {
       try {
@@ -26,6 +26,15 @@ export function useDailyStats(): {
         const available = await initializeHealthConnect();
         setHealthConnectAvailable(available);
         initializedRef.current = available;
+
+        if (available) {
+          const { getGrantedPermissions } = await import('react-native-health-connect');
+          const granted = await getGrantedPermissions();
+          if (granted.length > 0) {
+            setPermissionsGranted(true);
+            setFetchTrigger((t) => t + 1);
+          }
+        }
       } catch {
         setHealthConnectAvailable(false);
       }

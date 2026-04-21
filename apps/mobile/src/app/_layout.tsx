@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
+import MapLibreGL from '@maplibre/maplibre-react-native';
 import { useAuthStore } from '../stores/auth.store';
 import { getRefreshToken, setAccessToken } from '../services/api';
 import { apiClient } from '../services/api';
+
+// Must be called before any MapView is rendered
+MapLibreGL.setConnected(true);
 
 export default function RootLayout() {
   const router = useRouter();

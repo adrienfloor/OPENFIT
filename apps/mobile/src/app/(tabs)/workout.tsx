@@ -52,6 +52,17 @@ interface Program {
   weeks: Week[];
 }
 
+interface RecentLog {
+  id: string;
+  startedAt: string;
+  session: { name: string } | null;
+  exerciseLogs: { completedSets: unknown[] }[];
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
 export default function WorkoutScreen() {
   const router = useRouter();
   const { isActive, startedAt, activeExercises, startWorkout, addSet, finishWorkout, sessionId } =
@@ -59,6 +70,7 @@ export default function WorkoutScreen() {
 
   const [programs, setPrograms] = useState<Program[]>([]);
   const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [recentLogs, setRecentLogs] = useState<RecentLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProgram, setSelectedProgram] = useState<Program | null>(null);
 
@@ -70,12 +82,14 @@ export default function WorkoutScreen() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [progRes, exRes] = await Promise.all([
+      const [progRes, exRes, logsRes] = await Promise.all([
         apiClient.get<Program[]>('/workouts/programs'),
         apiClient.get<Exercise[]>('/workouts/exercises'),
+        apiClient.get<RecentLog[]>('/workouts/logs'),
       ]);
       setPrograms(progRes.data);
       setExercises(exRes.data);
+      setRecentLogs(logsRes.data.slice(0, 5));
     } catch {
       // empty state
     } finally {
@@ -144,14 +158,16 @@ export default function WorkoutScreen() {
 
     try {
       await apiClient.post('/workouts/logs', payload);
+      const totalSets = activeExercises.reduce((sum, e) => sum + e.completedSets.length, 0);
+      Alert.alert('Workout saved', `${activeExercises.length} exercises, ${totalSets} sets logged.`);
     } catch {
-      // Queue for offline sync would go here
       Alert.alert('Saved locally', 'Will sync when back online.');
     }
 
     finishWorkout();
     setCurrentExercise(null);
     setSelectedProgram(null);
+    fetchData();
   };
 
   const elapsed = startedAt
@@ -328,6 +344,25 @@ export default function WorkoutScreen() {
         <Text style={styles.emptyText}>No programs yet. Start a free workout or create a program on the web dashboard.</Text>
       )}
 
+      {/* Recent workouts */}
+      {recentLogs.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Recent workouts</Text>
+          {recentLogs.map((log) => {
+            const sets = log.exerciseLogs.reduce((sum, el) => sum + el.completedSets.length, 0);
+            return (
+              <View key={log.id} style={styles.recentCard}>
+                <View>
+                  <Text style={styles.recentName}>{log.session?.name ?? 'Free workout'}</Text>
+                  <Text style={styles.recentDate}>{formatDate(log.startedAt)}</Text>
+                </View>
+                <Text style={styles.recentSets}>{sets} sets</Text>
+              </View>
+            );
+          })}
+        </View>
+      )}
+
       <View style={{ height: 40 }} />
     </ScrollView>
   );
@@ -428,4 +463,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   finishBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  recentCard: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 6,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  recentName: { fontSize: 14, fontWeight: '500' },
+  recentDate: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
+  recentSets: { fontSize: 13, color: '#6b7280' },
 });

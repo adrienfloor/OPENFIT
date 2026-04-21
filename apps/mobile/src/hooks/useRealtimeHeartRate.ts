@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { AppState } from 'react-native';
 import type { HeartRateSample, HeartRateZone } from '@openfit/types';
 import {
   createBLEService,
@@ -19,14 +20,17 @@ export function useRealtimeHeartRate(maxHR: number): {
 
   const samplesRef = useRef<HeartRateSample[]>([]);
   const serviceRef = useRef<BLEService | null>(null);
+  const mountedRef = useRef(true);
 
   const handleSample = useCallback((sample: HeartRateSample) => {
     samplesRef.current.push(sample);
-    setBpm(sample.bpm);
-    setZone(sample.zone);
+    if (mountedRef.current) {
+      setBpm(sample.bpm);
+      setZone(sample.zone);
+    }
   }, []);
 
-  useEffect(() => {
+  const connectAndSubscribe = useCallback(() => {
     const service = createBLEService();
     serviceRef.current = service;
 
@@ -34,6 +38,7 @@ export function useRealtimeHeartRate(maxHR: number): {
 
     service
       .connect((newState) => {
+        if (!mountedRef.current) return;
         setConnectionState(newState);
 
         if (newState === 'connected' && !unsubscribeHR) {
@@ -41,7 +46,7 @@ export function useRealtimeHeartRate(maxHR: number): {
         }
       })
       .catch(() => {
-        setConnectionState('error');
+        if (mountedRef.current) setConnectionState('error');
       });
 
     return () => {
@@ -49,6 +54,26 @@ export function useRealtimeHeartRate(maxHR: number): {
       service.disconnect();
     };
   }, [maxHR, handleSample]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    const cleanup = connectAndSubscribe();
+
+    // Reconnect when app comes back to foreground
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && serviceRef.current?.getState() !== 'connected') {
+        console.log('[BLE] App foregrounded, reconnecting...');
+        cleanup();
+        connectAndSubscribe();
+      }
+    });
+
+    return () => {
+      mountedRef.current = false;
+      subscription.remove();
+      cleanup();
+    };
+  }, [connectAndSubscribe]);
 
   return {
     bpm,

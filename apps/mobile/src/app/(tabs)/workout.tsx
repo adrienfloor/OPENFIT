@@ -211,9 +211,18 @@ export default function WorkoutScreen() {
     fetchData();
   };
 
-  const elapsed = startedAt
-    ? Math.floor((Date.now() - startedAt.getTime()) / 1000)
-    : 0;
+  // Live timer that ticks every second
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!isActive || !startedAt) {
+      setElapsed(0);
+      return;
+    }
+    const tick = () => setElapsed(Math.floor((Date.now() - startedAt.getTime()) / 1000));
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [isActive, startedAt]);
 
   const handleCancel = () => {
     Alert.alert('Cancel workout?', 'Your logged sets will be lost.', [

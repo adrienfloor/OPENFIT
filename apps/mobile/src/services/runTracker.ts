@@ -39,6 +39,8 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, ({ data, error }) => {
   const locations = (data as { locations: Location.LocationObject[] }).locations;
   if (!locations || locations.length === 0) return;
 
+  console.log(`[RunTracker] Received ${locations.length} location(s), total points: ${gpsPoints.length + locations.length}`);
+
   for (const location of locations) {
     const point: GPSPoint = {
       lat: location.coords.latitude,
@@ -84,8 +86,10 @@ export async function startRunTracking(): Promise<boolean> {
 
   await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
     accuracy: Location.Accuracy.BestForNavigation,
-    distanceInterval: 5,
+    distanceInterval: 3,
     timeInterval: 3000,
+    deferredUpdatesDistance: 0,
+    deferredUpdatesInterval: 0,
     showsBackgroundLocationIndicator: true,
     foregroundService: {
       notificationTitle: 'OpenFit — Run in progress',

@@ -11,6 +11,7 @@
     "ios": "expo run:ios"
   },
   "dependencies": {
+    "@maplibre/maplibre-react-native": "^10.0.0-alpha.20",
     "@openfit/types": "*",
     "@react-navigation/native": "^6.1.17",
     "axios": "^1.7.2",
@@ -31,7 +32,6 @@
     "react-native": "0.76.9",
     "react-native-ble-plx": "^3.2.1",
     "react-native-health-connect": "^3.2.0",
-    "react-native-maps": "1.18.0",
     "react-native-reanimated": "~3.16.7",
     "react-native-safe-area-context": "~4.14.1",
     "react-native-screens": "~4.4.0",

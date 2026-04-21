@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   RefreshControl,
 } from 'react-native';
-import MapView, { Polyline } from 'react-native-maps';
+import MapLibreGL from '@maplibre/maplibre-react-native';
 import { apiClient } from '../../services/api';
 import { formatDuration } from '../../utils';
 
@@ -51,6 +51,8 @@ function formatPace(secondsPerKm: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
+const TILE_STYLE = 'https://demotiles.maplibre.org/style.json';
+
 function RunMap({ gpsPoints }: { gpsPoints: GPSPoint[] }) {
   if (gpsPoints.length < 2) {
     return (
@@ -60,46 +62,71 @@ function RunMap({ gpsPoints }: { gpsPoints: GPSPoint[] }) {
     );
   }
 
-  const coords = gpsPoints.map((p) => ({ latitude: p.lat, longitude: p.lng }));
+  // Calculate bounds
+  let minLat = gpsPoints[0]!.lat;
+  let maxLat = gpsPoints[0]!.lat;
+  let minLng = gpsPoints[0]!.lng;
+  let maxLng = gpsPoints[0]!.lng;
 
-  // Calculate bounds to fit the route
-  let minLat = coords[0]!.latitude;
-  let maxLat = coords[0]!.latitude;
-  let minLng = coords[0]!.longitude;
-  let maxLng = coords[0]!.longitude;
-
-  for (const c of coords) {
-    if (c.latitude < minLat) minLat = c.latitude;
-    if (c.latitude > maxLat) maxLat = c.latitude;
-    if (c.longitude < minLng) minLng = c.longitude;
-    if (c.longitude > maxLng) maxLng = c.longitude;
+  for (const p of gpsPoints) {
+    if (p.lat < minLat) minLat = p.lat;
+    if (p.lat > maxLat) maxLat = p.lat;
+    if (p.lng < minLng) minLng = p.lng;
+    if (p.lng > maxLng) maxLng = p.lng;
   }
 
-  const midLat = (minLat + maxLat) / 2;
-  const midLng = (minLng + maxLng) / 2;
-  const latDelta = Math.max(0.005, (maxLat - minLat) * 1.4);
-  const lngDelta = Math.max(0.005, (maxLng - minLng) * 1.4);
+  const centerLat = (minLat + maxLat) / 2;
+  const centerLng = (minLng + maxLng) / 2;
+  const latSpan = maxLat - minLat;
+  const lngSpan = maxLng - minLng;
+  const maxSpan = Math.max(latSpan, lngSpan, 0.005);
+  // Approximate zoom: smaller span = higher zoom
+  const zoom = Math.max(10, Math.min(16, 14 - Math.log2(maxSpan / 0.005)));
+
+  const routeGeoJSON: GeoJSON.FeatureCollection = {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'LineString',
+          coordinates: gpsPoints.map((p) => [p.lng, p.lat]),
+        },
+      },
+    ],
+  };
 
   return (
-    <MapView
-      style={styles.map}
-      initialRegion={{
-        latitude: midLat,
-        longitude: midLng,
-        latitudeDelta: latDelta,
-        longitudeDelta: lngDelta,
-      }}
-      scrollEnabled={false}
-      zoomEnabled={false}
-      rotateEnabled={false}
-      pitchEnabled={false}
-    >
-      <Polyline
-        coordinates={coords}
-        strokeColor="#22c55e"
-        strokeWidth={4}
-      />
-    </MapView>
+    <View style={styles.mapContainer}>
+      <MapLibreGL.MapView
+        style={styles.map}
+        styleURL={TILE_STYLE}
+        scrollEnabled={false}
+        zoomEnabled={false}
+        rotateEnabled={false}
+        pitchEnabled={false}
+        attributionEnabled={false}
+        logoEnabled={false}
+      >
+        <MapLibreGL.Camera
+          centerCoordinate={[centerLng, centerLat]}
+          zoomLevel={zoom}
+          animationDuration={0}
+        />
+        <MapLibreGL.ShapeSource id="route" shape={routeGeoJSON}>
+          <MapLibreGL.LineLayer
+            id="routeLine"
+            style={{
+              lineColor: '#22c55e',
+              lineWidth: 4,
+              lineCap: 'round',
+              lineJoin: 'round',
+            }}
+          />
+        </MapLibreGL.ShapeSource>
+      </MapLibreGL.MapView>
+    </View>
   );
 }
 
@@ -291,7 +318,8 @@ const styles = StyleSheet.create({
   exerciseRow: { marginBottom: 8 },
   exerciseName: { fontSize: 14, fontWeight: '500', marginBottom: 2 },
   setText: { fontSize: 13, color: '#6b7280', marginLeft: 8 },
-  map: { height: 200, borderRadius: 10, marginBottom: 12 },
+  mapContainer: { height: 200, borderRadius: 10, overflow: 'hidden', marginBottom: 12 },
+  map: { flex: 1 },
   mapPlaceholder: { height: 100, borderRadius: 10, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
   mapPlaceholderText: { fontSize: 13, color: '#9ca3af' },
   runDetailRow: { flexDirection: 'row', justifyContent: 'space-between' },

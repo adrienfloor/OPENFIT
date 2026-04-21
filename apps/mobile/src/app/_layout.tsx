@@ -16,20 +16,30 @@ export default function RootLayout() {
       try {
         const refreshToken = await getRefreshToken();
         if (refreshToken) {
-          const res = await apiClient.post<{
-            accessToken: string;
-            refreshToken: string;
-            user?: { id: string; email: string; name: string; dateOfBirth: string; weightKg: number; role: 'user' | 'admin'; createdAt: string; updatedAt: string };
-          }>('/auth/refresh', { refreshToken });
+          // Exchange refresh token for new token pair
+          const res = await apiClient.post<{ accessToken: string; refreshToken: string }>(
+            '/auth/refresh',
+            { refreshToken },
+          );
 
-          if (res.data.user) {
-            await setAuth(
-              { accessToken: res.data.accessToken, refreshToken: res.data.refreshToken },
-              { ...res.data.user, dateOfBirth: new Date(res.data.user.dateOfBirth), createdAt: new Date(res.data.user.createdAt), updatedAt: new Date(res.data.user.updatedAt) },
-            );
-          } else {
-            setAccessToken(res.data.accessToken);
-          }
+          // Set access token so the profile request is authenticated
+          setAccessToken(res.data.accessToken);
+
+          // Fetch user profile
+          const profileRes = await apiClient.get<{
+            id: string; email: string; name: string; dateOfBirth: string;
+            weightKg: number; role: 'user' | 'admin'; createdAt: string; updatedAt: string;
+          }>('/auth/me');
+
+          await setAuth(
+            { accessToken: res.data.accessToken, refreshToken: res.data.refreshToken },
+            {
+              ...profileRes.data,
+              dateOfBirth: new Date(profileRes.data.dateOfBirth),
+              createdAt: new Date(profileRes.data.createdAt),
+              updatedAt: new Date(profileRes.data.updatedAt),
+            },
+          );
         }
       } catch {
         // No valid session — user will see login

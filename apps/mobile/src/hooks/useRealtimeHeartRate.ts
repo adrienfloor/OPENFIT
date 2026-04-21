@@ -20,6 +20,7 @@ export function useRealtimeHeartRate(maxHR: number): {
 
   const samplesRef = useRef<HeartRateSample[]>([]);
   const serviceRef = useRef<BLEService | null>(null);
+  const unsubscribeHRRef = useRef<(() => void) | null>(null);
   const mountedRef = useRef(true);
 
   const handleSample = useCallback((sample: HeartRateSample) => {
@@ -30,50 +31,51 @@ export function useRealtimeHeartRate(maxHR: number): {
     }
   }, []);
 
-  const connectAndSubscribe = useCallback(() => {
+  // Resubscribe to HR notifications (used after foregrounding)
+  const resubscribe = useCallback(() => {
+    const service = serviceRef.current;
+    if (!service || service.getState() !== 'connected') return;
+
+    console.log('[BLE] Resubscribing to HR notifications...');
+    // Remove old subscription
+    unsubscribeHRRef.current?.();
+    // Create new subscription
+    unsubscribeHRRef.current = service.subscribeToHeartRate(maxHR, handleSample);
+  }, [maxHR, handleSample]);
+
+  useEffect(() => {
+    mountedRef.current = true;
     const service = createBLEService();
     serviceRef.current = service;
-
-    let unsubscribeHR: (() => void) | null = null;
 
     service
       .connect((newState) => {
         if (!mountedRef.current) return;
         setConnectionState(newState);
 
-        if (newState === 'connected' && !unsubscribeHR) {
-          unsubscribeHR = service.subscribeToHeartRate(maxHR, handleSample);
+        if (newState === 'connected') {
+          unsubscribeHRRef.current?.();
+          unsubscribeHRRef.current = service.subscribeToHeartRate(maxHR, handleSample);
         }
       })
       .catch(() => {
         if (mountedRef.current) setConnectionState('error');
       });
 
-    return () => {
-      unsubscribeHR?.();
-      service.disconnect();
-    };
-  }, [maxHR, handleSample]);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    const cleanup = connectAndSubscribe();
-
-    // Reconnect when app comes back to foreground
+    // Resubscribe when app returns to foreground
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active' && serviceRef.current?.getState() !== 'connected') {
-        console.log('[BLE] App foregrounded, reconnecting...');
-        cleanup();
-        connectAndSubscribe();
+      if (state === 'active') {
+        resubscribe();
       }
     });
 
     return () => {
       mountedRef.current = false;
       subscription.remove();
-      cleanup();
+      unsubscribeHRRef.current?.();
+      service.disconnect();
     };
-  }, [connectAndSubscribe]);
+  }, [maxHR, handleSample, resubscribe]);
 
   return {
     bpm,

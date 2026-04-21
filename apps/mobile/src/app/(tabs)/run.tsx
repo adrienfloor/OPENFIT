@@ -31,6 +31,8 @@ export default function RunScreen() {
   const startTimeRef = useRef<Date | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const locationWatchRef = useRef<{ remove: () => void } | null>(null);
+  const elapsedBeforePauseRef = useRef(0);
+  const segmentStartRef = useRef<number | null>(null);
 
   const pace = distance > 0 ? elapsed / (distance / 1000) : 0;
   const distanceKm = (distance / 1000).toFixed(2);
@@ -43,15 +45,22 @@ export default function RunScreen() {
   }, 0);
 
   const startTimer = useCallback(() => {
+    segmentStartRef.current = Date.now();
     timerRef.current = setInterval(() => {
-      if (startTimeRef.current) {
-        setElapsed(Math.floor((Date.now() - startTimeRef.current.getTime()) / 1000));
+      if (segmentStartRef.current !== null) {
+        const segmentElapsed = Math.floor((Date.now() - segmentStartRef.current) / 1000);
+        setElapsed(elapsedBeforePauseRef.current + segmentElapsed);
       }
     }, 1000);
   }, []);
 
   const stopTimer = useCallback(() => {
     if (timerRef.current) {
+      // Save accumulated time before clearing
+      if (segmentStartRef.current !== null) {
+        elapsedBeforePauseRef.current += Math.floor((Date.now() - segmentStartRef.current) / 1000);
+        segmentStartRef.current = null;
+      }
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
@@ -115,6 +124,7 @@ export default function RunScreen() {
 
   const handleStart = async () => {
     startTimeRef.current = new Date();
+    elapsedBeforePauseRef.current = 0;
     setRunState('running');
     setElapsed(0);
     setDistance(0);
@@ -166,13 +176,14 @@ export default function RunScreen() {
 
     try {
       await apiClient.post('/runs', payload);
-      Alert.alert('Run saved');
+      Alert.alert('Run saved', `${distanceKm} km in ${formatDuration(elapsed)}`);
     } catch {
       Alert.alert('Saved locally', 'Will sync when back online.');
     }
 
     setRunState('idle');
     startTimeRef.current = null;
+    elapsedBeforePauseRef.current = 0;
   };
 
   const handleDiscard = () => {

@@ -4,7 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 
 export default function TodayScreen() {
   const { user, logout } = useAuth();
-  const { today, loading, refetch } = useDailyStats();
+  const { today, loading, refetch, healthConnectAvailable, requestPermissions } = useDailyStats();
 
   const stats = [
     { label: 'Steps', value: today?.steps?.toLocaleString() ?? '--' },
@@ -26,6 +26,20 @@ export default function TodayScreen() {
           <Text style={styles.logoutText}>Log out</Text>
         </TouchableOpacity>
       </View>
+
+      {healthConnectAvailable === false && (
+        <View style={styles.banner}>
+          <Text style={styles.bannerText}>Health Connect is not installed. Install it from the Play Store to see your daily stats.</Text>
+        </View>
+      )}
+
+      {healthConnectAvailable === true && !today && !loading && (
+        <TouchableOpacity style={styles.connectBtn} onPress={requestPermissions}>
+          <Text style={styles.connectBtnText}>Connect Health Data</Text>
+          <Text style={styles.connectBtnSub}>Tap to grant Health Connect permissions</Text>
+        </TouchableOpacity>
+      )}
+
       <View style={styles.grid}>
         {stats.map((stat) => (
           <View key={stat.label} style={styles.card}>
@@ -45,6 +59,11 @@ const styles = StyleSheet.create({
   date: { fontSize: 14, color: '#6b7280' },
   logoutBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: '#f3f4f6' },
   logoutText: { fontSize: 13, color: '#6b7280', fontWeight: '500' },
+  banner: { backgroundColor: '#fef3c7', borderRadius: 12, padding: 14, marginBottom: 16 },
+  bannerText: { fontSize: 13, color: '#92400e' },
+  connectBtn: { backgroundColor: '#22c55e', borderRadius: 12, padding: 16, alignItems: 'center', marginBottom: 16 },
+  connectBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  connectBtnSub: { color: '#dcfce7', fontSize: 12, marginTop: 4 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   card: { width: '47%', backgroundColor: '#fff', borderRadius: 12, padding: 16 },
   cardLabel: { fontSize: 12, color: '#6b7280', marginBottom: 6 },

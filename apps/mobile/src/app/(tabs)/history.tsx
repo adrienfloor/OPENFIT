@@ -27,6 +27,8 @@ interface RunSession {
   distanceMeters: number;
   durationSeconds: number;
   avgPaceSecondsPerKm: number | null;
+  bestPaceSecondsPerKm: number | null;
+  elevationGainMeters: number;
 }
 
 type Tab = 'workouts' | 'runs';
@@ -153,22 +155,53 @@ export default function HistoryScreen() {
           {runs.length === 0 && !loading && (
             <Text style={styles.emptyText}>No runs logged yet.</Text>
           )}
-          {runs.map((r) => (
-            <View key={r.id} style={styles.card}>
-              <View style={styles.cardHeader}>
-                <View>
-                  <Text style={styles.cardTitle}>{(r.distanceMeters / 1000).toFixed(1)} km</Text>
-                  <Text style={styles.cardDate}>{formatDate(r.startedAt)}</Text>
+          {runs.map((r) => {
+            const isExpanded = expandedId === r.id;
+            return (
+              <TouchableOpacity
+                key={r.id}
+                style={styles.card}
+                onPress={() => setExpandedId(isExpanded ? null : r.id)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.cardHeader}>
+                  <View>
+                    <Text style={styles.cardTitle}>{(r.distanceMeters / 1000).toFixed(1)} km</Text>
+                    <Text style={styles.cardDate}>{formatDate(r.startedAt)}</Text>
+                  </View>
+                  <View style={styles.cardRight}>
+                    <Text style={styles.cardStat}>{formatDuration(r.durationSeconds)}</Text>
+                    <Text style={styles.cardStatSub}>
+                      {r.avgPaceSecondsPerKm != null ? `${formatPace(r.avgPaceSecondsPerKm)} /km` : '--'}
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.cardRight}>
-                  <Text style={styles.cardStat}>{formatDuration(r.durationSeconds)}</Text>
-                  <Text style={styles.cardStatSub}>
-                    {r.avgPaceSecondsPerKm != null ? `${formatPace(r.avgPaceSecondsPerKm)} /km` : '--'}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          ))}
+
+                {isExpanded && (
+                  <View style={styles.expandedContent}>
+                    <View style={styles.runDetailRow}>
+                      <View style={styles.runDetailItem}>
+                        <Text style={styles.runDetailLabel}>Avg pace</Text>
+                        <Text style={styles.runDetailValue}>
+                          {r.avgPaceSecondsPerKm != null ? `${formatPace(r.avgPaceSecondsPerKm)} /km` : '--'}
+                        </Text>
+                      </View>
+                      <View style={styles.runDetailItem}>
+                        <Text style={styles.runDetailLabel}>Best pace</Text>
+                        <Text style={styles.runDetailValue}>
+                          {r.bestPaceSecondsPerKm != null ? `${formatPace(r.bestPaceSecondsPerKm)} /km` : '--'}
+                        </Text>
+                      </View>
+                      <View style={styles.runDetailItem}>
+                        <Text style={styles.runDetailLabel}>Elevation</Text>
+                        <Text style={styles.runDetailValue}>{r.elevationGainMeters ?? 0} m</Text>
+                      </View>
+                    </View>
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
         </View>
       )}
 
@@ -197,4 +230,8 @@ const styles = StyleSheet.create({
   exerciseRow: { marginBottom: 8 },
   exerciseName: { fontSize: 14, fontWeight: '500', marginBottom: 2 },
   setText: { fontSize: 13, color: '#6b7280', marginLeft: 8 },
+  runDetailRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  runDetailItem: { flex: 1, alignItems: 'center' },
+  runDetailLabel: { fontSize: 11, color: '#9ca3af', marginBottom: 2 },
+  runDetailValue: { fontSize: 14, fontWeight: '500' },
 });

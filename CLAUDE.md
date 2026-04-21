@@ -135,20 +135,66 @@ Monorepo, types, fitness-core, Prisma schema, auth API + tests, web auth pages, 
 - Health sync API (single + bulk upsert)
 - Web dashboard with Recharts (today, workouts, runs, health, program builder)
 - Mobile workout screen (program browser, set logging, live BLE HR from Helio Strap)
-- Mobile run screen (GPS tracking, timer with pause/resume, save to API)
-- Mobile history tab (expandable workout/run cards)
-- Mobile Health Connect integration (daily stats on Today tab)
+- Mobile run screen (background GPS via expo-task-manager foreground service, timer with pause/resume)
+- Mobile history tab (expandable workout/run cards, MapLibre route maps with Marseille seed data)
+- Mobile Health Connect integration (daily stats on Today tab, permission flow)
 - Session restore on mobile (refresh token + profile fetch)
+- BLE Helio Strap live HR during workouts (with foreground/background resilience)
+- Run screen redesign: avg pace, current pace, current HR, avg HR, distance, time
+
+### Phase 1.5 — Testing & Polish (done)
+- Full mobile app tested on Galaxy S26 Ultra with Amazfit Helio Strap
+- Health Connect ↔ Zepp integration confirmed working (steps, calories, HR, HRV, sleep)
+- BLE HR confirmed working during workouts
+- Background GPS confirmed working (expo-task-manager foreground service)
+- Auth flow: login, register, session restore, logout all working
+- MapLibre maps with OpenFreeMap tiles (no API key), route glow + start/end markers
+- Seed data: 6 realistic Marseille running routes (Corniche, Vieux-Port, Borély, Calanques, Prado, Panier)
 
 ## What's Next (Phase 2)
+
+### 2.1 — Today Tab Data Validation
+- Compare OpenFit Today tab values against Zepp app as reference
+- Verify: steps, active calories, resting HR, HRV, sleep duration all match Zepp
+- Fix any discrepancies in Health Connect data reading
+
+### 2.2 — Today Tab Rework (Zepp/Garmin/Whoop style)
+Rework the Today tab to show three key scores like Zepp's dashboard:
+- **BioCharge score** (like Zepp PAI / Garmin Body Battery / Whoop Recovery):
+  Calculated from sleep quality, recovery metrics, previous workout accumulation, and energy spent during the day. Check Zepp documentation and replicate their algorithm.
+- **Effort score** (like Zepp Activity / Whoop Strain):
+  Percentage of total available effort used during the day, based on HR data, workout intensity, and movement.
+- **Sleep score** (like Zepp Sleep Score):
+  Calculated from sleep duration, regularity, quality (deep/REM/light/awake stages). Replicate Zepp's sleep scoring methodology.
+
+### 2.3 — Jiu-Jitsu Workout Type
+- Add "Jiu-Jitsu" as a workout type (no sets/reps — just HR tracking + duration)
+- Start session → BLE connects to Helio Strap → track live HR + elapsed time
+- On finish: save duration, HR samples, avg HR, max HR, time in each HR zone
+- Display jiu-jitsu sessions in history with HR zone breakdown
+
+### 2.4 — Mike Thurston Workout Library
+- Pre-built 5-week workout programs based on Mike Thurston's programming (content provided by user)
+- User selects a program → follows it session by session
+- App provides: exercise names, target sets, target reps — user logs actual reps/weight
+- **Rest timer**: configurable 1 min / 1.5 min / 2 min countdown between sets with vibration alert
+- Progress tracking across the 5-week program
+
+### 2.5 — UI Overhaul
+- Dark mode (system preference or manual toggle)
+- Icon set for navigation tabs, workout types, stats
+- Redesigned cards, typography, spacing
+- Consistent color palette across all screens
+- Animations and transitions (react-native-reanimated)
+- Polished splash screen and app icon
+
+### Phase 3 (future)
 - Offline sync testing and hardening
-- Jiu-jitsu session tracking
-- Exercise-specific progress charts (e.g. bench press 1RM trend)
-- Weekly/monthly summaries and streak tracking
-- Exercise library CRUD (add custom exercises from app)
+- Exercise-specific progress charts (e.g. bench press 1RM trend over time)
+- Weekly/monthly summary reports with streak tracking
+- Exercise library CRUD (add custom exercises)
 - Web dashboard token refresh interceptor
-- Error boundaries and loading skeletons
-- Production builds and deployment
+- Production builds, deployment, and CI/CD
 
 ## Workflow
 - Always write specific and clean commits and push to the repo after completing work.

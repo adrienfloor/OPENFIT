@@ -275,82 +275,132 @@ async function main(): Promise<void> {
 
   console.log('Created 16 workout logs (8 per user) with HR samples');
 
-  // Marseille running routes — realistic GPS waypoints
+  // Marseille running routes — waypoints follow actual roads/paths [lat, lng, altitude]
   const marseilleRoutes: Array<{ name: string; waypoints: Array<[number, number, number]>; distanceMeters: number }> = [
     {
-      // Corniche Kennedy — along the coast
+      // Corniche Kennedy: Plage des Catalans → Vallon des Auffes → Malmousque → Prophète beach
+      // Follows the actual coastal road (Avenue de la Corse → Corniche Kennedy)
       name: 'Corniche Kennedy',
-      distanceMeters: 5200,
+      distanceMeters: 4800,
       waypoints: [
-        [43.2780, 5.3590, 5], [43.2770, 5.3570, 8], [43.2758, 5.3545, 15],
-        [43.2745, 5.3520, 22], [43.2730, 5.3500, 30], [43.2715, 5.3478, 35],
-        [43.2700, 5.3455, 28], [43.2688, 5.3430, 20], [43.2675, 5.3405, 15],
-        [43.2660, 5.3380, 10], [43.2648, 5.3358, 8], [43.2635, 5.3335, 12],
-        [43.2622, 5.3312, 18], [43.2610, 5.3290, 25], [43.2598, 5.3268, 20],
-        [43.2585, 5.3245, 15], [43.2575, 5.3225, 10], [43.2565, 5.3205, 8],
+        [43.2867, 5.3549, 8],   // Plage des Catalans
+        [43.2855, 5.3535, 12],  // Rue des Catalans
+        [43.2843, 5.3520, 18],  // Start of Corniche
+        [43.2830, 5.3510, 25],  // Vallon des Auffes overlook
+        [43.2818, 5.3498, 30],  // Anse de Malmousque
+        [43.2803, 5.3485, 28],  // Corniche bend
+        [43.2788, 5.3478, 25],  // Malmousque
+        [43.2770, 5.3472, 22],  // Continuing south on Corniche
+        [43.2755, 5.3465, 18],  // Near Fausse Monnaie
+        [43.2738, 5.3460, 15],  // Plage du Prophète approach
+        [43.2722, 5.3455, 8],   // Plage du Prophète
       ],
     },
     {
-      // Vieux-Port loop — around the old harbour
+      // Vieux-Port: Quai des Belges → Fort Saint-Jean → MuCEM → Quai de Rive Neuve → back
+      // Loop around the old harbour following the quays
       name: 'Vieux-Port',
-      distanceMeters: 3800,
-      waypoints: [
-        [43.2965, 5.3698, 3], [43.2958, 5.3715, 3], [43.2950, 5.3730, 4],
-        [43.2942, 5.3745, 3], [43.2935, 5.3755, 3], [43.2928, 5.3742, 4],
-        [43.2920, 5.3728, 5], [43.2912, 5.3715, 4], [43.2905, 5.3700, 3],
-        [43.2910, 5.3685, 3], [43.2918, 5.3672, 4], [43.2926, 5.3660, 5],
-        [43.2935, 5.3650, 6], [43.2943, 5.3662, 5], [43.2950, 5.3675, 4],
-        [43.2958, 5.3688, 3], [43.2965, 5.3698, 3],
-      ],
-    },
-    {
-      // Parc Borély — park loop near the beach
-      name: 'Parc Borély',
-      distanceMeters: 4500,
-      waypoints: [
-        [43.2610, 5.3830, 5], [43.2618, 5.3845, 6], [43.2628, 5.3860, 7],
-        [43.2640, 5.3870, 8], [43.2652, 5.3875, 7], [43.2662, 5.3865, 6],
-        [43.2670, 5.3850, 5], [43.2675, 5.3835, 4], [43.2672, 5.3818, 5],
-        [43.2665, 5.3802, 6], [43.2655, 5.3790, 7], [43.2642, 5.3785, 8],
-        [43.2630, 5.3790, 7], [43.2620, 5.3800, 6], [43.2612, 5.3815, 5],
-        [43.2610, 5.3830, 5],
-      ],
-    },
-    {
-      // Calanques trail — hilly coastal path
-      name: 'Calanques',
-      distanceMeters: 7200,
-      waypoints: [
-        [43.2310, 5.4350, 45], [43.2298, 5.4368, 60], [43.2285, 5.4385, 85],
-        [43.2270, 5.4400, 110], [43.2255, 5.4418, 130], [43.2242, 5.4435, 95],
-        [43.2228, 5.4450, 70], [43.2215, 5.4465, 50], [43.2200, 5.4480, 80],
-        [43.2188, 5.4498, 120], [43.2175, 5.4515, 145], [43.2162, 5.4530, 110],
-        [43.2148, 5.4545, 75], [43.2135, 5.4560, 55], [43.2125, 5.4575, 40],
-        [43.2118, 5.4590, 30], [43.2112, 5.4605, 25], [43.2108, 5.4620, 20],
-        [43.2105, 5.4635, 15], [43.2102, 5.4650, 10],
-      ],
-    },
-    {
-      // Plages du Prado — flat beach run
-      name: 'Plages du Prado',
       distanceMeters: 3200,
       waypoints: [
-        [43.2615, 5.3755, 3], [43.2605, 5.3740, 3], [43.2595, 5.3725, 3],
-        [43.2585, 5.3710, 3], [43.2575, 5.3698, 3], [43.2565, 5.3685, 3],
-        [43.2555, 5.3672, 3], [43.2545, 5.3660, 3], [43.2535, 5.3648, 3],
-        [43.2525, 5.3635, 3], [43.2515, 5.3622, 3], [43.2505, 5.3610, 3],
+        [43.2943, 5.3753, 3],   // Quai des Belges (bottom of port)
+        [43.2950, 5.3740, 3],   // Along Quai du Port (north side)
+        [43.2958, 5.3723, 4],   // Mairie de Marseille
+        [43.2965, 5.3705, 4],   // Hôtel de Ville
+        [43.2970, 5.3688, 5],   // Fort Saint-Jean approach
+        [43.2967, 5.3670, 8],   // Fort Saint-Jean
+        [43.2960, 5.3660, 10],  // MuCEM area
+        [43.2952, 5.3668, 5],   // Esplanade J4
+        [43.2945, 5.3680, 4],   // Heading to south quay
+        [43.2935, 5.3695, 3],   // Quai de Rive Neuve
+        [43.2930, 5.3715, 3],   // Théâtre La Criée
+        [43.2932, 5.3735, 3],   // Along Rive Neuve
+        [43.2938, 5.3748, 3],   // Approaching Belges
+        [43.2943, 5.3753, 3],   // Back to start
       ],
     },
     {
-      // Panier quartier — old town hills
-      name: 'Le Panier',
-      distanceMeters: 2800,
+      // Parc Borély: loop inside the park + along Av du Prado towards the beach
+      // Follows the park paths and Avenue du Prado
+      name: 'Parc Borély',
+      distanceMeters: 3800,
       waypoints: [
-        [43.2985, 5.3665, 15], [43.2992, 5.3650, 25], [43.2998, 5.3638, 35],
-        [43.3005, 5.3625, 45], [43.3010, 5.3612, 50], [43.3015, 5.3600, 42],
-        [43.3020, 5.3588, 35], [43.3012, 5.3578, 28], [43.3002, 5.3572, 22],
-        [43.2992, 5.3580, 18], [43.2985, 5.3592, 20], [43.2980, 5.3608, 22],
-        [43.2978, 5.3625, 20], [43.2980, 5.3642, 18], [43.2985, 5.3658, 15],
+        [43.2595, 5.3810, 8],   // Park entrance (Av du Prado side)
+        [43.2588, 5.3822, 7],   // Main alley heading east
+        [43.2580, 5.3838, 6],   // Near the château
+        [43.2572, 5.3848, 5],   // Lac Borély north
+        [43.2562, 5.3852, 5],   // Lac east side
+        [43.2555, 5.3842, 5],   // Lac south
+        [43.2558, 5.3828, 5],   // Lac west side
+        [43.2565, 5.3815, 6],   // Back towards north
+        [43.2575, 5.3805, 7],   // Jardin botanique
+        [43.2585, 5.3795, 8],   // Near hippodrome
+        [43.2592, 5.3788, 7],   // Av de Bonneveine
+        [43.2598, 5.3798, 7],   // Heading back east
+        [43.2595, 5.3810, 8],   // Back to start
+      ],
+    },
+    {
+      // Calanques: Luminy campus → Col de Sugiton → Calanque de Sugiton overlook → back
+      // Trail running on GR51 / marked hiking paths
+      name: 'Calanques - Sugiton',
+      distanceMeters: 6500,
+      waypoints: [
+        [43.2330, 5.4390, 160],  // Campus de Luminy parking
+        [43.2315, 5.4378, 180],  // Trail head
+        [43.2300, 5.4365, 210],  // Climbing through garrigue
+        [43.2285, 5.4350, 260],  // Rocky switchbacks
+        [43.2270, 5.4338, 310],  // Col de Sugiton approach
+        [43.2258, 5.4325, 340],  // Col de Sugiton
+        [43.2245, 5.4315, 290],  // Descending towards calanque
+        [43.2235, 5.4305, 230],  // Overlook point
+        [43.2228, 5.4298, 180],  // Calanque de Sugiton view
+        [43.2235, 5.4305, 230],  // Turning back
+        [43.2245, 5.4315, 290],  // Climbing back up
+        [43.2258, 5.4325, 340],  // Col again
+        [43.2270, 5.4338, 310],  // Descending
+        [43.2285, 5.4350, 260],  // Back through garrigue
+        [43.2300, 5.4365, 210],  // Lower trail
+        [43.2315, 5.4378, 180],  // Near campus
+        [43.2330, 5.4390, 160],  // Back at Luminy
+      ],
+    },
+    {
+      // Prado beaches: along Promenade Georges Pompidou (the seafront promenade)
+      // Flat run along the beach from Rondpoint du Prado to Pointe Rouge
+      name: 'Plages du Prado',
+      distanceMeters: 3500,
+      waypoints: [
+        [43.2630, 5.3785, 3],   // Rond-point du Prado / beach start
+        [43.2618, 5.3790, 3],   // Promenade heading south
+        [43.2605, 5.3795, 3],   // Prado beach 1
+        [43.2590, 5.3800, 3],   // Between beaches
+        [43.2575, 5.3808, 3],   // Prado beach 2
+        [43.2560, 5.3815, 3],   // Escale Borély
+        [43.2545, 5.3825, 3],   // Continuing south
+        [43.2530, 5.3835, 3],   // Near Parc Balnéaire
+        [43.2518, 5.3845, 3],   // Plage de la Vieille Chapelle
+        [43.2505, 5.3855, 4],   // Approaching Pointe Rouge
+        [43.2492, 5.3862, 4],   // Pointe Rouge
+      ],
+    },
+    {
+      // Le Panier: Vieille Charité → Place des Moulins → Montée des Accoules → Place Daviel
+      // Hilly old town streets
+      name: 'Le Panier',
+      distanceMeters: 2500,
+      waypoints: [
+        [43.2990, 5.3700, 25],  // Rue de la Charité / Vieille Charité
+        [43.2995, 5.3688, 35],  // Rue du Refuge
+        [43.3000, 5.3678, 42],  // Place des Moulins
+        [43.2998, 5.3665, 40],  // Rue des Moulins descending
+        [43.2992, 5.3655, 35],  // Rue du Petit Puits
+        [43.2985, 5.3648, 30],  // Montée des Accoules
+        [43.2978, 5.3658, 22],  // Rue Caisserie
+        [43.2972, 5.3670, 15],  // Place Daviel
+        [43.2968, 5.3682, 10],  // Heading to port
+        [43.2975, 5.3695, 8],   // Quai du Port
+        [43.2982, 5.3705, 12],  // Back up towards Panier
+        [43.2990, 5.3700, 25],  // Back to start
       ],
     },
   ];
@@ -375,7 +425,7 @@ async function main(): Promise<void> {
       for (let s = 0; s < stepsInSeg; s++) {
         const t = s / stepsInSeg;
         const idx = points.length;
-        const jitter = () => (Math.random() - 0.5) * 0.00005; // ~5m GPS noise
+        const jitter = () => (Math.random() - 0.5) * 0.00002; // ~2m GPS noise
         points.push({
           lat: lat1 + (lat2 - lat1) * t + jitter(),
           lng: lng1 + (lng2 - lng1) * t + jitter(),

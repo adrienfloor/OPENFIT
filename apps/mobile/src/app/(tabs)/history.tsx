@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   RefreshControl,
 } from 'react-native';
+import MapView, { Polyline } from 'react-native-maps';
 import { apiClient } from '../../services/api';
 import { formatDuration } from '../../utils';
 
@@ -21,6 +22,12 @@ interface WorkoutLog {
   }[];
 }
 
+interface GPSPoint {
+  lat: number;
+  lng: number;
+  altitudeMeters: number;
+}
+
 interface RunSession {
   id: string;
   startedAt: string;
@@ -29,6 +36,7 @@ interface RunSession {
   avgPaceSecondsPerKm: number | null;
   bestPaceSecondsPerKm: number | null;
   elevationGainMeters: number;
+  gpsPoints: GPSPoint[];
 }
 
 type Tab = 'workouts' | 'runs';
@@ -41,6 +49,58 @@ function formatPace(secondsPerKm: number): string {
   const mins = Math.floor(secondsPerKm / 60);
   const secs = Math.round(secondsPerKm % 60);
   return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+function RunMap({ gpsPoints }: { gpsPoints: GPSPoint[] }) {
+  if (gpsPoints.length < 2) {
+    return (
+      <View style={styles.mapPlaceholder}>
+        <Text style={styles.mapPlaceholderText}>No GPS data</Text>
+      </View>
+    );
+  }
+
+  const coords = gpsPoints.map((p) => ({ latitude: p.lat, longitude: p.lng }));
+
+  // Calculate bounds to fit the route
+  let minLat = coords[0]!.latitude;
+  let maxLat = coords[0]!.latitude;
+  let minLng = coords[0]!.longitude;
+  let maxLng = coords[0]!.longitude;
+
+  for (const c of coords) {
+    if (c.latitude < minLat) minLat = c.latitude;
+    if (c.latitude > maxLat) maxLat = c.latitude;
+    if (c.longitude < minLng) minLng = c.longitude;
+    if (c.longitude > maxLng) maxLng = c.longitude;
+  }
+
+  const midLat = (minLat + maxLat) / 2;
+  const midLng = (minLng + maxLng) / 2;
+  const latDelta = Math.max(0.005, (maxLat - minLat) * 1.4);
+  const lngDelta = Math.max(0.005, (maxLng - minLng) * 1.4);
+
+  return (
+    <MapView
+      style={styles.map}
+      initialRegion={{
+        latitude: midLat,
+        longitude: midLng,
+        latitudeDelta: latDelta,
+        longitudeDelta: lngDelta,
+      }}
+      scrollEnabled={false}
+      zoomEnabled={false}
+      rotateEnabled={false}
+      pitchEnabled={false}
+    >
+      <Polyline
+        coordinates={coords}
+        strokeColor="#22c55e"
+        strokeWidth={4}
+      />
+    </MapView>
+  );
 }
 
 export default function HistoryScreen() {
@@ -179,6 +239,7 @@ export default function HistoryScreen() {
 
                 {isExpanded && (
                   <View style={styles.expandedContent}>
+                    <RunMap gpsPoints={r.gpsPoints} />
                     <View style={styles.runDetailRow}>
                       <View style={styles.runDetailItem}>
                         <Text style={styles.runDetailLabel}>Avg pace</Text>
@@ -230,6 +291,9 @@ const styles = StyleSheet.create({
   exerciseRow: { marginBottom: 8 },
   exerciseName: { fontSize: 14, fontWeight: '500', marginBottom: 2 },
   setText: { fontSize: 13, color: '#6b7280', marginLeft: 8 },
+  map: { height: 200, borderRadius: 10, marginBottom: 12 },
+  mapPlaceholder: { height: 100, borderRadius: 10, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+  mapPlaceholderText: { fontSize: 13, color: '#9ca3af' },
   runDetailRow: { flexDirection: 'row', justifyContent: 'space-between' },
   runDetailItem: { flex: 1, alignItems: 'center' },
   runDetailLabel: { fontSize: 11, color: '#9ca3af', marginBottom: 2 },

@@ -275,44 +275,135 @@ async function main(): Promise<void> {
 
   console.log('Created 16 workout logs (8 per user) with HR samples');
 
-  // Seed run sessions (6 per user, spread over last 3 weeks)
+  // Marseille running routes — realistic GPS waypoints
+  const marseilleRoutes: Array<{ name: string; waypoints: Array<[number, number, number]>; distanceMeters: number }> = [
+    {
+      // Corniche Kennedy — along the coast
+      name: 'Corniche Kennedy',
+      distanceMeters: 5200,
+      waypoints: [
+        [43.2780, 5.3590, 5], [43.2770, 5.3570, 8], [43.2758, 5.3545, 15],
+        [43.2745, 5.3520, 22], [43.2730, 5.3500, 30], [43.2715, 5.3478, 35],
+        [43.2700, 5.3455, 28], [43.2688, 5.3430, 20], [43.2675, 5.3405, 15],
+        [43.2660, 5.3380, 10], [43.2648, 5.3358, 8], [43.2635, 5.3335, 12],
+        [43.2622, 5.3312, 18], [43.2610, 5.3290, 25], [43.2598, 5.3268, 20],
+        [43.2585, 5.3245, 15], [43.2575, 5.3225, 10], [43.2565, 5.3205, 8],
+      ],
+    },
+    {
+      // Vieux-Port loop — around the old harbour
+      name: 'Vieux-Port',
+      distanceMeters: 3800,
+      waypoints: [
+        [43.2965, 5.3698, 3], [43.2958, 5.3715, 3], [43.2950, 5.3730, 4],
+        [43.2942, 5.3745, 3], [43.2935, 5.3755, 3], [43.2928, 5.3742, 4],
+        [43.2920, 5.3728, 5], [43.2912, 5.3715, 4], [43.2905, 5.3700, 3],
+        [43.2910, 5.3685, 3], [43.2918, 5.3672, 4], [43.2926, 5.3660, 5],
+        [43.2935, 5.3650, 6], [43.2943, 5.3662, 5], [43.2950, 5.3675, 4],
+        [43.2958, 5.3688, 3], [43.2965, 5.3698, 3],
+      ],
+    },
+    {
+      // Parc Borély — park loop near the beach
+      name: 'Parc Borély',
+      distanceMeters: 4500,
+      waypoints: [
+        [43.2610, 5.3830, 5], [43.2618, 5.3845, 6], [43.2628, 5.3860, 7],
+        [43.2640, 5.3870, 8], [43.2652, 5.3875, 7], [43.2662, 5.3865, 6],
+        [43.2670, 5.3850, 5], [43.2675, 5.3835, 4], [43.2672, 5.3818, 5],
+        [43.2665, 5.3802, 6], [43.2655, 5.3790, 7], [43.2642, 5.3785, 8],
+        [43.2630, 5.3790, 7], [43.2620, 5.3800, 6], [43.2612, 5.3815, 5],
+        [43.2610, 5.3830, 5],
+      ],
+    },
+    {
+      // Calanques trail — hilly coastal path
+      name: 'Calanques',
+      distanceMeters: 7200,
+      waypoints: [
+        [43.2310, 5.4350, 45], [43.2298, 5.4368, 60], [43.2285, 5.4385, 85],
+        [43.2270, 5.4400, 110], [43.2255, 5.4418, 130], [43.2242, 5.4435, 95],
+        [43.2228, 5.4450, 70], [43.2215, 5.4465, 50], [43.2200, 5.4480, 80],
+        [43.2188, 5.4498, 120], [43.2175, 5.4515, 145], [43.2162, 5.4530, 110],
+        [43.2148, 5.4545, 75], [43.2135, 5.4560, 55], [43.2125, 5.4575, 40],
+        [43.2118, 5.4590, 30], [43.2112, 5.4605, 25], [43.2108, 5.4620, 20],
+        [43.2105, 5.4635, 15], [43.2102, 5.4650, 10],
+      ],
+    },
+    {
+      // Plages du Prado — flat beach run
+      name: 'Plages du Prado',
+      distanceMeters: 3200,
+      waypoints: [
+        [43.2615, 5.3755, 3], [43.2605, 5.3740, 3], [43.2595, 5.3725, 3],
+        [43.2585, 5.3710, 3], [43.2575, 5.3698, 3], [43.2565, 5.3685, 3],
+        [43.2555, 5.3672, 3], [43.2545, 5.3660, 3], [43.2535, 5.3648, 3],
+        [43.2525, 5.3635, 3], [43.2515, 5.3622, 3], [43.2505, 5.3610, 3],
+      ],
+    },
+    {
+      // Panier quartier — old town hills
+      name: 'Le Panier',
+      distanceMeters: 2800,
+      waypoints: [
+        [43.2985, 5.3665, 15], [43.2992, 5.3650, 25], [43.2998, 5.3638, 35],
+        [43.3005, 5.3625, 45], [43.3010, 5.3612, 50], [43.3015, 5.3600, 42],
+        [43.3020, 5.3588, 35], [43.3012, 5.3578, 28], [43.3002, 5.3572, 22],
+        [43.2992, 5.3580, 18], [43.2985, 5.3592, 20], [43.2980, 5.3608, 22],
+        [43.2978, 5.3625, 20], [43.2980, 5.3642, 18], [43.2985, 5.3658, 15],
+      ],
+    },
+  ];
+
+  // Interpolate smooth GPS track between waypoints
+  function interpolateRoute(
+    waypoints: Array<[number, number, number]>,
+    numPoints: number,
+    startTime: Date,
+    durationSeconds: number,
+    paceBase: number,
+  ) {
+    const points: Array<{ lat: number; lng: number; altitudeMeters: number; timestamp: Date; speedMps: number }> = [];
+    const totalSegments = waypoints.length - 1;
+    const pointsPerSegment = Math.ceil(numPoints / totalSegments);
+
+    for (let seg = 0; seg < totalSegments; seg++) {
+      const [lat1, lng1, alt1] = waypoints[seg]!;
+      const [lat2, lng2, alt2] = waypoints[seg + 1]!;
+      const stepsInSeg = seg === totalSegments - 1 ? numPoints - points.length : pointsPerSegment;
+
+      for (let s = 0; s < stepsInSeg; s++) {
+        const t = s / stepsInSeg;
+        const idx = points.length;
+        const jitter = () => (Math.random() - 0.5) * 0.00005; // ~5m GPS noise
+        points.push({
+          lat: lat1 + (lat2 - lat1) * t + jitter(),
+          lng: lng1 + (lng2 - lng1) * t + jitter(),
+          altitudeMeters: alt1 + (alt2 - alt1) * t + (Math.random() - 0.5) * 2,
+          timestamp: new Date(startTime.getTime() + (idx / numPoints) * durationSeconds * 1000),
+          speedMps: 1000 / paceBase + (Math.random() - 0.5) * 0.4,
+        });
+      }
+    }
+
+    return points;
+  }
+
+  // Seed run sessions (6 per user, spread over last 3 weeks) in Marseille
   for (const user of users) {
     for (let i = 0; i < 6; i++) {
+      const route = marseilleRoutes[i % marseilleRoutes.length]!;
       const startedAt = new Date();
       startedAt.setDate(startedAt.getDate() - i * 4 - Math.floor(Math.random() * 2));
       startedAt.setHours(6 + Math.floor(Math.random() * 4), Math.floor(Math.random() * 60), 0, 0);
 
-      const distanceMeters = 3000 + Math.floor(Math.random() * 7000);
+      const distanceMeters = route.distanceMeters + Math.floor(Math.random() * 500 - 250);
       const paceBase = 280 + Math.floor(Math.random() * 120);
       const durationSeconds = Math.round((distanceMeters / 1000) * paceBase);
       const completedAt = new Date(startedAt.getTime() + durationSeconds * 1000);
 
-      // Generate GPS points (one every ~100m)
-      const numPoints = Math.floor(distanceMeters / 100);
-      const baseLat = 48.8566 + (Math.random() - 0.5) * 0.02;
-      const baseLng = 2.3522 + (Math.random() - 0.5) * 0.02;
-
-      const gpsPoints: Array<{
-        lat: number;
-        lng: number;
-        altitudeMeters: number;
-        timestamp: Date;
-        speedMps: number;
-      }> = [];
-
-      let altitude = 30 + Math.random() * 20;
-      for (let p = 0; p < numPoints; p++) {
-        const angle = (p / numPoints) * Math.PI * 2 * (0.5 + Math.random() * 0.5);
-        const radius = 0.002 + Math.random() * 0.003;
-        altitude += (Math.random() - 0.45) * 3;
-        gpsPoints.push({
-          lat: baseLat + Math.sin(angle) * radius,
-          lng: baseLng + Math.cos(angle) * radius,
-          altitudeMeters: Math.max(0, altitude),
-          timestamp: new Date(startedAt.getTime() + (p / numPoints) * durationSeconds * 1000),
-          speedMps: 1000 / paceBase + (Math.random() - 0.5) * 0.5,
-        });
-      }
+      const numPoints = Math.floor(distanceMeters / 30);
+      const gpsPoints = interpolateRoute(route.waypoints, numPoints, startedAt, durationSeconds, paceBase);
 
       // HR samples every 30s
       const runHR: Array<{ timestamp: Date; bpm: number; zone: string }> = [];
@@ -349,7 +440,7 @@ async function main(): Promise<void> {
     }
   }
 
-  console.log('Created 12 run sessions (6 per user) with GPS + HR data');
+  console.log('Created 12 run sessions (6 per user) with Marseille GPS routes + HR data');
   console.log('Seed complete!');
 }
 

@@ -36,14 +36,16 @@ export function useDailyStats(): {
   // Manual permission request
   const requestPermissions = useCallback(async () => {
     try {
+      console.log('[useDailyStats] requesting permissions...');
       const { requestHealthPermissions } = await import('../services/healthConnect');
       const granted = await requestHealthPermissions();
+      console.log('[useDailyStats] permissions granted:', granted);
       setPermissionsGranted(granted);
       if (granted) {
         setFetchTrigger((t) => t + 1);
       }
     } catch (err) {
-      console.log('Permission request failed:', err);
+      console.log('[useDailyStats] permission request failed:', err);
     }
   }, []);
 
@@ -55,9 +57,11 @@ export function useDailyStats(): {
       setLoading(true);
       setError(null);
       try {
+        console.log('[useDailyStats] fetching stats...');
         const { getDailyStats } = await import('../services/healthConnect');
         const date = new Date();
         const results = await getDailyStats(date, date);
+        console.log('[useDailyStats] results:', JSON.stringify(results));
         setToday(results[0] ?? null);
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Failed to fetch daily stats'));

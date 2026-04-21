@@ -79,7 +79,9 @@ const REQUIRED_PERMISSIONS = [
 export async function requestHealthPermissions(): Promise<boolean> {
   assertInitialized();
   const granted = await requestPermission(REQUIRED_PERMISSIONS);
-  return granted.length === REQUIRED_PERMISSIONS.length;
+  console.log('[HealthConnect] permissions result:', JSON.stringify(granted));
+  // Treat any granted permissions as success — partial access is better than none
+  return granted.length > 0;
 }
 
 /**

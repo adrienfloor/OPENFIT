@@ -51,7 +51,8 @@ function formatPace(secondsPerKm: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-const TILE_STYLE = 'https://demotiles.maplibre.org/style.json';
+// OpenFreeMap — free OSM tiles, no API key, Strava-like appearance
+const TILE_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
 
 let mapInitialized = false;
 function ensureMapInit() {
@@ -125,6 +126,16 @@ function RunMap({ gpsPoints }: { gpsPoints: GPSPoint[] }) {
         />
         <MapLibreGL.ShapeSource id="route" shape={routeGeoJSON}>
           <MapLibreGL.LineLayer
+            id="routeLineGlow"
+            style={{
+              lineColor: '#22c55e',
+              lineWidth: 8,
+              lineOpacity: 0.3,
+              lineCap: 'round',
+              lineJoin: 'round',
+            }}
+          />
+          <MapLibreGL.LineLayer
             id="routeLine"
             style={{
               lineColor: '#22c55e',
@@ -132,6 +143,24 @@ function RunMap({ gpsPoints }: { gpsPoints: GPSPoint[] }) {
               lineCap: 'round',
               lineJoin: 'round',
             }}
+          />
+        </MapLibreGL.ShapeSource>
+        <MapLibreGL.ShapeSource
+          id="startPoint"
+          shape={{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [gpsPoints[0]!.lng, gpsPoints[0]!.lat] } }}
+        >
+          <MapLibreGL.CircleLayer
+            id="startCircle"
+            style={{ circleRadius: 7, circleColor: '#22c55e', circleStrokeWidth: 3, circleStrokeColor: '#ffffff' }}
+          />
+        </MapLibreGL.ShapeSource>
+        <MapLibreGL.ShapeSource
+          id="endPoint"
+          shape={{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [gpsPoints[gpsPoints.length - 1]!.lng, gpsPoints[gpsPoints.length - 1]!.lat] } }}
+        >
+          <MapLibreGL.CircleLayer
+            id="endCircle"
+            style={{ circleRadius: 7, circleColor: '#ef4444', circleStrokeWidth: 3, circleStrokeColor: '#ffffff' }}
           />
         </MapLibreGL.ShapeSource>
       </MapLibreGL.MapView>
@@ -327,7 +356,7 @@ const styles = StyleSheet.create({
   exerciseRow: { marginBottom: 8 },
   exerciseName: { fontSize: 14, fontWeight: '500', marginBottom: 2 },
   setText: { fontSize: 13, color: '#6b7280', marginLeft: 8 },
-  mapContainer: { height: 200, borderRadius: 10, overflow: 'hidden', marginBottom: 12 },
+  mapContainer: { height: 250, borderRadius: 12, overflow: 'hidden', marginBottom: 12 },
   map: { flex: 1 },
   mapPlaceholder: { height: 100, borderRadius: 10, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
   mapPlaceholderText: { fontSize: 13, color: '#9ca3af' },

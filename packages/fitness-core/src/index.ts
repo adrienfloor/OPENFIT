@@ -1,3 +1,3 @@
-export * from './heart-rate.js';
-export * from './running.js';
-export * from './workout.js';
+export * from './heart-rate';
+export * from './running';
+export * from './workout';

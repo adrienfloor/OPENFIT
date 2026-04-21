@@ -158,6 +158,21 @@ export default function WorkoutScreen() {
     ? Math.floor((Date.now() - startedAt.getTime()) / 1000)
     : 0;
 
+  const handleCancel = () => {
+    Alert.alert('Cancel workout?', 'Your logged sets will be lost.', [
+      { text: 'Keep going', style: 'cancel' },
+      {
+        text: 'Cancel',
+        style: 'destructive',
+        onPress: () => {
+          finishWorkout();
+          setCurrentExercise(null);
+          setSelectedProgram(null);
+        },
+      },
+    ]);
+  };
+
   // Active workout view
   if (isActive) {
     const totalSets = activeExercises.reduce((sum, e) => sum + e.completedSets.length, 0);
@@ -165,7 +180,9 @@ export default function WorkoutScreen() {
     return (
       <ScrollView style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.title}>Active Workout</Text>
+          <TouchableOpacity onPress={handleCancel}>
+            <Text style={styles.cancelText}>Cancel</Text>
+          </TouchableOpacity>
           <Text style={styles.elapsed}>{formatDuration(elapsed)}</Text>
         </View>
 
@@ -321,6 +338,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   title: { fontSize: 24, fontWeight: 'bold', marginBottom: 16 },
   elapsed: { fontSize: 18, fontWeight: '600', color: '#22c55e' },
+  cancelText: { fontSize: 15, color: '#ef4444', fontWeight: '500' },
   section: { marginTop: 24 },
   sectionTitle: { fontSize: 16, fontWeight: '600', marginBottom: 12, color: '#374151' },
   startFreeBtn: {

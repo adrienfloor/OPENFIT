@@ -8,6 +8,10 @@ import {
   Alert,
 } from 'react-native';
 import { apiClient } from '../../services/api';
+import { useAuthStore } from '../../stores/auth.store';
+import { useRealtimeHeartRate } from '../../hooks/useRealtimeHeartRate';
+import { calculateMaxHR } from '@openfit/fitness-core';
+import { calculateAge, formatDuration } from '../../utils';
 import {
   startRunTracking,
   stopRunTracking,
@@ -15,32 +19,98 @@ import {
   resetRunData,
   setOnUpdateCallback,
 } from '../../services/runTracker';
-import { formatDuration } from '../../utils';
 
 type RunState = 'idle' | 'running' | 'paused' | 'finished';
 
+function formatPace(secondsPerKm: number): string {
+  if (!isFinite(secondsPerKm) || secondsPerKm <= 0) return '--:--';
+  const mins = Math.floor(secondsPerKm / 60);
+  const secs = Math.round(secondsPerKm % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+function HeartRateDisplay({ maxHR, avgHrRef }: { maxHR: number; avgHrRef: React.MutableRefObject<{ total: number; count: number; samples: Array<{ timestamp: Date; bpm: number; zone: string }> }> }) {
+  const { bpm, zone, connectionState, samples } = useRealtimeHeartRate(maxHR);
+
+  // Track average HR
+  useEffect(() => {
+    if (bpm !== null) {
+      avgHrRef.current.total += bpm;
+      avgHrRef.current.count += 1;
+      avgHrRef.current.samples = samples;
+    }
+  }, [bpm, samples, avgHrRef]);
+
+  const avgBpm = avgHrRef.current.count > 0
+    ? Math.round(avgHrRef.current.total / avgHrRef.current.count)
+    : null;
+
+  const stateLabel =
+    connectionState === 'scanning' ? 'Scanning...' :
+    connectionState === 'connecting' ? 'Connecting...' :
+    connectionState === 'connected' ? 'Connected' :
+    connectionState === 'error' ? 'No strap found' :
+    connectionState === 'disconnected' ? 'Disconnected' :
+    '';
+
+  return (
+    <View style={styles.hrSection}>
+      <View style={styles.hrRow}>
+        <View style={styles.hrStatBox}>
+          <Text style={styles.hrStatLabel}>Current HR</Text>
+          <Text style={styles.hrStatValue}>{bpm ?? '--'}</Text>
+          <Text style={styles.hrStatUnit}>bpm</Text>
+        </View>
+        <View style={styles.hrStatBox}>
+          <Text style={styles.hrStatLabel}>Zone</Text>
+          <Text style={[styles.hrZoneText, zone === 'peak' || zone === 'max' ? styles.hrZoneHigh : zone === 'cardio' ? styles.hrZoneMid : styles.hrZoneLow]}>
+            {zone ? zone.replace('_', ' ').toUpperCase() : '--'}
+          </Text>
+        </View>
+        <View style={styles.hrStatBox}>
+          <Text style={styles.hrStatLabel}>Avg HR</Text>
+          <Text style={styles.hrStatValue}>{avgBpm ?? '--'}</Text>
+          <Text style={styles.hrStatUnit}>bpm</Text>
+        </View>
+      </View>
+      {connectionState !== 'connected' && (
+        <Text style={styles.hrConnectionStatus}>{stateLabel}</Text>
+      )}
+    </View>
+  );
+}
+
 export default function RunScreen() {
+  const user = useAuthStore((s) => s.user);
   const [runState, setRunState] = useState<RunState>('idle');
   const [elapsed, setElapsed] = useState(0);
   const [distance, setDistance] = useState(0);
   const [pointCount, setPointCount] = useState(0);
+  const [currentSpeed, setCurrentSpeed] = useState(0);
 
   const startTimeRef = useRef<Date | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const elapsedBeforePauseRef = useRef(0);
   const segmentStartRef = useRef<number | null>(null);
+  const avgHrRef = useRef({ total: 0, count: 0, samples: [] as Array<{ timestamp: Date; bpm: number; zone: string }> });
 
-  const pace = distance > 0 ? elapsed / (distance / 1000) : 0;
+  const maxHR = user?.dateOfBirth ? calculateMaxHR(calculateAge(new Date(user.dateOfBirth))) : 190;
+
   const distanceKm = (distance / 1000).toFixed(2);
+  const avgPace = distance > 0 ? elapsed / (distance / 1000) : 0;
+  const currentPace = currentSpeed > 0.3 ? 1000 / currentSpeed : 0;
 
   // Sync UI with background GPS data
   const syncFromTracker = useCallback(() => {
     const data = getRunData();
     setDistance(data.distance);
     setPointCount(data.gpsPoints.length);
+    if (data.gpsPoints.length > 0) {
+      const latest = data.gpsPoints[data.gpsPoints.length - 1]!;
+      setCurrentSpeed(latest.speedMps);
+    }
   }, []);
 
-  // Register callback so background task can trigger UI updates
   useEffect(() => {
     if (runState === 'running') {
       setOnUpdateCallback(syncFromTracker);
@@ -50,14 +120,12 @@ export default function RunScreen() {
     return () => setOnUpdateCallback(null);
   }, [runState, syncFromTracker]);
 
-  // Also poll every second when running (in case background callback is delayed)
   useEffect(() => {
     if (runState !== 'running') return;
     const interval = setInterval(syncFromTracker, 1000);
     return () => clearInterval(interval);
   }, [runState, syncFromTracker]);
 
-  // Calculate elevation gain from current GPS data
   const getElevationGain = useCallback(() => {
     const { gpsPoints } = getRunData();
     return gpsPoints.reduce((gain, point, i) => {
@@ -97,17 +165,18 @@ export default function RunScreen() {
 
     startTimeRef.current = new Date();
     elapsedBeforePauseRef.current = 0;
+    avgHrRef.current = { total: 0, count: 0, samples: [] };
     setRunState('running');
     setElapsed(0);
     setDistance(0);
     setPointCount(0);
+    setCurrentSpeed(0);
     startTimer();
   };
 
   const handlePause = () => {
     setRunState('paused');
     stopTimer();
-    // Keep GPS tracking running in background even when paused
   };
 
   const handleResume = () => {
@@ -126,8 +195,8 @@ export default function RunScreen() {
     if (!startTimeRef.current) return;
 
     const { gpsPoints } = getRunData();
+    const hrSamples = avgHrRef.current.samples;
 
-    // Best pace from GPS speed data
     let bestPace: number | null = null;
     for (const point of gpsPoints) {
       if (point.speedMps > 0.5) {
@@ -147,6 +216,13 @@ export default function RunScreen() {
       bestPaceSecondsPerKm: bestPace ? Math.round(bestPace) : null,
       elevationGainMeters: Math.round(getElevationGain()),
       gpsPoints,
+      heartRateSamples: hrSamples.length > 0
+        ? hrSamples.map((s) => ({
+            timestamp: s.timestamp.toISOString(),
+            bpm: s.bpm,
+            zone: s.zone,
+          }))
+        : undefined,
     };
 
     try {
@@ -174,6 +250,7 @@ export default function RunScreen() {
           setElapsed(0);
           setDistance(0);
           setPointCount(0);
+          setCurrentSpeed(0);
           resetRunData();
         },
       },
@@ -200,27 +277,28 @@ export default function RunScreen() {
       {/* Timer */}
       <Text style={styles.timer}>{formatDuration(elapsed)}</Text>
 
-      {/* Stats grid */}
-      <View style={styles.statsGrid}>
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Distance</Text>
-          <Text style={styles.statValue}>{distanceKm} km</Text>
+      {/* Distance */}
+      <Text style={styles.distanceBig}>{distanceKm} km</Text>
+
+      {/* Pace stats */}
+      <View style={styles.paceRow}>
+        <View style={styles.paceBox}>
+          <Text style={styles.paceLabel}>Avg Pace</Text>
+          <Text style={styles.paceValue}>{formatPace(avgPace)}</Text>
+          <Text style={styles.paceUnit}>/km</Text>
         </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Pace</Text>
-          <Text style={styles.statValue}>
-            {pace > 0 ? formatPace(pace) : '--:--'} /km
-          </Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Elevation</Text>
-          <Text style={styles.statValue}>{Math.round(getElevationGain())} m</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>GPS Points</Text>
-          <Text style={styles.statValue}>{pointCount}</Text>
+        <View style={styles.paceDivider} />
+        <View style={styles.paceBox}>
+          <Text style={styles.paceLabel}>Current Pace</Text>
+          <Text style={styles.paceValue}>{formatPace(currentPace)}</Text>
+          <Text style={styles.paceUnit}>/km</Text>
         </View>
       </View>
+
+      {/* Heart rate — only render when running (mounts BLE hook) */}
+      {(runState === 'running' || runState === 'paused') && (
+        <HeartRateDisplay maxHR={maxHR} avgHrRef={avgHrRef} />
+      )}
 
       {/* Controls */}
       {runState === 'running' && (
@@ -246,23 +324,36 @@ export default function RunScreen() {
       )}
 
       {runState === 'finished' && (
-        <View style={styles.controls}>
-          <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-            <Text style={styles.saveBtnText}>Save Run</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.discardBtn} onPress={handleDiscard}>
-            <Text style={styles.discardBtnText}>Discard</Text>
-          </TouchableOpacity>
+        <View>
+          {/* Summary before save */}
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryLabel}>Elevation</Text>
+              <Text style={styles.summaryValue}>{Math.round(getElevationGain())} m</Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryLabel}>GPS Points</Text>
+              <Text style={styles.summaryValue}>{pointCount}</Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryLabel}>Avg HR</Text>
+              <Text style={styles.summaryValue}>
+                {avgHrRef.current.count > 0 ? Math.round(avgHrRef.current.total / avgHrRef.current.count) : '--'} bpm
+              </Text>
+            </View>
+          </View>
+          <View style={styles.controls}>
+            <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
+              <Text style={styles.saveBtnText}>Save Run</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.discardBtn} onPress={handleDiscard}>
+              <Text style={styles.discardBtnText}>Discard</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
     </ScrollView>
   );
-}
-
-function formatPace(secondsPerKm: number): string {
-  const mins = Math.floor(secondsPerKm / 60);
-  const secs = Math.round(secondsPerKm % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
 const styles = StyleSheet.create({
@@ -272,11 +363,29 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, fontWeight: 'bold', marginBottom: 8 },
   subtitle: { fontSize: 14, color: '#6b7280', marginBottom: 4 },
   subtitleSmall: { fontSize: 12, color: '#9ca3af', marginBottom: 32 },
-  timer: { fontSize: 56, fontWeight: 'bold', textAlign: 'center', marginBottom: 24, color: '#111827' },
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 32 },
-  statCard: { width: '47%', backgroundColor: '#fff', borderRadius: 12, padding: 16 },
-  statLabel: { fontSize: 12, color: '#6b7280', marginBottom: 4 },
-  statValue: { fontSize: 22, fontWeight: '600' },
+  timer: { fontSize: 52, fontWeight: 'bold', textAlign: 'center', color: '#111827' },
+  distanceBig: { fontSize: 36, fontWeight: '700', textAlign: 'center', color: '#22c55e', marginBottom: 24 },
+  paceRow: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16, alignItems: 'center' },
+  paceBox: { flex: 1, alignItems: 'center' },
+  paceDivider: { width: 1, height: 40, backgroundColor: '#e5e7eb' },
+  paceLabel: { fontSize: 11, color: '#9ca3af', marginBottom: 4 },
+  paceValue: { fontSize: 28, fontWeight: '700', color: '#111827' },
+  paceUnit: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
+  hrSection: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16, borderLeftWidth: 4, borderLeftColor: '#ef4444' },
+  hrRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  hrStatBox: { flex: 1, alignItems: 'center' },
+  hrStatLabel: { fontSize: 11, color: '#9ca3af', marginBottom: 4 },
+  hrStatValue: { fontSize: 28, fontWeight: '700', color: '#ef4444' },
+  hrStatUnit: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
+  hrZoneText: { fontSize: 18, fontWeight: '700', marginTop: 8 },
+  hrZoneHigh: { color: '#ef4444' },
+  hrZoneMid: { color: '#f59e0b' },
+  hrZoneLow: { color: '#22c55e' },
+  hrConnectionStatus: { textAlign: 'center', fontSize: 11, color: '#9ca3af', marginTop: 8 },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16 },
+  summaryItem: { flex: 1, alignItems: 'center' },
+  summaryLabel: { fontSize: 11, color: '#9ca3af', marginBottom: 4 },
+  summaryValue: { fontSize: 16, fontWeight: '600' },
   controls: { flexDirection: 'row', gap: 12 },
   startBtn: {
     backgroundColor: '#22c55e',

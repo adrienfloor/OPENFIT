@@ -4,7 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 
 export default function TodayScreen() {
   const { user, logout } = useAuth();
-  const { today, loading, refetch, healthConnectAvailable, requestPermissions } = useDailyStats();
+  const { today, loading, refetch, healthConnectAvailable, permissionsGranted, requestPermissions } = useDailyStats();
 
   const stats = [
     { label: 'Steps', value: today?.steps?.toLocaleString() ?? '--' },
@@ -33,7 +33,7 @@ export default function TodayScreen() {
         </View>
       )}
 
-      {healthConnectAvailable === true && !today && !loading && (
+      {healthConnectAvailable === true && !permissionsGranted && (
         <TouchableOpacity style={styles.connectBtn} onPress={requestPermissions}>
           <Text style={styles.connectBtnText}>Connect Health Data</Text>
           <Text style={styles.connectBtnSub}>Tap to grant Health Connect permissions</Text>

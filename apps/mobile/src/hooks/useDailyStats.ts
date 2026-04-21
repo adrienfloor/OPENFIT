@@ -1,30 +1,31 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { DailyHealth } from '@openfit/types';
-
-const STALE_TIME_MS = 5 * 60 * 1000;
 
 export function useDailyStats(): {
   today: DailyHealth | null;
   loading: boolean;
   error: Error | null;
   healthConnectAvailable: boolean | null;
+  permissionsGranted: boolean;
   refetch: () => void;
   requestPermissions: () => Promise<void>;
 } {
   const [today, setToday] = useState<DailyHealth | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
-  const [lastFetchedAt, setLastFetchedAt] = useState(0);
   const [healthConnectAvailable, setHealthConnectAvailable] = useState<boolean | null>(null);
   const [permissionsGranted, setPermissionsGranted] = useState(false);
+  const [fetchTrigger, setFetchTrigger] = useState(0);
+  const initializedRef = useRef(false);
 
-  // Check availability on mount (no permission request)
+  // Check availability on mount
   useEffect(() => {
     async function checkAvailability() {
       try {
         const { initializeHealthConnect } = await import('../services/healthConnect');
         const available = await initializeHealthConnect();
         setHealthConnectAvailable(available);
+        initializedRef.current = available;
       } catch {
         setHealthConnectAvailable(false);
       }
@@ -32,53 +33,50 @@ export function useDailyStats(): {
     checkAvailability();
   }, []);
 
-  // Manual permission request — called by user action only
+  // Manual permission request
   const requestPermissions = useCallback(async () => {
     try {
       const { requestHealthPermissions } = await import('../services/healthConnect');
       const granted = await requestHealthPermissions();
       setPermissionsGranted(granted);
-    } catch {
-      // Permission request failed — Health Connect may not be ready
+      if (granted) {
+        setFetchTrigger((t) => t + 1);
+      }
+    } catch (err) {
+      console.log('Permission request failed:', err);
     }
   }, []);
 
-  const fetchStats = useCallback(async () => {
-    if (healthConnectAvailable !== true || !permissionsGranted) return;
-
-    const now = Date.now();
-    if (now - lastFetchedAt < STALE_TIME_MS && today !== null) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const { getDailyStats } = await import('../services/healthConnect');
-      const date = new Date();
-      const results = await getDailyStats(date, date);
-      setToday(results[0] ?? null);
-      setLastFetchedAt(Date.now());
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error('Failed to fetch daily stats'));
-      setToday(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [healthConnectAvailable, permissionsGranted, lastFetchedAt, today]);
-
+  // Fetch data when permissions are granted
   useEffect(() => {
+    if (!permissionsGranted || !initializedRef.current) return;
+
+    async function fetchStats() {
+      setLoading(true);
+      setError(null);
+      try {
+        const { getDailyStats } = await import('../services/healthConnect');
+        const date = new Date();
+        const results = await getDailyStats(date, date);
+        setToday(results[0] ?? null);
+      } catch (err) {
+        setError(err instanceof Error ? err : new Error('Failed to fetch daily stats'));
+        setToday(null);
+      } finally {
+        setLoading(false);
+      }
+    }
+
     fetchStats();
-  }, [fetchStats]);
+  }, [permissionsGranted, fetchTrigger]);
 
   return {
     today,
     loading,
     error,
     healthConnectAvailable,
-    refetch: () => {
-      setLastFetchedAt(0);
-      fetchStats();
-    },
+    permissionsGranted,
+    refetch: () => setFetchTrigger((t) => t + 1),
     requestPermissions,
   };
 }

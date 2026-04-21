@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   RefreshControl,
 } from 'react-native';
-import MapLibreGL from '@maplibre/maplibre-react-native';
+import MapLibreGL, { setConnected } from '@maplibre/maplibre-react-native';
 import { apiClient } from '../../services/api';
 import { formatDuration } from '../../utils';
 
@@ -53,7 +53,16 @@ function formatPace(secondsPerKm: number): string {
 
 const TILE_STYLE = 'https://demotiles.maplibre.org/style.json';
 
+let mapInitialized = false;
+function ensureMapInit() {
+  if (!mapInitialized) {
+    try { setConnected(true); } catch { /* ignore if already set */ }
+    mapInitialized = true;
+  }
+}
+
 function RunMap({ gpsPoints }: { gpsPoints: GPSPoint[] }) {
+  ensureMapInit();
   if (gpsPoints.length < 2) {
     return (
       <View style={styles.mapPlaceholder}>

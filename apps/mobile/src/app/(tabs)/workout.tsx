@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,10 @@ import {
 import { useRouter } from 'expo-router';
 import { apiClient } from '../../services/api';
 import { useWorkoutStore } from '../../stores/workout.store';
-import { formatDuration } from '../../utils';
+import { useAuthStore } from '../../stores/auth.store';
+import { useRealtimeHeartRate } from '../../hooks/useRealtimeHeartRate';
+import { formatDuration, calculateAge } from '../../utils';
+import { calculateMaxHR } from '@openfit/fitness-core';
 
 interface Exercise {
   id: string;
@@ -63,10 +66,40 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
+function HeartRateCard({ maxHR, onSamplesRef }: { maxHR: number; onSamplesRef: React.MutableRefObject<() => Array<{ timestamp: Date; bpm: number; zone: string }>> }) {
+  const { bpm, zone, connectionState, samples } = useRealtimeHeartRate(maxHR);
+
+  // Expose samples getter to parent
+  onSamplesRef.current = () => samples;
+
+  const stateLabel =
+    connectionState === 'scanning' ? 'Scanning for HR strap...' :
+    connectionState === 'connecting' ? 'Connecting...' :
+    connectionState === 'connected' ? 'Connected' :
+    connectionState === 'error' ? 'Connection failed' :
+    connectionState === 'disconnected' ? 'Disconnected' :
+    'Waiting...';
+
+  return (
+    <View style={styles.hrCard}>
+      <View style={styles.hrCardLeft}>
+        <Text style={styles.hrBpm}>{bpm ?? '--'}</Text>
+        <Text style={styles.hrUnit}>bpm</Text>
+      </View>
+      <View style={styles.hrCardRight}>
+        {zone && <Text style={styles.hrZone}>{zone.replace('_', ' ').toUpperCase()}</Text>}
+        <Text style={styles.hrState}>{stateLabel}</Text>
+      </View>
+    </View>
+  );
+}
+
 export default function WorkoutScreen() {
   const router = useRouter();
   const { isActive, startedAt, activeExercises, startWorkout, addSet, finishWorkout, sessionId } =
     useWorkoutStore();
+  const user = useAuthStore((s) => s.user);
+  const hrSamplesRef = useRef<() => Array<{ timestamp: Date; bpm: number; zone: string }>>(() => []);
 
   const [programs, setPrograms] = useState<Program[]>([]);
   const [exercises, setExercises] = useState<Exercise[]>([]);
@@ -140,6 +173,7 @@ export default function WorkoutScreen() {
       return;
     }
 
+    const hrSamples = hrSamplesRef.current();
     const payload = {
       sessionId: sessionId ?? undefined,
       startedAt: startedAt!.toISOString(),
@@ -154,6 +188,13 @@ export default function WorkoutScreen() {
           restTaken: s.restTaken,
         })),
       })),
+      heartRateSamples: hrSamples.length > 0
+        ? hrSamples.map((s) => ({
+            timestamp: s.timestamp.toISOString(),
+            bpm: s.bpm,
+            zone: s.zone,
+          }))
+        : undefined,
     };
 
     try {
@@ -189,6 +230,8 @@ export default function WorkoutScreen() {
     ]);
   };
 
+  const maxHR = user?.dateOfBirth ? calculateMaxHR(calculateAge(new Date(user.dateOfBirth))) : 190;
+
   // Active workout view
   if (isActive) {
     const totalSets = activeExercises.reduce((sum, e) => sum + e.completedSets.length, 0);
@@ -201,6 +244,9 @@ export default function WorkoutScreen() {
           </TouchableOpacity>
           <Text style={styles.elapsed}>{formatDuration(elapsed)}</Text>
         </View>
+
+        {/* Live heart rate */}
+        <HeartRateCard maxHR={maxHR} onSamplesRef={hrSamplesRef} />
 
         {/* Exercise picker */}
         <Text style={styles.sectionTitle}>Select exercise</Text>
@@ -374,6 +420,23 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, fontWeight: 'bold', marginBottom: 16 },
   elapsed: { fontSize: 18, fontWeight: '600', color: '#22c55e' },
   cancelText: { fontSize: 15, color: '#ef4444', fontWeight: '500' },
+  hrCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderLeftWidth: 4,
+    borderLeftColor: '#ef4444',
+  },
+  hrCardLeft: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
+  hrBpm: { fontSize: 36, fontWeight: 'bold', color: '#ef4444' },
+  hrUnit: { fontSize: 14, color: '#9ca3af' },
+  hrCardRight: { alignItems: 'flex-end' },
+  hrZone: { fontSize: 13, fontWeight: '600', color: '#ef4444', marginBottom: 2 },
+  hrState: { fontSize: 11, color: '#9ca3af' },
   section: { marginTop: 24 },
   sectionTitle: { fontSize: 16, fontWeight: '600', marginBottom: 12, color: '#374151' },
   startFreeBtn: {

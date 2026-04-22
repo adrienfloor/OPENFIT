@@ -62,15 +62,20 @@ npx expo run:android
 - **Session restore** (mobile): On app launch, `_layout.tsx` exchanges stored refresh token via `/auth/refresh`, then fetches `/auth/me` for user profile.
 - **Offline sync** (mobile): SQLite-backed queue via expo-sqlite, auto-flush on foreground. Not fully tested yet.
 - **Two ORMs**: Prisma for PostgreSQL (server), Drizzle for SQLite (mobile). Prisma doesn't support RN SQLite.
+- **Unified activity model**: A single `WorkoutLog` with a `type` enum (`strength | run | jiu_jitsu`) holds every trained activity. Run fields (`distanceMeters`, `durationSeconds`, pace, elevation) and `gpsPoints` are nullable; `exerciseLogs` is empty for non-strength. Adding future types (cycling, yoga, hiking) is a one-line enum change. No separate `RunSession` model.
+- **Energy estimation**:
+  - **BMR** via Mifflin-St Jeor (`packages/fitness-core/src/bmr.ts`) using weight + height + age + sex. Used by the Today tab to derive active daily calories as `TotalCaloriesBurned − bmrCaloriesElapsed(BMR, now)` — the same definition Zepp/Garmin/Whoop use.
+  - **Workout calories** via Keytel et al. 2005 (`packages/fitness-core/src/calories.ts`) — a sex-specific regression that maps HR + weight + age to kcal/min. Integrated over the workout's HR samples (uneven sample gaps handled). A MET-based fallback exists for activities without HR.
+- **User profile**: `weightKg`, `heightCm`, `sex`, and `dateOfBirth` are required fields. Height isn't needed for Keytel but is needed for BMR, and both are needed so future workouts / runs log real calorie numbers.
 
 ## Project Structure
 ```
-apps/api/         — Fastify backend (auth + full CRUD for workouts, runs, health)
+apps/api/         — Fastify backend (auth + full CRUD for workouts/health; no separate runs endpoints — runs are WorkoutLog rows)
 apps/web/         — Next.js dashboard (auth, dashboard with Recharts, program builder)
-apps/mobile/      — Expo app (auth, today stats, workout logging with BLE HR, run GPS, history)
+apps/mobile/      — Expo app (auth, today stats, unified Workout tab with Strength/Run/Jiu-Jitsu picker, history)
 packages/types/   — Zod schemas + TypeScript types (all domain types + input schemas)
-packages/db/      — Prisma schema + seed script (15 models, 2 users, 3 programs, workout/run/health seed data)
-packages/fitness-core/ — Pure business logic (HR zones, pace calc, ACWR, calories) + Vitest tests
+packages/db/      — Prisma schema + seed script (2 users, 10 exercises, 3 programs, 60 daily-health rows, 16 strength logs, 12 run logs)
+packages/fitness-core/ — Pure business logic (HR zones, pace calc, ACWR, BMR, Keytel calories) + Vitest tests
 packages/ui/      — Shared React components (scaffold only)
 ```
 
@@ -88,16 +93,11 @@ POST   /workouts/programs     — Create program
 PATCH  /workouts/programs/:id — Update program name
 DELETE /workouts/programs/:id — Delete program
 GET    /workouts/exercises    — List all exercises
-GET    /workouts/logs         — List user's workout logs
-GET    /workouts/logs/:id     — Get single workout log
-POST   /workouts/logs         — Create workout log (with exercise logs, sets, optional HR samples)
-DELETE /workouts/logs/:id     — Delete workout log
-
-GET    /runs                  — List user's run sessions
-GET    /runs/:id              — Get single run
-POST   /runs                  — Create run (with GPS points, optional HR samples)
-PATCH  /runs/:id              — Update run
-DELETE /runs/:id              — Delete run
+GET    /workouts/logs              — List user's activity logs (strength + run + jiu-jitsu); ?type= filter
+GET    /workouts/logs/:id          — Get single log (with exercises OR GPS + HR, depending on type)
+POST   /workouts/logs              — Create activity log; type required; run fields + gpsPoints for type=run
+PATCH  /workouts/logs/:id          — Update mutable fields (completedAt, caloriesBurned, run fields)
+DELETE /workouts/logs/:id          — Delete log
 
 GET    /health                — List user's daily health records
 GET    /health/:date          — Get single day
@@ -106,16 +106,16 @@ POST   /health/bulk           — Bulk upsert (up to 90 days, for mobile sync)
 ```
 
 ## Testing
-- `packages/fitness-core`: 30 Vitest tests (heart rate, running, workout calculations)
-- `apps/api`: 44 Vitest tests (auth, workout CRUD, run CRUD, health, multi-tenancy)
+- `packages/fitness-core`: 48 Vitest tests (heart rate zones, pace, ACWR, BMR Mifflin-St Jeor, Keytel calories)
+- `apps/api`: 34 Vitest tests (auth, unified workout CRUD, health, multi-tenancy)
 - Run with: `cd apps/api && npx vitest run` or `cd packages/fitness-core && npx vitest run`
-- Total: 74 tests passing
+- Total: 82 tests passing
 
 ## Database
 - PostgreSQL via Docker: `docker compose up -d`
 - Connection: `postgresql://openfit:openfit@localhost:5432/openfit`
 - After starting DB: `npm run db:migrate && npm run db:seed`
-- Seed includes: 2 users, 10 exercises, 3 programs, 30 days health data, 8 workout logs + HR samples, 6 run sessions + GPS + HR per user
+- Seed includes: 2 users (Alice f/65/165, Bob m/80/180), 10 exercises, 3 programs, 60 daily-health rows (30/user), 16 strength `WorkoutLog` rows + HR samples (8/user), 12 run `WorkoutLog` rows + Marseille GPS + HR samples (6/user). Every workout log has `caloriesBurned` computed from HR via Keytel.
 
 ## Wearable Integration (tested on Galaxy S26 Ultra + Amazfit Helio Strap)
 - **Passive data**: Helio Strap → Zepp app → Health Connect → OpenFit (via react-native-health-connect)
@@ -151,12 +151,24 @@ Monorepo, types, fitness-core, Prisma schema, auth API + tests, web auth pages, 
 - MapLibre maps with OpenFreeMap tiles (no API key), route glow + start/end markers
 - Seed data: 6 realistic Marseille running routes (Corniche, Vieux-Port, Borély, Calanques, Prado, Panier)
 
-## What's Next (Phase 2)
+### Phase 2.1 — Today tab data validation (done)
+Compared every Today-tab metric against Zepp (source of truth) and Health Connect (raw storage) via on-device screenshot triangulation.
+- **Steps**: `aggregateRecord('Steps')` instead of summing raw records (avoids double-counting when phone pedometer + Zepp both write overlapping windows). OpenFit matches HC exactly.
+- **Sleep**: `getSleepSummary` now returns session bounds + `durationMinutes = sessionSpan − awakeMinutes` (matches Zepp's "time asleep," not "time in bed"). Fixed a `Math.round` vs `Math.floor` bug on the hours display. OpenFit matches Zepp exactly.
+- **Active calories**: Zepp writes only explicit workouts to `ActiveCaloriesBurned`, so reading it gave a big undercount. Switched to Mifflin-St Jeor BMR ourselves (Zepp doesn't write `BasalMetabolicRate` to HC) and compute `active = TotalCaloriesBurned − bmrCaloriesElapsed(BMR, now)`. Within ~15 % of Zepp's number (expected — their proprietary BMR variant differs; Mifflin is the clinical consensus default).
+- **Resting HR**: switched to `aggregateRecord('RestingHeartRate').BPM_AVG`. 1-bpm delta vs Zepp's trend chart is a Zepp-side smoothing step we can't reach — we faithfully report what HC contains.
+- **HRV**: no aggregate API exists, so we now average all `HeartRateVariabilityRmssd` records **within the sleep session window** (fallback: 22:00 prev → 08:00 current). Matches Zepp. Individual RMSSD samples bounce 40–100 ms per minute — mean is the meaningful value, last-sample was arbitrary.
+- Added `heightCm` and `sex` (male/female) to `User` model with a new `Sex` enum, exposed through register / `/auth/me`, required on registration.
 
-### 2.1 — Today Tab Data Validation
-- Compare OpenFit Today tab values against Zepp app as reference
-- Verify: steps, active calories, resting HR, HRV, sleep duration all match Zepp
-- Fix any discrepancies in Health Connect data reading
+### Phase 2.3 — Unified workout model + Jiu-Jitsu type + HR calories (done)
+Bigger than the originally-scoped jiu-jitsu addition: consolidated the entire activity data model.
+- **Data model**: deleted `RunSession` entirely. A single `WorkoutLog` with a `WorkoutType` enum (`strength | run | jiu_jitsu`) holds every trained activity. Run fields (`distanceMeters`, `durationSeconds`, pace, elevation) and `gpsPoints` are nullable; `exerciseLogs` can be empty for non-strength. `HeartRateSample` and `GPSPoint` FK now points at `workoutLogId` directly. Seed migrated.
+- **API**: `/runs/*` endpoints removed. Everything flows through `/workouts/logs` with an optional `?type=` filter. New `PATCH /workouts/logs/:id`.
+- **Calories**: new `packages/fitness-core/src/calories.ts` with Keytel et al. (2005) — sex-specific HR-based regression giving kcal/min. `computeCaloriesFromHRSamples` integrates over the workout's samples with median-gap padding for the last interval. Every workout screen computes calories on finish and includes it in the POST payload; every history card shows it.
+- **Mobile navigation**: the `Run` tab is gone. The `Workout` tab is now a 3-card picker (Strength / Run / Jiu-Jitsu) that routes into `workout/strength.tsx`, `workout/run.tsx`, `workout/jiujitsu.tsx`. History is a single unified list with type-chip filtering (All / Strength / Run / Jiu-Jitsu) and per-type card rendering (sets+volume / map+pace / duration+HR).
+- **Jiu-Jitsu**: new `workout/jiujitsu.tsx` — start button auto-connects BLE, timer + live HR + avg/max, pause/resume, save → POST with `type='jiu_jitsu'`.
+
+## What's Next (Phase 2)
 
 ### 2.2 — Today Tab Rework (Zepp/Garmin/Whoop style)
 Rework the Today tab to show three key scores like Zepp's dashboard:
@@ -166,12 +178,6 @@ Rework the Today tab to show three key scores like Zepp's dashboard:
   Percentage of total available effort used during the day, based on HR data, workout intensity, and movement.
 - **Sleep score** (like Zepp Sleep Score):
   Calculated from sleep duration, regularity, quality (deep/REM/light/awake stages). Replicate Zepp's sleep scoring methodology.
-
-### 2.3 — Jiu-Jitsu Workout Type
-- Add "Jiu-Jitsu" as a workout type (no sets/reps — just HR tracking + duration)
-- Start session → BLE connects to Helio Strap → track live HR + elapsed time
-- On finish: save duration, HR samples, avg HR, max HR, time in each HR zone
-- Display jiu-jitsu sessions in history with HR zone breakdown
 
 ### 2.4 — Mike Thurston Workout Library
 - Pre-built 5-week workout programs based on Mike Thurston's programming (content provided by user)

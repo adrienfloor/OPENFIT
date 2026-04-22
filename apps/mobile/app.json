@@ -14,6 +14,10 @@
         "backgroundColor": "#22c55e"
       },
       "package": "dev.openfit.app",
+      "minSdkVersion": 26,
+      "compileSdkVersion": 35,
+      "targetSdkVersion": 35,
+      "buildToolsVersion": "35.0.0",
       "permissions": [
         "android.permission.health.READ_HEART_RATE",
         "android.permission.health.READ_SLEEP",

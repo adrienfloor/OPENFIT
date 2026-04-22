@@ -9,6 +9,7 @@ import {
   initialize,
   requestPermission,
   readRecords,
+  aggregateRecord,
   getSdkStatus,
   SdkAvailabilityStatus,
 } from 'react-native-health-connect';
@@ -107,48 +108,43 @@ export async function getDailyStats(
       endTime: dayEnd.toISOString(),
     };
 
-    const [steps, activeCal, totalCal, restingHR, hrv, spo2] =
+    // Aggregated metrics: Health Connect deduplicates across data sources
+    // (e.g. phone pedometer + Zepp both writing Steps) using its priority
+    // rules. readRecords would return raw per-source records and summing
+    // them double-counts overlapping windows.
+    const [stepsAgg, activeCalAgg, totalCalAgg, restingHRAgg] =
       await Promise.all([
-        readRecords('Steps', { timeRangeFilter }).catch(() => ({ records: [] })),
-        readRecords('ActiveCaloriesBurned', { timeRangeFilter }).catch(
-          () => ({ records: [] }),
+        aggregateRecord({ recordType: 'Steps', timeRangeFilter }).catch(
+          () => null,
         ),
-        readRecords('TotalCaloriesBurned', { timeRangeFilter }).catch(
-          () => ({ records: [] }),
-        ),
-        readRecords('RestingHeartRate', { timeRangeFilter }).catch(
-          () => ({ records: [] }),
-        ),
-        readRecords('HeartRateVariabilityRmssd', { timeRangeFilter }).catch(
-          () => ({ records: [] }),
-        ),
-        readRecords('OxygenSaturation', { timeRangeFilter }).catch(
-          () => ({ records: [] }),
-        ),
+        aggregateRecord({
+          recordType: 'ActiveCaloriesBurned',
+          timeRangeFilter,
+        }).catch(() => null),
+        aggregateRecord({
+          recordType: 'TotalCaloriesBurned',
+          timeRangeFilter,
+        }).catch(() => null),
+        aggregateRecord({
+          recordType: 'RestingHeartRate',
+          timeRangeFilter,
+        }).catch(() => null),
       ]);
 
-    const totalSteps = steps.records.reduce(
-      (sum: number, r: { count: number }) => sum + r.count,
-      0,
-    );
+    // HRV and SpO2 have no aggregate API — fall back to raw records.
+    const [hrv, spo2] = await Promise.all([
+      readRecords('HeartRateVariabilityRmssd', { timeRangeFilter }).catch(
+        () => ({ records: [] }),
+      ),
+      readRecords('OxygenSaturation', { timeRangeFilter }).catch(
+        () => ({ records: [] }),
+      ),
+    ]);
 
-    const totalActiveCal = activeCal.records.reduce(
-      (sum: number, r: { energy: { inKilocalories: number } }) =>
-        sum + r.energy.inKilocalories,
-      0,
-    );
-
-    const totalTotalCal = totalCal.records.reduce(
-      (sum: number, r: { energy: { inKilocalories: number } }) =>
-        sum + r.energy.inKilocalories,
-      0,
-    );
-
-    const latestRestingHR =
-      restingHR.records.length > 0
-        ? (restingHR.records[restingHR.records.length - 1] as { beatsPerMinute: number })
-            .beatsPerMinute
-        : null;
+    const totalSteps = stepsAgg?.COUNT_TOTAL ?? 0;
+    const totalActiveCal = activeCalAgg?.ACTIVE_CALORIES_TOTAL.inKilocalories ?? 0;
+    const totalTotalCal = totalCalAgg?.ENERGY_TOTAL.inKilocalories ?? 0;
+    const latestRestingHR = restingHRAgg?.BPM_AVG ?? null;
 
     const latestHRV =
       hrv.records.length > 0
@@ -316,11 +312,12 @@ export async function getHRV(date: Date): Promise<number | null> {
   ).heartRateVariabilityMillis;
 }
 
-/** Fetch step count for a given day. */
+/** Fetch step count for a given day (deduplicated across data sources). */
 export async function getSteps(date: Date): Promise<number> {
   assertInitialized();
 
-  const result = await readRecords('Steps', {
+  const result = await aggregateRecord({
+    recordType: 'Steps',
     timeRangeFilter: {
       operator: 'between' as const,
       startTime: startOfDay(date).toISOString(),
@@ -328,10 +325,7 @@ export async function getSteps(date: Date): Promise<number> {
     },
   });
 
-  return result.records.reduce(
-    (sum: number, r: { count: number }) => sum + r.count,
-    0,
-  );
+  return result.COUNT_TOTAL;
 }
 
 /** Fetch average SpO2 for a given day (null if unavailable). */

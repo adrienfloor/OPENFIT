@@ -125,12 +125,13 @@ export async function getDailyStats(
       endTime: dayEnd.toISOString(),
     };
 
-    // Aggregated metrics: Health Connect deduplicates across data sources
-    // (e.g. phone pedometer + Zepp both writing Steps) using its priority
-    // rules. readRecords would return raw per-source records and summing
-    // them double-counts overlapping windows.
-    const [stepsAgg, activeCalAgg, totalCalAgg, restingHRAgg] =
+    // Aggregated metrics + sleep run in parallel. Health Connect deduplicates
+    // across data sources (e.g. phone pedometer + Zepp both writing Steps)
+    // using its priority rules; readRecords would return raw per-source
+    // records and summing them double-counts overlapping windows.
+    const [sleep, stepsAgg, activeCalAgg, totalCalAgg, restingHRAgg, spo2] =
       await Promise.all([
+        getSleepSummary(current).catch(() => null),
         aggregateRecord({ recordType: 'Steps', timeRangeFilter }).catch(
           () => null,
         ),
@@ -146,17 +147,35 @@ export async function getDailyStats(
           recordType: 'RestingHeartRate',
           timeRangeFilter,
         }).catch(() => null),
+        readRecords('OxygenSaturation', { timeRangeFilter }).catch(
+          () => ({ records: [] }),
+        ),
       ]);
 
-    // HRV and SpO2 have no aggregate API — fall back to raw records.
-    const [hrv, spo2] = await Promise.all([
-      readRecords('HeartRateVariabilityRmssd', { timeRangeFilter }).catch(
-        () => ({ records: [] }),
-      ),
-      readRecords('OxygenSaturation', { timeRangeFilter }).catch(
-        () => ({ records: [] }),
-      ),
-    ]);
+    // HRV is a sleep / wake-transition metric — its value comes from the
+    // autonomic state at rest. Averaging over the calendar day would mix in
+    // Zepp's daytime stress-feature readings and any naps, diluting the
+    // baseline. Restrict the read to the night's sleep session bounds, or
+    // fall back to a 22:00 prev-day → 08:00 current-day window if no sleep
+    // session was recorded.
+    const hrvWindowStart = sleep?.startTime ?? (() => {
+      const fb = new Date(current);
+      fb.setDate(fb.getDate() - 1);
+      fb.setHours(22, 0, 0, 0);
+      return fb;
+    })();
+    const hrvWindowEnd = sleep?.endTime ?? (() => {
+      const fb = new Date(current);
+      fb.setHours(8, 0, 0, 0);
+      return fb;
+    })();
+    const hrv = await readRecords('HeartRateVariabilityRmssd', {
+      timeRangeFilter: {
+        operator: 'between' as const,
+        startTime: hrvWindowStart.toISOString(),
+        endTime: hrvWindowEnd.toISOString(),
+      },
+    }).catch(() => ({ records: [] }));
 
     const totalSteps = stepsAgg?.COUNT_TOTAL ?? 0;
     const totalTotalCal = totalCalAgg?.ENERGY_TOTAL.inKilocalories ?? 0;
@@ -182,10 +201,17 @@ export async function getDailyStats(
 
     const latestRestingHR = restingHRAgg?.BPM_AVG ?? null;
 
-    const latestHRV =
+    // RMSSD is computed on ~1-min windows, so a single record can land
+    // anywhere from 40–100 ms. The meaningful daily value is the mean of
+    // the readings taken across the sleep window — that's what Zepp and
+    // similar apps display.
+    const avgHRV =
       hrv.records.length > 0
-        ? (hrv.records[hrv.records.length - 1] as { heartRateVariabilityMillis: number })
-            .heartRateVariabilityMillis
+        ? hrv.records.reduce(
+            (sum: number, r: { heartRateVariabilityMillis: number }) =>
+              sum + r.heartRateVariabilityMillis,
+            0,
+          ) / hrv.records.length
         : null;
 
     const avgSpO2 =
@@ -196,9 +222,6 @@ export async function getDailyStats(
           ) / spo2.records.length
         : null;
 
-    // Sleep data for the night ending on this day
-    const sleep = await getSleepSummary(current);
-
     results.push({
       id: `hc-${dayStart.toISOString().slice(0, 10)}`,
       date: dayStart,
@@ -207,7 +230,7 @@ export async function getDailyStats(
       caloriesActive: totalActiveCal || null,
       caloriesTotal: totalTotalCal || null,
       heartRateResting: latestRestingHR,
-      hrvRmssd: latestHRV,
+      hrvRmssd: avgHRV,
       sleepDurationMinutes: sleep?.durationMinutes ?? null,
       sleepScore: sleep?.score ?? null,
       recoveryScore: null,
@@ -229,6 +252,8 @@ export async function getDailyStats(
 export async function getSleepSummary(
   date: Date,
 ): Promise<{
+  startTime: Date;
+  endTime: Date;
   durationMinutes: number;
   score: number | null;
   deepMinutes: number;
@@ -308,6 +333,8 @@ export async function getSleepSummary(
   const durationMinutes = Math.max(0, sessionSpanMinutes - awakeMinutes);
 
   return {
+    startTime: start,
+    endTime: end,
     durationMinutes,
     score: null, // Health Connect does not provide a sleep score
     deepMinutes,

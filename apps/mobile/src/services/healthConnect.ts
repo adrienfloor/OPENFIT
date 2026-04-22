@@ -231,7 +231,9 @@ export async function getSleepSummary(
 
   const start = new Date(session.startTime);
   const end = new Date(session.endTime);
-  const durationMinutes = Math.round((end.getTime() - start.getTime()) / 60000);
+  const sessionSpanMinutes = Math.round(
+    (end.getTime() - start.getTime()) / 60000,
+  );
 
   let deepMinutes = 0;
   let remMinutes = 0;
@@ -264,6 +266,10 @@ export async function getSleepSummary(
       }
     }
   }
+
+  // Report time actually asleep (industry standard — matches Zepp/Garmin/Whoop).
+  // When stage data is missing we fall back to raw session span.
+  const durationMinutes = Math.max(0, sessionSpanMinutes - awakeMinutes);
 
   return {
     durationMinutes,

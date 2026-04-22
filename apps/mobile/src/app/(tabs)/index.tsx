@@ -11,7 +11,7 @@ export default function TodayScreen() {
     { label: 'Active cal', value: today?.caloriesActive ? `${Math.round(today.caloriesActive)} kcal` : '--' },
     { label: 'Resting HR', value: today?.heartRateResting ? `${today.heartRateResting} bpm` : '--' },
     { label: 'HRV', value: today?.hrvRmssd ? `${Math.round(today.hrvRmssd)} ms` : '--' },
-    { label: 'Sleep', value: today?.sleepDurationMinutes ? `${Math.round(today.sleepDurationMinutes / 60)}h ${today.sleepDurationMinutes % 60}m` : '--' },
+    { label: 'Sleep', value: today?.sleepDurationMinutes ? `${Math.floor(today.sleepDurationMinutes / 60)}h ${today.sleepDurationMinutes % 60}m` : '--' },
     { label: 'Recovery', value: today?.recoveryScore ? `${Math.round(today.recoveryScore)}%` : '--' },
   ];
 

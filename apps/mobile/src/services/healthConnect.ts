@@ -71,7 +71,10 @@ const REQUIRED_PERMISSIONS = [
   { accessType: 'read', recordType: 'HeartRateVariabilityRmssd' },
   { accessType: 'read', recordType: 'ActiveCaloriesBurned' },
   { accessType: 'read', recordType: 'TotalCaloriesBurned' },
+  { accessType: 'read', recordType: 'BasalMetabolicRate' },
 ] as const;
+
+export const REQUIRED_PERMISSION_COUNT = REQUIRED_PERMISSIONS.length;
 
 /**
  * Request all READ permissions declared in AndroidManifest.
@@ -112,7 +115,7 @@ export async function getDailyStats(
     // (e.g. phone pedometer + Zepp both writing Steps) using its priority
     // rules. readRecords would return raw per-source records and summing
     // them double-counts overlapping windows.
-    const [stepsAgg, activeCalAgg, totalCalAgg, restingHRAgg] =
+    const [stepsAgg, activeCalAgg, totalCalAgg, basalCalAgg, restingHRAgg] =
       await Promise.all([
         aggregateRecord({ recordType: 'Steps', timeRangeFilter }).catch(
           () => null,
@@ -123,6 +126,10 @@ export async function getDailyStats(
         }).catch(() => null),
         aggregateRecord({
           recordType: 'TotalCaloriesBurned',
+          timeRangeFilter,
+        }).catch(() => null),
+        aggregateRecord({
+          recordType: 'BasalMetabolicRate',
           timeRangeFilter,
         }).catch(() => null),
         aggregateRecord({
@@ -142,8 +149,18 @@ export async function getDailyStats(
     ]);
 
     const totalSteps = stepsAgg?.COUNT_TOTAL ?? 0;
-    const totalActiveCal = activeCalAgg?.ACTIVE_CALORIES_TOTAL.inKilocalories ?? 0;
     const totalTotalCal = totalCalAgg?.ENERGY_TOTAL.inKilocalories ?? 0;
+    const totalBasalCal = basalCalAgg?.BASAL_CALORIES_TOTAL.inKilocalories ?? 0;
+    const rawActiveCal = activeCalAgg?.ACTIVE_CALORIES_TOTAL.inKilocalories ?? 0;
+    // Zepp's "active calories" = TotalCaloriesBurned − BasalMetabolicRate,
+    // which includes the day's walking/casual activity. ActiveCaloriesBurned
+    // alone only covers Zepp's explicitly-tagged workouts (e.g. a logged
+    // jiu-jitsu session) so falls short of the Zepp dashboard value.
+    // Fall back to the raw ActiveCaloriesBurned when basal/total are absent.
+    const totalActiveCal =
+      totalTotalCal > 0 && totalBasalCal > 0
+        ? Math.max(0, totalTotalCal - totalBasalCal)
+        : rawActiveCal;
     const latestRestingHR = restingHRAgg?.BPM_AVG ?? null;
 
     const latestHRV =

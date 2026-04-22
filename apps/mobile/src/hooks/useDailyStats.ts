@@ -29,8 +29,12 @@ export function useDailyStats(): {
 
         if (available) {
           const { getGrantedPermissions } = await import('react-native-health-connect');
+          const { REQUIRED_PERMISSION_COUNT } = await import('../services/healthConnect');
           const granted = await getGrantedPermissions();
-          if (granted.length > 0) {
+          // Treat as connected only when every required read permission is
+          // granted — this way a new permission added in an app update will
+          // re-show the Connect Health Data button so the user can grant it.
+          if (granted.length >= REQUIRED_PERMISSION_COUNT) {
             setPermissionsGranted(true);
             setFetchTrigger((t) => t + 1);
           }

@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import { HeartRateSampleSchema } from './health';
 
+export const WorkoutTypeSchema = z.enum(['strength', 'jiu_jitsu', 'run']);
+export type WorkoutType = z.infer<typeof WorkoutTypeSchema>;
+
 export const MuscleGroupSchema = z.enum([
   'chest',
   'back',
@@ -26,6 +29,14 @@ export const EquipmentSchema = z.enum([
   'resistance_band',
   'other',
 ]);
+
+export const GPSPointSchema = z.object({
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+  altitudeMeters: z.number(),
+  timestamp: z.coerce.date(),
+  speedMps: z.number().nonnegative(),
+});
 
 export const ExerciseSchema = z.object({
   id: z.string(),
@@ -77,14 +88,28 @@ export const ExerciseLogSchema = z.object({
   sets: z.array(CompletedSetSchema).min(1),
 });
 
+/**
+ * Unified activity log — strength workouts, jiu-jitsu sessions, and runs all
+ * live here, distinguished by `type`. Run-specific fields and `gpsTrack` are
+ * populated only when `type === 'run'`; `exerciseLogs` is only populated for
+ * `type === 'strength'`.
+ */
 export const WorkoutLogSchema = z.object({
   id: z.string(),
   userId: z.string(),
   sessionId: z.string().nullable(),
+  type: WorkoutTypeSchema,
   startedAt: z.coerce.date(),
   completedAt: z.coerce.date().nullable(),
+  caloriesBurned: z.number().nonnegative().nullable(),
+  distanceMeters: z.number().nonnegative().nullable(),
+  durationSeconds: z.number().int().nonnegative().nullable(),
+  avgPaceSecondsPerKm: z.number().positive().nullable(),
+  bestPaceSecondsPerKm: z.number().positive().nullable(),
+  elevationGainMeters: z.number().nonnegative().nullable(),
   heartRateData: z.array(HeartRateSampleSchema),
   exerciseLogs: z.array(ExerciseLogSchema),
+  gpsTrack: z.array(GPSPointSchema),
 });
 
 export type MuscleGroup = z.infer<typeof MuscleGroupSchema>;
@@ -95,6 +120,8 @@ export type PlannedExercise = z.infer<typeof PlannedExerciseSchema>;
 export type Session = z.infer<typeof SessionSchema>;
 export type Week = z.infer<typeof WeekSchema>;
 export type Program = z.infer<typeof ProgramSchema>;
+export type GPSPoint = z.infer<typeof GPSPointSchema>;
+
 // --- Input schemas for CRUD operations ---
 
 export const CreateExerciseInputSchema = z.object({
@@ -148,12 +175,39 @@ export const LogExerciseInputSchema = z.object({
   sets: z.array(LogCompletedSetInputSchema).min(1),
 });
 
-export const CreateWorkoutLogInputSchema = z.object({
-  sessionId: z.string().nullable().optional(),
-  startedAt: z.coerce.date(),
+export const CreateGPSPointInputSchema = GPSPointSchema;
+
+export const CreateWorkoutLogInputSchema = z
+  .object({
+    type: WorkoutTypeSchema.default('strength'),
+    sessionId: z.string().nullable().optional(),
+    startedAt: z.coerce.date(),
+    completedAt: z.coerce.date().nullable().optional(),
+    caloriesBurned: z.number().nonnegative().nullable().optional(),
+    // Run-only fields
+    distanceMeters: z.number().nonnegative().optional(),
+    durationSeconds: z.number().int().nonnegative().optional(),
+    avgPaceSecondsPerKm: z.number().positive().nullable().optional(),
+    bestPaceSecondsPerKm: z.number().positive().nullable().optional(),
+    elevationGainMeters: z.number().nonnegative().optional(),
+    gpsPoints: z.array(CreateGPSPointInputSchema).optional(),
+    // Strength-only fields
+    exerciseLogs: z.array(LogExerciseInputSchema).optional().default([]),
+    heartRateSamples: z.array(HeartRateSampleSchema).optional(),
+  })
+  .refine(
+    (data) => data.type !== 'strength' || data.exerciseLogs.length > 0,
+    { message: 'Strength workouts require at least one exerciseLog', path: ['exerciseLogs'] },
+  );
+
+export const UpdateWorkoutLogInputSchema = z.object({
   completedAt: z.coerce.date().nullable().optional(),
-  exerciseLogs: z.array(LogExerciseInputSchema).min(1),
-  heartRateSamples: z.array(HeartRateSampleSchema).optional(),
+  caloriesBurned: z.number().nonnegative().nullable().optional(),
+  distanceMeters: z.number().nonnegative().optional(),
+  durationSeconds: z.number().int().nonnegative().optional(),
+  avgPaceSecondsPerKm: z.number().positive().nullable().optional(),
+  bestPaceSecondsPerKm: z.number().positive().nullable().optional(),
+  elevationGainMeters: z.number().nonnegative().optional(),
 });
 
 export type CreateExerciseInput = z.infer<typeof CreateExerciseInputSchema>;
@@ -165,7 +219,9 @@ export type CreateProgramInput = z.infer<typeof CreateProgramInputSchema>;
 export type UpdateProgramInput = z.infer<typeof UpdateProgramInputSchema>;
 export type LogCompletedSetInput = z.infer<typeof LogCompletedSetInputSchema>;
 export type LogExerciseInput = z.infer<typeof LogExerciseInputSchema>;
+export type CreateGPSPointInput = z.infer<typeof CreateGPSPointInputSchema>;
 export type CreateWorkoutLogInput = z.infer<typeof CreateWorkoutLogInputSchema>;
+export type UpdateWorkoutLogInput = z.infer<typeof UpdateWorkoutLogInputSchema>;
 
 export type CompletedSet = z.infer<typeof CompletedSetSchema>;
 export type ExerciseLog = z.infer<typeof ExerciseLogSchema>;

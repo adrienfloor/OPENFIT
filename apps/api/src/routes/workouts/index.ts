@@ -3,6 +3,8 @@ import {
   CreateProgramInputSchema,
   UpdateProgramInputSchema,
   CreateWorkoutLogInputSchema,
+  UpdateWorkoutLogInputSchema,
+  WorkoutTypeSchema,
 } from '@openfit/types';
 import { WorkoutService, WorkoutError } from '../../services/workout.service.js';
 
@@ -85,8 +87,17 @@ export const workoutRoutes: FastifyPluginAsync = async (fastify) => {
 
   // --- Workout Logs ---
 
-  fastify.get('/logs', async (request, reply) => {
-    const logs = await service.getLogsForUser(request.user.sub);
+  fastify.get<{ Querystring: { type?: string } }>('/logs', async (request, reply) => {
+    const typeParam = request.query.type;
+    const parsedType = typeParam ? WorkoutTypeSchema.safeParse(typeParam) : null;
+    if (parsedType && !parsedType.success) {
+      return reply.status(400).send({ error: 'Invalid workout type' });
+    }
+    const logs = await service.getLogsForUser(
+      request.user.sub,
+      50,
+      parsedType?.data,
+    );
     return reply.send(logs);
   });
 
@@ -111,6 +122,23 @@ export const workoutRoutes: FastifyPluginAsync = async (fastify) => {
     try {
       const log = await service.createWorkoutLog(request.user.sub, parsed.data);
       return reply.status(201).send(log);
+    } catch (err) {
+      if (err instanceof WorkoutError) {
+        return reply.status(err.statusCode).send({ error: err.message });
+      }
+      throw err;
+    }
+  });
+
+  fastify.patch<{ Params: { id: string } }>('/logs/:id', async (request, reply) => {
+    const parsed = UpdateWorkoutLogInputSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'Validation error', details: parsed.error.flatten() });
+    }
+
+    try {
+      const log = await service.updateWorkoutLog(request.user.sub, request.params.id, parsed.data);
+      return reply.send(log);
     } catch (err) {
       if (err instanceof WorkoutError) {
         return reply.status(err.statusCode).send({ error: err.message });

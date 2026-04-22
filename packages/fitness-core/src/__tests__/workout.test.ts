@@ -34,10 +34,18 @@ describe('calculateTrainingLoad', () => {
       id: `session-${daysBack}`,
       userId: 'user1',
       sessionId: null,
+      type: 'strength',
       startedAt: daysAgo(daysBack),
       completedAt: new Date(daysAgo(daysBack).getTime() + durationMinutes * 60 * 1000),
+      caloriesBurned: null,
+      distanceMeters: null,
+      durationSeconds: durationMinutes * 60,
+      avgPaceSecondsPerKm: null,
+      bestPaceSecondsPerKm: null,
+      elevationGainMeters: null,
       heartRateData: [],
       exerciseLogs: [],
+      gpsTrack: [],
     });
 
     // 4 sessions over 28 days, each 60 minutes = 240 total chronic = 60/week avg

@@ -1,5 +1,11 @@
 import type { PrismaClient } from '@prisma/client';
-import type { CreateProgramInput, UpdateProgramInput, CreateWorkoutLogInput } from '@openfit/types';
+import type {
+  CreateProgramInput,
+  UpdateProgramInput,
+  CreateWorkoutLogInput,
+  UpdateWorkoutLogInput,
+  WorkoutType,
+} from '@openfit/types';
 
 export class WorkoutError extends Error {
   constructor(
@@ -199,9 +205,9 @@ export class WorkoutService {
 
   // --- Workout Logs ---
 
-  async getLogsForUser(userId: string, limit = 50) {
+  async getLogsForUser(userId: string, limit = 50, type?: WorkoutType) {
     return this.prisma.workoutLog.findMany({
-      where: { userId },
+      where: { userId, ...(type ? { type } : {}) },
       orderBy: { startedAt: 'desc' },
       take: limit,
       include: {
@@ -213,6 +219,7 @@ export class WorkoutService {
           },
         },
         heartRateSamples: { orderBy: { timestamp: 'asc' } },
+        gpsPoints: { orderBy: { timestamp: 'asc' } },
       },
     });
   }
@@ -229,6 +236,7 @@ export class WorkoutService {
           },
         },
         heartRateSamples: { orderBy: { timestamp: 'asc' } },
+        gpsPoints: { orderBy: { timestamp: 'asc' } },
       },
     });
 
@@ -269,9 +277,16 @@ export class WorkoutService {
 
     const data: Parameters<typeof this.prisma.workoutLog.create>[0]['data'] = {
       userId,
+      type: input.type,
       sessionId: input.sessionId ?? null,
       startedAt: input.startedAt,
       completedAt: input.completedAt ?? null,
+      caloriesBurned: input.caloriesBurned ?? null,
+      distanceMeters: input.distanceMeters ?? null,
+      durationSeconds: input.durationSeconds ?? null,
+      avgPaceSecondsPerKm: input.avgPaceSecondsPerKm ?? null,
+      bestPaceSecondsPerKm: input.bestPaceSecondsPerKm ?? null,
+      elevationGainMeters: input.elevationGainMeters ?? null,
       exerciseLogs: {
         create: input.exerciseLogs.map((el) => ({
           exerciseId: el.exerciseId,
@@ -289,12 +304,24 @@ export class WorkoutService {
       },
     };
 
-    if (input.heartRateSamples) {
+    if (input.heartRateSamples && input.heartRateSamples.length > 0) {
       data.heartRateSamples = {
         create: input.heartRateSamples.map((sample) => ({
           timestamp: sample.timestamp,
           bpm: sample.bpm,
           zone: sample.zone,
+        })),
+      };
+    }
+
+    if (input.gpsPoints && input.gpsPoints.length > 0) {
+      data.gpsPoints = {
+        create: input.gpsPoints.map((p) => ({
+          lat: p.lat,
+          lng: p.lng,
+          altitudeMeters: p.altitudeMeters,
+          timestamp: p.timestamp,
+          speedMps: p.speedMps,
         })),
       };
     }
@@ -310,6 +337,41 @@ export class WorkoutService {
           },
         },
         heartRateSamples: { orderBy: { timestamp: 'asc' } },
+        gpsPoints: { orderBy: { timestamp: 'asc' } },
+      },
+    });
+  }
+
+  async updateWorkoutLog(userId: string, logId: string, input: UpdateWorkoutLogInput) {
+    const log = await this.prisma.workoutLog.findFirst({
+      where: { id: logId, userId },
+    });
+
+    if (!log) {
+      throw new WorkoutError('Workout log not found', 404);
+    }
+
+    return this.prisma.workoutLog.update({
+      where: { id: logId },
+      data: {
+        ...(input.completedAt !== undefined ? { completedAt: input.completedAt } : {}),
+        ...(input.caloriesBurned !== undefined ? { caloriesBurned: input.caloriesBurned } : {}),
+        ...(input.distanceMeters !== undefined ? { distanceMeters: input.distanceMeters } : {}),
+        ...(input.durationSeconds !== undefined ? { durationSeconds: input.durationSeconds } : {}),
+        ...(input.avgPaceSecondsPerKm !== undefined ? { avgPaceSecondsPerKm: input.avgPaceSecondsPerKm } : {}),
+        ...(input.bestPaceSecondsPerKm !== undefined ? { bestPaceSecondsPerKm: input.bestPaceSecondsPerKm } : {}),
+        ...(input.elevationGainMeters !== undefined ? { elevationGainMeters: input.elevationGainMeters } : {}),
+      },
+      include: {
+        session: true,
+        exerciseLogs: {
+          include: {
+            exercise: true,
+            completedSets: { orderBy: { setIndex: 'asc' } },
+          },
+        },
+        heartRateSamples: { orderBy: { timestamp: 'asc' } },
+        gpsPoints: { orderBy: { timestamp: 'asc' } },
       },
     });
   }

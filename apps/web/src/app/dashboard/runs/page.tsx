@@ -67,7 +67,7 @@ export default function RunsPage() {
   useEffect(() => {
     async function fetchRuns() {
       try {
-        const res = await apiClient.get<RunSession[]>('/runs');
+        const res = await apiClient.get<RunSession[]>('/workouts/logs?type=run');
         setRuns(res.data);
       } catch {
         // empty state

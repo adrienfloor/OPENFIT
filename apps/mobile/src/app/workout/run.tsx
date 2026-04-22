@@ -7,10 +7,15 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { apiClient } from '../../services/api';
 import { useAuthStore } from '../../stores/auth.store';
 import { useRealtimeHeartRate } from '../../hooks/useRealtimeHeartRate';
-import { calculateMaxHR } from '@openfit/fitness-core';
+import {
+  calculateMaxHR,
+  computeCaloriesFromHRSamples,
+  ageYearsFromDob,
+} from '@openfit/fitness-core';
 import { calculateAge, formatDuration } from '../../utils';
 import {
   startRunTracking,
@@ -81,6 +86,7 @@ function HeartRateDisplay({ maxHR, avgHrRef }: { maxHR: number; avgHrRef: React.
 }
 
 export default function RunScreen() {
+  const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const [runState, setRunState] = useState<RunState>('idle');
   const [elapsed, setElapsed] = useState(0);
@@ -207,11 +213,23 @@ export default function RunScreen() {
       }
     }
 
+    const caloriesBurned =
+      user && hrSamples.length > 0
+        ? computeCaloriesFromHRSamples({
+            samples: hrSamples.map((s) => ({ timestamp: s.timestamp, bpm: s.bpm })),
+            weightKg: user.weightKg,
+            ageYears: ageYearsFromDob(new Date(user.dateOfBirth)),
+            sex: user.sex,
+          })
+        : null;
+
     const payload = {
+      type: 'run' as const,
       startedAt: startTimeRef.current.toISOString(),
       completedAt: new Date().toISOString(),
       distanceMeters: Math.round(distance),
       durationSeconds: elapsed,
+      caloriesBurned,
       avgPaceSecondsPerKm: distance > 0 ? Math.round(elapsed / (distance / 1000)) : null,
       bestPaceSecondsPerKm: bestPace ? Math.round(bestPace) : null,
       elevationGainMeters: Math.round(getElevationGain()),
@@ -226,8 +244,9 @@ export default function RunScreen() {
     };
 
     try {
-      await apiClient.post('/runs', payload);
-      Alert.alert('Run saved', `${distanceKm} km in ${formatDuration(elapsed)}`);
+      await apiClient.post('/workouts/logs', payload);
+      const calText = caloriesBurned ? ` · ${Math.round(caloriesBurned)} kcal` : '';
+      Alert.alert('Run saved', `${distanceKm} km in ${formatDuration(elapsed)}${calText}`);
     } catch {
       Alert.alert('Saved locally', 'Will sync when back online.');
     }
@@ -236,6 +255,7 @@ export default function RunScreen() {
     startTimeRef.current = null;
     elapsedBeforePauseRef.current = 0;
     resetRunData();
+    router.back();
   };
 
   const handleDiscard = () => {
@@ -261,6 +281,9 @@ export default function RunScreen() {
   if (runState === 'idle') {
     return (
       <View style={styles.centered}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <Text style={styles.backText}>‹ Back</Text>
+        </TouchableOpacity>
         <Text style={styles.title}>Run</Text>
         <Text style={styles.subtitle}>Track your run with GPS</Text>
         <Text style={styles.subtitleSmall}>Works with screen locked</Text>
@@ -358,6 +381,8 @@ export default function RunScreen() {
 
 const styles = StyleSheet.create({
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb' },
+  backBtn: { position: 'absolute', top: 56, left: 16 },
+  backText: { fontSize: 16, color: '#22c55e', fontWeight: '500' },
   container: { flex: 1, backgroundColor: '#f9fafb' },
   content: { paddingHorizontal: 16, paddingTop: 56, paddingBottom: 40 },
   title: { fontSize: 24, fontWeight: 'bold', marginBottom: 8 },

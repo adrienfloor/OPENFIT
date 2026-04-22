@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
+import { computeCaloriesFromHRSamples, ageYearsFromDob } from '@openfit/fitness-core';
 
 const prisma = new PrismaClient();
 
@@ -11,7 +12,6 @@ async function main(): Promise<void> {
   await prisma.completedSet.deleteMany();
   await prisma.exerciseLog.deleteMany();
   await prisma.gPSPoint.deleteMany();
-  await prisma.runSession.deleteMany();
   await prisma.workoutLog.deleteMany();
   await prisma.plannedSet.deleteMany();
   await prisma.plannedExercise.deleteMany();
@@ -246,11 +246,21 @@ async function main(): Promise<void> {
         });
       }
 
+      const caloriesBurned = computeCaloriesFromHRSamples({
+        samples: hrSamples.map((s) => ({ timestamp: s.timestamp, bpm: s.bpm })),
+        weightKg: user.weightKg,
+        ageYears: ageYearsFromDob(user.dateOfBirth),
+        sex: user.sex,
+      });
+
       await prisma.workoutLog.create({
         data: {
           userId: user.id,
+          type: 'strength',
           startedAt,
           completedAt,
+          durationSeconds: durationMinutes * 60,
+          caloriesBurned,
           exerciseLogs: {
             create: shuffled.map((ex) => {
               const numSets = 3 + Math.floor(Math.random() * 2);
@@ -477,13 +487,22 @@ async function main(): Promise<void> {
         return gain + (diff > 0 ? diff : 0);
       }, 0);
 
-      await prisma.runSession.create({
+      const runCalories = computeCaloriesFromHRSamples({
+        samples: runHR.map((s) => ({ timestamp: s.timestamp, bpm: s.bpm })),
+        weightKg: user.weightKg,
+        ageYears: ageYearsFromDob(user.dateOfBirth),
+        sex: user.sex,
+      });
+
+      await prisma.workoutLog.create({
         data: {
           userId: user.id,
+          type: 'run',
           startedAt,
           completedAt,
-          distanceMeters,
           durationSeconds,
+          caloriesBurned: runCalories,
+          distanceMeters,
           avgPaceSecondsPerKm: paceBase,
           bestPaceSecondsPerKm: paceBase - 15 - Math.floor(Math.random() * 20),
           elevationGainMeters: Math.round(elevationGain),
@@ -494,7 +513,7 @@ async function main(): Promise<void> {
     }
   }
 
-  console.log('Created 12 run sessions (6 per user) with Marseille GPS routes + HR data');
+  console.log('Created 12 run workout logs (6 per user) with Marseille GPS routes + HR data');
   console.log('Seed complete!');
 }
 

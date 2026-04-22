@@ -4,7 +4,6 @@ import { corsPlugin } from './plugins/cors.js';
 import { jwtPlugin } from './plugins/jwt.js';
 import { authRoutes } from './routes/auth/index.js';
 import { workoutRoutes } from './routes/workouts/index.js';
-import { runRoutes } from './routes/runs/index.js';
 import { healthRoutes } from './routes/health/index.js';
 
 const server = Fastify({
@@ -20,7 +19,6 @@ async function bootstrap(): Promise<void> {
 
   await server.register(authRoutes, { prefix: '/auth' });
   await server.register(workoutRoutes, { prefix: '/workouts' });
-  await server.register(runRoutes, { prefix: '/runs' });
   await server.register(healthRoutes, { prefix: '/health' });
 
   server.get('/healthz', async () => ({ status: 'ok' }));

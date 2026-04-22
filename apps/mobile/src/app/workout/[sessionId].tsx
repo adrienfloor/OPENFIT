@@ -109,10 +109,15 @@ export default function ActiveWorkoutScreen() {
       return;
     }
 
+    const now = new Date();
+    const durationSeconds = Math.round((now.getTime() - startedAt!.getTime()) / 1000);
+
     const payload = {
+      type: 'strength' as const,
       sessionId,
       startedAt: startedAt!.toISOString(),
-      completedAt: new Date().toISOString(),
+      completedAt: now.toISOString(),
+      durationSeconds,
       exerciseLogs: activeExercises.map((ae) => ({
         exerciseId: ae.exerciseId,
         sets: ae.completedSets.map((s, idx) => ({

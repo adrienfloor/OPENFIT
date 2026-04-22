@@ -28,7 +28,8 @@ export default function RootLayout() {
           // Fetch user profile
           const profileRes = await apiClient.get<{
             id: string; email: string; name: string; dateOfBirth: string;
-            weightKg: number; role: 'user' | 'admin'; createdAt: string; updatedAt: string;
+            weightKg: number; heightCm: number; sex: 'male' | 'female';
+            role: 'user' | 'admin'; createdAt: string; updatedAt: string;
           }>('/auth/me');
 
           await setAuth(

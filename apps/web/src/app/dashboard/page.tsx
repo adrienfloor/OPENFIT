@@ -72,7 +72,7 @@ export default function TodayPage() {
         const [healthRes, workoutRes, runRes] = await Promise.all([
           apiClient.get<DailyHealthRecord[]>('/health'),
           apiClient.get<RecentWorkout[]>('/workouts/logs'),
-          apiClient.get<RecentRun[]>('/runs'),
+          apiClient.get<RecentRun[]>('/workouts/logs?type=run'),
         ]);
         setHealth(healthRes.data);
         setWorkouts(workoutRes.data);

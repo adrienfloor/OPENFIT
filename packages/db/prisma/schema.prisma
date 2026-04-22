@@ -20,6 +20,12 @@ enum Sex {
   female
 }
 
+enum WorkoutType {
+  strength
+  jiu_jitsu
+  run
+}
+
 enum MuscleGroup {
   chest
   back
@@ -62,7 +68,6 @@ model User {
   refreshTokens    RefreshToken[]
   programs         Program[]
   workoutLogs      WorkoutLog[]
-  runSessions      RunSession[]
   dailyHealth      DailyHealth[]
 }
 
@@ -148,19 +153,30 @@ model PlannedSet {
 }
 
 model WorkoutLog {
-  id          String    @id @default(cuid())
+  id          String      @id @default(cuid())
   userId      String
   sessionId   String?
+  type        WorkoutType @default(strength)
   startedAt   DateTime
   completedAt DateTime?
+  caloriesBurned Float?
+
+  // Run-specific fields, null for non-run types.
+  distanceMeters       Float?
+  durationSeconds      Int?
+  avgPaceSecondsPerKm  Float?
+  bestPaceSecondsPerKm Float?
+  elevationGainMeters  Float?
 
   user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   session          Session?          @relation(fields: [sessionId], references: [id], onDelete: SetNull)
   heartRateSamples HeartRateSample[]
   exerciseLogs     ExerciseLog[]
+  gpsPoints        GPSPoint[]
 
   @@index([userId])
   @@index([userId, startedAt])
+  @@index([userId, type])
 }
 
 model ExerciseLog {
@@ -190,37 +206,18 @@ model CompletedSet {
   @@unique([exerciseLogId, setIndex])
 }
 
-model RunSession {
-  id                   String    @id @default(cuid())
-  userId               String
-  startedAt            DateTime
-  completedAt          DateTime?
-  distanceMeters       Float
-  durationSeconds      Int
-  avgPaceSecondsPerKm  Float?
-  bestPaceSecondsPerKm Float?
-  elevationGainMeters  Float
-
-  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  heartRateSamples HeartRateSample[]
-  gpsPoints        GPSPoint[]
-
-  @@index([userId])
-  @@index([userId, startedAt])
-}
-
 model GPSPoint {
   id             String   @id @default(cuid())
-  runSessionId   String
+  workoutLogId   String
   lat            Float
   lng            Float
   altitudeMeters Float
   timestamp      DateTime
   speedMps       Float
 
-  runSession RunSession @relation(fields: [runSessionId], references: [id], onDelete: Cascade)
+  workoutLog WorkoutLog @relation(fields: [workoutLogId], references: [id], onDelete: Cascade)
 
-  @@index([runSessionId])
+  @@index([workoutLogId])
 }
 
 model HeartRateSample {
@@ -228,14 +225,11 @@ model HeartRateSample {
   timestamp    DateTime
   bpm          Int
   zone         String
-  workoutLogId String?
-  runSessionId String?
+  workoutLogId String
 
-  workoutLog WorkoutLog? @relation(fields: [workoutLogId], references: [id], onDelete: Cascade)
-  runSession RunSession? @relation(fields: [runSessionId], references: [id], onDelete: Cascade)
+  workoutLog WorkoutLog @relation(fields: [workoutLogId], references: [id], onDelete: Cascade)
 
   @@index([workoutLogId])
-  @@index([runSessionId])
 }
 
 model DailyHealth {

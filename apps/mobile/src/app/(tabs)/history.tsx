@@ -8,19 +8,9 @@ import {
   RefreshControl,
 } from 'react-native';
 import MapLibreGL, { setConnected } from '@maplibre/maplibre-react-native';
+import type { WorkoutType } from '@openfit/types';
 import { apiClient } from '../../services/api';
 import { formatDuration } from '../../utils';
-
-interface WorkoutLog {
-  id: string;
-  startedAt: string;
-  completedAt: string | null;
-  session: { name: string } | null;
-  exerciseLogs: {
-    exercise: { name: string };
-    completedSets: { reps: number; weight: number }[];
-  }[];
-}
 
 interface GPSPoint {
   lat: number;
@@ -28,21 +18,39 @@ interface GPSPoint {
   altitudeMeters: number;
 }
 
-interface RunSession {
-  id: string;
-  startedAt: string;
-  distanceMeters: number;
-  durationSeconds: number;
-  avgPaceSecondsPerKm: number | null;
-  bestPaceSecondsPerKm: number | null;
-  elevationGainMeters: number;
-  gpsPoints: GPSPoint[];
+interface HeartRateSample {
+  bpm: number;
+  zone: string;
 }
 
-type Tab = 'workouts' | 'runs';
+interface WorkoutLog {
+  id: string;
+  type: WorkoutType;
+  startedAt: string;
+  completedAt: string | null;
+  caloriesBurned: number | null;
+  durationSeconds: number | null;
+  distanceMeters: number | null;
+  avgPaceSecondsPerKm: number | null;
+  bestPaceSecondsPerKm: number | null;
+  elevationGainMeters: number | null;
+  session: { name: string } | null;
+  exerciseLogs: {
+    exercise: { name: string };
+    completedSets: { reps: number; weight: number }[];
+  }[];
+  gpsPoints: GPSPoint[];
+  heartRateSamples: HeartRateSample[];
+}
+
+type Filter = 'all' | WorkoutType;
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  return new Date(iso).toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
 }
 
 function formatPace(secondsPerKm: number): string {
@@ -51,7 +59,19 @@ function formatPace(secondsPerKm: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-// OpenFreeMap — free OSM tiles, no API key, Strava-like appearance
+function typeLabel(type: WorkoutType): string {
+  if (type === 'strength') return 'Strength';
+  if (type === 'jiu_jitsu') return 'Jiu-Jitsu';
+  return 'Run';
+}
+
+function typeColor(type: WorkoutType): string {
+  if (type === 'strength') return '#22c55e';
+  if (type === 'jiu_jitsu') return '#a855f7';
+  return '#3b82f6';
+}
+
+// OpenFreeMap — free OSM tiles, no API key.
 const TILE_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
 
 let mapInitialized = false;
@@ -72,12 +92,10 @@ function RunMap({ gpsPoints }: { gpsPoints: GPSPoint[] }) {
     );
   }
 
-  // Calculate bounds
   let minLat = gpsPoints[0]!.lat;
   let maxLat = gpsPoints[0]!.lat;
   let minLng = gpsPoints[0]!.lng;
   let maxLng = gpsPoints[0]!.lng;
-
   for (const p of gpsPoints) {
     if (p.lat < minLat) minLat = p.lat;
     if (p.lat > maxLat) maxLat = p.lat;
@@ -87,10 +105,7 @@ function RunMap({ gpsPoints }: { gpsPoints: GPSPoint[] }) {
 
   const centerLat = (minLat + maxLat) / 2;
   const centerLng = (minLng + maxLng) / 2;
-  const latSpan = maxLat - minLat;
-  const lngSpan = maxLng - minLng;
-  const maxSpan = Math.max(latSpan, lngSpan, 0.005);
-  // Approximate zoom: smaller span = higher zoom
+  const maxSpan = Math.max(maxLat - minLat, maxLng - minLng, 0.005);
   const zoom = Math.max(10, Math.min(16, 14 - Math.log2(maxSpan / 0.005)));
 
   const routeGeoJSON: GeoJSON.FeatureCollection = {
@@ -127,22 +142,11 @@ function RunMap({ gpsPoints }: { gpsPoints: GPSPoint[] }) {
         <MapLibreGL.ShapeSource id="route" shape={routeGeoJSON}>
           <MapLibreGL.LineLayer
             id="routeLineGlow"
-            style={{
-              lineColor: '#22c55e',
-              lineWidth: 8,
-              lineOpacity: 0.3,
-              lineCap: 'round',
-              lineJoin: 'round',
-            }}
+            style={{ lineColor: '#3b82f6', lineWidth: 8, lineOpacity: 0.3, lineCap: 'round', lineJoin: 'round' }}
           />
           <MapLibreGL.LineLayer
             id="routeLine"
-            style={{
-              lineColor: '#22c55e',
-              lineWidth: 4,
-              lineCap: 'round',
-              lineJoin: 'round',
-            }}
+            style={{ lineColor: '#3b82f6', lineWidth: 4, lineCap: 'round', lineJoin: 'round' }}
           />
         </MapLibreGL.ShapeSource>
         <MapLibreGL.ShapeSource
@@ -168,22 +172,28 @@ function RunMap({ gpsPoints }: { gpsPoints: GPSPoint[] }) {
   );
 }
 
+function hrStats(samples: HeartRateSample[]): { avg: number; max: number } | null {
+  if (samples.length === 0) return null;
+  let total = 0;
+  let max = 0;
+  for (const s of samples) {
+    total += s.bpm;
+    if (s.bpm > max) max = s.bpm;
+  }
+  return { avg: Math.round(total / samples.length), max };
+}
+
 export default function HistoryScreen() {
-  const [tab, setTab] = useState<Tab>('workouts');
-  const [workouts, setWorkouts] = useState<WorkoutLog[]>([]);
-  const [runs, setRuns] = useState<RunSession[]>([]);
+  const [filter, setFilter] = useState<Filter>('all');
+  const [logs, setLogs] = useState<WorkoutLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [wRes, rRes] = await Promise.all([
-        apiClient.get<WorkoutLog[]>('/workouts/logs'),
-        apiClient.get<RunSession[]>('/runs'),
-      ]);
-      setWorkouts(wRes.data);
-      setRuns(rRes.data);
+      const res = await apiClient.get<WorkoutLog[]>('/workouts/logs');
+      setLogs(res.data);
     } catch {
       // empty state
     } finally {
@@ -195,6 +205,14 @@ export default function HistoryScreen() {
     fetchData();
   }, [fetchData]);
 
+  const filtered = filter === 'all' ? logs : logs.filter((l) => l.type === filter);
+  const counts = {
+    all: logs.length,
+    strength: logs.filter((l) => l.type === 'strength').length,
+    run: logs.filter((l) => l.type === 'run').length,
+    jiu_jitsu: logs.filter((l) => l.type === 'jiu_jitsu').length,
+  };
+
   return (
     <ScrollView
       style={styles.container}
@@ -202,134 +220,154 @@ export default function HistoryScreen() {
     >
       <Text style={styles.title}>History</Text>
 
-      {/* Tab switcher */}
-      <View style={styles.tabs}>
-        <TouchableOpacity
-          style={[styles.tab, tab === 'workouts' && styles.tabActive]}
-          onPress={() => setTab('workouts')}
-        >
-          <Text style={[styles.tabText, tab === 'workouts' && styles.tabTextActive]}>
-            Workouts ({workouts.length})
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, tab === 'runs' && styles.tabActive]}
-          onPress={() => setTab('runs')}
-        >
-          <Text style={[styles.tabText, tab === 'runs' && styles.tabTextActive]}>
-            Runs ({runs.length})
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
+        {(['all', 'strength', 'run', 'jiu_jitsu'] as const).map((f) => (
+          <TouchableOpacity
+            key={f}
+            style={[styles.filterChip, filter === f && styles.filterChipActive]}
+            onPress={() => setFilter(f)}
+          >
+            <Text style={[styles.filterChipText, filter === f && styles.filterChipTextActive]}>
+              {f === 'all' ? 'All' : typeLabel(f)} ({counts[f]})
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
 
-      {/* Workout list */}
-      {tab === 'workouts' && (
-        <View>
-          {workouts.length === 0 && !loading && (
-            <Text style={styles.emptyText}>No workouts logged yet.</Text>
-          )}
-          {workouts.map((w) => {
-            const totalSets = w.exerciseLogs.reduce((sum, el) => sum + el.completedSets.length, 0);
-            const totalVolume = w.exerciseLogs.reduce(
-              (sum, el) => sum + el.completedSets.reduce((s, set) => s + set.reps * set.weight, 0),
-              0,
-            );
-            const isExpanded = expandedId === w.id;
-
-            return (
-              <TouchableOpacity
-                key={w.id}
-                style={styles.card}
-                onPress={() => setExpandedId(isExpanded ? null : w.id)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.cardHeader}>
-                  <View>
-                    <Text style={styles.cardTitle}>{w.session?.name ?? 'Free workout'}</Text>
-                    <Text style={styles.cardDate}>{formatDate(w.startedAt)}</Text>
-                  </View>
-                  <View style={styles.cardRight}>
-                    <Text style={styles.cardStat}>{totalSets} sets</Text>
-                    <Text style={styles.cardStatSub}>{totalVolume.toLocaleString()} kg</Text>
-                  </View>
-                </View>
-
-                {isExpanded && (
-                  <View style={styles.expandedContent}>
-                    {w.exerciseLogs.map((el, idx) => (
-                      <View key={idx} style={styles.exerciseRow}>
-                        <Text style={styles.exerciseName}>{el.exercise.name}</Text>
-                        {el.completedSets.map((s, si) => (
-                          <Text key={si} style={styles.setText}>
-                            Set {si + 1}: {s.reps} x {s.weight}kg
-                          </Text>
-                        ))}
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+      {filtered.length === 0 && !loading && (
+        <Text style={styles.emptyText}>No activities yet.</Text>
       )}
 
-      {/* Run list */}
-      {tab === 'runs' && (
-        <View>
-          {runs.length === 0 && !loading && (
-            <Text style={styles.emptyText}>No runs logged yet.</Text>
-          )}
-          {runs.map((r) => {
-            const isExpanded = expandedId === r.id;
-            return (
-              <TouchableOpacity
-                key={r.id}
-                style={styles.card}
-                onPress={() => setExpandedId(isExpanded ? null : r.id)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.cardHeader}>
-                  <View>
-                    <Text style={styles.cardTitle}>{(r.distanceMeters / 1000).toFixed(1)} km</Text>
-                    <Text style={styles.cardDate}>{formatDate(r.startedAt)}</Text>
-                  </View>
-                  <View style={styles.cardRight}>
-                    <Text style={styles.cardStat}>{formatDuration(r.durationSeconds)}</Text>
-                    <Text style={styles.cardStatSub}>
-                      {r.avgPaceSecondsPerKm != null ? `${formatPace(r.avgPaceSecondsPerKm)} /km` : '--'}
-                    </Text>
-                  </View>
-                </View>
+      {filtered.map((log) => {
+        const isExpanded = expandedId === log.id;
+        const color = typeColor(log.type);
+        const hr = hrStats(log.heartRateSamples);
 
-                {isExpanded && (
-                  <View style={styles.expandedContent}>
-                    <RunMap gpsPoints={r.gpsPoints} />
-                    <View style={styles.runDetailRow}>
-                      <View style={styles.runDetailItem}>
-                        <Text style={styles.runDetailLabel}>Avg pace</Text>
-                        <Text style={styles.runDetailValue}>
-                          {r.avgPaceSecondsPerKm != null ? `${formatPace(r.avgPaceSecondsPerKm)} /km` : '--'}
+        const headerRight = (() => {
+          if (log.type === 'strength') {
+            const sets = log.exerciseLogs.reduce((s, el) => s + el.completedSets.length, 0);
+            const volume = log.exerciseLogs.reduce(
+              (s, el) => s + el.completedSets.reduce((ss, set) => ss + set.reps * set.weight, 0),
+              0,
+            );
+            return (
+              <View style={styles.cardRight}>
+                <Text style={styles.cardStat}>{sets} sets</Text>
+                <Text style={styles.cardStatSub}>{volume.toLocaleString()} kg</Text>
+              </View>
+            );
+          }
+          if (log.type === 'run') {
+            return (
+              <View style={styles.cardRight}>
+                <Text style={styles.cardStat}>
+                  {log.distanceMeters ? `${(log.distanceMeters / 1000).toFixed(2)} km` : '—'}
+                </Text>
+                <Text style={styles.cardStatSub}>
+                  {log.avgPaceSecondsPerKm != null ? `${formatPace(log.avgPaceSecondsPerKm)} /km` : '--'}
+                </Text>
+              </View>
+            );
+          }
+          // jiu_jitsu
+          return (
+            <View style={styles.cardRight}>
+              <Text style={styles.cardStat}>
+                {log.durationSeconds != null ? formatDuration(log.durationSeconds) : '—'}
+              </Text>
+              <Text style={styles.cardStatSub}>
+                {hr ? `${hr.avg} avg · ${hr.max} max` : '--'}
+              </Text>
+            </View>
+          );
+        })();
+
+        return (
+          <TouchableOpacity
+            key={log.id}
+            style={styles.card}
+            onPress={() => setExpandedId(isExpanded ? null : log.id)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.cardHeader}>
+              <View style={styles.cardLeft}>
+                <View style={[styles.typeBadge, { backgroundColor: color }]}>
+                  <Text style={styles.typeBadgeText}>{typeLabel(log.type)}</Text>
+                </View>
+                <View>
+                  <Text style={styles.cardTitle}>
+                    {log.session?.name ?? typeLabel(log.type)}
+                  </Text>
+                  <Text style={styles.cardDate}>{formatDate(log.startedAt)}</Text>
+                </View>
+              </View>
+              {headerRight}
+            </View>
+
+            {log.caloriesBurned != null && (
+              <Text style={styles.calBar}>🔥 {Math.round(log.caloriesBurned)} kcal</Text>
+            )}
+
+            {isExpanded && (
+              <View style={styles.expandedContent}>
+                {log.type === 'strength' && log.exerciseLogs.map((el, idx) => (
+                  <View key={idx} style={styles.exerciseRow}>
+                    <Text style={styles.exerciseName}>{el.exercise.name}</Text>
+                    {el.completedSets.map((s, si) => (
+                      <Text key={si} style={styles.setText}>
+                        Set {si + 1}: {s.reps} x {s.weight}kg
+                      </Text>
+                    ))}
+                  </View>
+                ))}
+
+                {log.type === 'run' && (
+                  <>
+                    <RunMap gpsPoints={log.gpsPoints} />
+                    <View style={styles.detailRow}>
+                      <View style={styles.detailItem}>
+                        <Text style={styles.detailLabel}>Avg pace</Text>
+                        <Text style={styles.detailValue}>
+                          {log.avgPaceSecondsPerKm != null ? `${formatPace(log.avgPaceSecondsPerKm)} /km` : '--'}
                         </Text>
                       </View>
-                      <View style={styles.runDetailItem}>
-                        <Text style={styles.runDetailLabel}>Best pace</Text>
-                        <Text style={styles.runDetailValue}>
-                          {r.bestPaceSecondsPerKm != null ? `${formatPace(r.bestPaceSecondsPerKm)} /km` : '--'}
+                      <View style={styles.detailItem}>
+                        <Text style={styles.detailLabel}>Best pace</Text>
+                        <Text style={styles.detailValue}>
+                          {log.bestPaceSecondsPerKm != null ? `${formatPace(log.bestPaceSecondsPerKm)} /km` : '--'}
                         </Text>
                       </View>
-                      <View style={styles.runDetailItem}>
-                        <Text style={styles.runDetailLabel}>Elevation</Text>
-                        <Text style={styles.runDetailValue}>{r.elevationGainMeters ?? 0} m</Text>
+                      <View style={styles.detailItem}>
+                        <Text style={styles.detailLabel}>Elevation</Text>
+                        <Text style={styles.detailValue}>{log.elevationGainMeters ?? 0} m</Text>
                       </View>
+                    </View>
+                  </>
+                )}
+
+                {log.type === 'jiu_jitsu' && hr && (
+                  <View style={styles.detailRow}>
+                    <View style={styles.detailItem}>
+                      <Text style={styles.detailLabel}>Duration</Text>
+                      <Text style={styles.detailValue}>
+                        {log.durationSeconds != null ? formatDuration(log.durationSeconds) : '--'}
+                      </Text>
+                    </View>
+                    <View style={styles.detailItem}>
+                      <Text style={styles.detailLabel}>Avg HR</Text>
+                      <Text style={styles.detailValue}>{hr.avg} bpm</Text>
+                    </View>
+                    <View style={styles.detailItem}>
+                      <Text style={styles.detailLabel}>Max HR</Text>
+                      <Text style={styles.detailValue}>{hr.max} bpm</Text>
                     </View>
                   </View>
                 )}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
+              </View>
+            )}
+          </TouchableOpacity>
+        );
+      })}
 
       <View style={{ height: 40 }} />
     </ScrollView>
@@ -339,19 +377,31 @@ export default function HistoryScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb', paddingHorizontal: 16, paddingTop: 56 },
   title: { fontSize: 24, fontWeight: 'bold', marginBottom: 16 },
-  tabs: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 10, padding: 4, marginBottom: 16 },
-  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
-  tabActive: { backgroundColor: '#22c55e' },
-  tabText: { fontSize: 14, fontWeight: '500', color: '#6b7280' },
-  tabTextActive: { color: '#fff' },
+  filterRow: { flexDirection: 'row', marginBottom: 16, maxHeight: 44 },
+  filterChip: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  filterChipActive: { backgroundColor: '#22c55e', borderColor: '#22c55e' },
+  filterChipText: { fontSize: 13, color: '#374151', fontWeight: '500' },
+  filterChipTextActive: { color: '#fff' },
   emptyText: { fontSize: 14, color: '#9ca3af', textAlign: 'center', marginTop: 40 },
   card: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 10 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardTitle: { fontSize: 16, fontWeight: '600' },
+  cardLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  typeBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  typeBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  cardTitle: { fontSize: 15, fontWeight: '600' },
   cardDate: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
   cardRight: { alignItems: 'flex-end' },
   cardStat: { fontSize: 14, fontWeight: '500', color: '#374151' },
   cardStatSub: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
+  calBar: { fontSize: 12, color: '#6b7280', marginTop: 8, fontWeight: '500' },
   expandedContent: { marginTop: 12, borderTopWidth: 1, borderTopColor: '#f3f4f6', paddingTop: 12 },
   exerciseRow: { marginBottom: 8 },
   exerciseName: { fontSize: 14, fontWeight: '500', marginBottom: 2 },
@@ -360,8 +410,8 @@ const styles = StyleSheet.create({
   map: { flex: 1 },
   mapPlaceholder: { height: 100, borderRadius: 10, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
   mapPlaceholderText: { fontSize: 13, color: '#9ca3af' },
-  runDetailRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  runDetailItem: { flex: 1, alignItems: 'center' },
-  runDetailLabel: { fontSize: 11, color: '#9ca3af', marginBottom: 2 },
-  runDetailValue: { fontSize: 14, fontWeight: '500' },
+  detailRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  detailItem: { flex: 1, alignItems: 'center' },
+  detailLabel: { fontSize: 11, color: '#9ca3af', marginBottom: 2 },
+  detailValue: { fontSize: 14, fontWeight: '500' },
 });

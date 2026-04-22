@@ -15,7 +15,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       schema: {
         body: {
           type: 'object',
-          required: ['email', 'password', 'name', 'dateOfBirth', 'weightKg'],
+          required: ['email', 'password', 'name', 'dateOfBirth', 'weightKg', 'heightCm', 'sex'],
         },
       },
     },

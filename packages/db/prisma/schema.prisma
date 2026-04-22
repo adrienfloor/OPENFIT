@@ -15,6 +15,11 @@ enum Role {
   admin
 }
 
+enum Sex {
+  male
+  female
+}
+
 enum MuscleGroup {
   chest
   back
@@ -48,6 +53,8 @@ model User {
   name         String
   dateOfBirth  DateTime
   weightKg     Float
+  heightCm     Float
+  sex          Sex
   role         Role     @default(user)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

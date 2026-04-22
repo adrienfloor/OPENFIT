@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@maplibre/maplibre-react-native": "^10.0.0-alpha.20",
+    "@openfit/fitness-core": "*",
     "@openfit/types": "*",
     "@react-navigation/native": "^6.1.17",
     "axios": "^1.7.2",

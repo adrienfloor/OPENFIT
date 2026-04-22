@@ -10,6 +10,8 @@ const mockUser = {
   name: 'Test User',
   dateOfBirth: new Date('1990-01-01'),
   weightKg: 75,
+  heightCm: 178,
+  sex: 'male' as const,
   role: 'user' as const,
   createdAt: new Date(),
   updatedAt: new Date(),
@@ -59,6 +61,8 @@ describe('AuthService.register', () => {
       name: 'Test User',
       dateOfBirth: new Date('1990-01-01'),
       weightKg: 75,
+      heightCm: 178,
+      sex: 'male',
     };
 
     const result = await service.register(input);
@@ -84,6 +88,8 @@ describe('AuthService.register', () => {
       name: 'Test User',
       dateOfBirth: new Date('1990-01-01'),
       weightKg: 75,
+      heightCm: 178,
+      sex: 'male',
     };
 
     await expect(service.register(input)).rejects.toThrow(AuthError);

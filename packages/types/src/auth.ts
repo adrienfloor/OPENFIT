@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+export const SexSchema = z.enum(['male', 'female']);
+export type Sex = z.infer<typeof SexSchema>;
+
 export const RegisterInputSchema = z.object({
   email: z.string().email().toLowerCase().trim(),
   password: z
@@ -10,6 +13,8 @@ export const RegisterInputSchema = z.object({
   name: z.string().min(1).max(100).trim(),
   dateOfBirth: z.coerce.date(),
   weightKg: z.number().positive().max(500),
+  heightCm: z.number().positive().max(300),
+  sex: SexSchema,
 });
 
 export const LoginInputSchema = z.object({
@@ -40,6 +45,8 @@ export const UserProfileSchema = z.object({
   name: z.string(),
   dateOfBirth: z.coerce.date(),
   weightKg: z.number(),
+  heightCm: z.number(),
+  sex: SexSchema,
   role: z.enum(['user', 'admin']),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),

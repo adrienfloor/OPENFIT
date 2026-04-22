@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { DailyHealth } from '@openfit/types';
+import { useAuth } from './useAuth';
 
 export function useDailyStats(): {
   today: DailyHealth | null;
@@ -10,6 +11,7 @@ export function useDailyStats(): {
   refetch: () => void;
   requestPermissions: () => Promise<void>;
 } {
+  const { user } = useAuth();
   const [today, setToday] = useState<DailyHealth | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -73,7 +75,15 @@ export function useDailyStats(): {
         console.log('[useDailyStats] fetching stats...');
         const { getDailyStats } = await import('../services/healthConnect');
         const date = new Date();
-        const results = await getDailyStats(date, date);
+        const profile = user
+          ? {
+              weightKg: user.weightKg,
+              heightCm: user.heightCm,
+              sex: user.sex,
+              dateOfBirth: new Date(user.dateOfBirth),
+            }
+          : undefined;
+        const results = await getDailyStats(date, date, profile);
         console.log('[useDailyStats] results:', JSON.stringify(results));
         setToday(results[0] ?? null);
       } catch (err) {
@@ -85,7 +95,7 @@ export function useDailyStats(): {
     }
 
     fetchStats();
-  }, [permissionsGranted, fetchTrigger]);
+  }, [permissionsGranted, fetchTrigger, user]);
 
   return {
     today,

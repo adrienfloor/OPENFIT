@@ -33,6 +33,8 @@ async function main(): Promise<void> {
       name: 'Alice Trainer',
       dateOfBirth: new Date('1990-04-15'),
       weightKg: 65,
+      heightCm: 165,
+      sex: 'female',
       role: 'user',
     },
   });
@@ -43,7 +45,9 @@ async function main(): Promise<void> {
       passwordHash,
       name: 'Bob Lifter',
       dateOfBirth: new Date('1985-08-22'),
-      weightKg: 85,
+      weightKg: 80,
+      heightCm: 180,
+      sex: 'male',
       role: 'admin',
     },
   });

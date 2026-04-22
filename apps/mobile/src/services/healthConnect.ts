@@ -13,7 +13,8 @@ import {
   getSdkStatus,
   SdkAvailabilityStatus,
 } from 'react-native-health-connect';
-import type { DailyHealth } from '@openfit/types';
+import type { DailyHealth, UserProfile } from '@openfit/types';
+import { computeBMR, bmrCaloriesElapsed, ageYearsFromDob } from '@openfit/fitness-core';
 
 export class HealthConnectError extends Error {
   constructor(message: string) {
@@ -71,7 +72,6 @@ const REQUIRED_PERMISSIONS = [
   { accessType: 'read', recordType: 'HeartRateVariabilityRmssd' },
   { accessType: 'read', recordType: 'ActiveCaloriesBurned' },
   { accessType: 'read', recordType: 'TotalCaloriesBurned' },
-  { accessType: 'read', recordType: 'BasalMetabolicRate' },
 ] as const;
 
 export const REQUIRED_PERMISSION_COUNT = REQUIRED_PERMISSIONS.length;
@@ -95,12 +95,26 @@ export async function requestHealthPermissions(): Promise<boolean> {
 export async function getDailyStats(
   startDate: Date,
   endDate: Date,
+  userProfile?: Pick<UserProfile, 'weightKg' | 'heightCm' | 'sex' | 'dateOfBirth'>,
 ): Promise<DailyHealth[]> {
   assertInitialized();
 
   const results: DailyHealth[] = [];
   const current = startOfDay(startDate);
   const end = startOfDay(endDate);
+
+  // Derive BMR once — it's constant across days for the same user. If we
+  // don't have a full profile, we can't compute basal and will fall back to
+  // Health Connect's ActiveCaloriesBurned record (workout-only).
+  const bmrPerDay =
+    userProfile !== undefined
+      ? computeBMR({
+          weightKg: userProfile.weightKg,
+          heightCm: userProfile.heightCm,
+          ageYears: ageYearsFromDob(userProfile.dateOfBirth),
+          sex: userProfile.sex,
+        })
+      : null;
 
   while (current <= end) {
     const dayStart = startOfDay(current);
@@ -115,7 +129,7 @@ export async function getDailyStats(
     // (e.g. phone pedometer + Zepp both writing Steps) using its priority
     // rules. readRecords would return raw per-source records and summing
     // them double-counts overlapping windows.
-    const [stepsAgg, activeCalAgg, totalCalAgg, basalCalAgg, restingHRAgg] =
+    const [stepsAgg, activeCalAgg, totalCalAgg, restingHRAgg] =
       await Promise.all([
         aggregateRecord({ recordType: 'Steps', timeRangeFilter }).catch(
           () => null,
@@ -126,10 +140,6 @@ export async function getDailyStats(
         }).catch(() => null),
         aggregateRecord({
           recordType: 'TotalCaloriesBurned',
-          timeRangeFilter,
-        }).catch(() => null),
-        aggregateRecord({
-          recordType: 'BasalMetabolicRate',
           timeRangeFilter,
         }).catch(() => null),
         aggregateRecord({
@@ -150,17 +160,26 @@ export async function getDailyStats(
 
     const totalSteps = stepsAgg?.COUNT_TOTAL ?? 0;
     const totalTotalCal = totalCalAgg?.ENERGY_TOTAL.inKilocalories ?? 0;
-    const totalBasalCal = basalCalAgg?.BASAL_CALORIES_TOTAL.inKilocalories ?? 0;
     const rawActiveCal = activeCalAgg?.ACTIVE_CALORIES_TOTAL.inKilocalories ?? 0;
-    // Zepp's "active calories" = TotalCaloriesBurned − BasalMetabolicRate,
-    // which includes the day's walking/casual activity. ActiveCaloriesBurned
-    // alone only covers Zepp's explicitly-tagged workouts (e.g. a logged
-    // jiu-jitsu session) so falls short of the Zepp dashboard value.
-    // Fall back to the raw ActiveCaloriesBurned when basal/total are absent.
-    const totalActiveCal =
-      totalTotalCal > 0 && totalBasalCal > 0
-        ? Math.max(0, totalTotalCal - totalBasalCal)
-        : rawActiveCal;
+
+    // Zepp's "Consommation d'activité" = TotalCaloriesBurned − BMR.
+    // Zepp does not write BasalMetabolicRate records to Health Connect, so we
+    // compute BMR ourselves from the user profile (Mifflin-St Jeor) and
+    // prorate by the portion of the day that has elapsed — a full-day BMR
+    // would overestimate the resting component for a still-in-progress day.
+    // ActiveCaloriesBurned on its own only covers explicit workout sessions
+    // (e.g. the 540 kcal jiu-jitsu log) and misses daily walking / casual
+    // activity, so we only fall back to it when the profile is missing.
+    const isToday = startOfDay(current).getTime() === startOfDay(new Date()).getTime();
+    const now = isToday ? new Date() : endOfDay(current);
+    let totalActiveCal: number;
+    if (bmrPerDay !== null && totalTotalCal > 0) {
+      const basalSoFar = bmrCaloriesElapsed(bmrPerDay, now);
+      totalActiveCal = Math.max(0, totalTotalCal - basalSoFar);
+    } else {
+      totalActiveCal = rawActiveCal;
+    }
+
     const latestRestingHR = restingHRAgg?.BPM_AVG ?? null;
 
     const latestHRV =

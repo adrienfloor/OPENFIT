@@ -6,7 +6,15 @@ import { RegisterInputSchema } from '@openfit/types';
 
 export default function RegisterScreen() {
   const { register } = useAuth();
-  const [form, setForm] = useState({ name: '', email: '', password: '', dateOfBirth: '', weightKg: '' });
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    dateOfBirth: '',
+    weightKg: '',
+    heightCm: '',
+    sex: '' as '' | 'male' | 'female',
+  });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -18,6 +26,7 @@ export default function RegisterScreen() {
     const parsed = RegisterInputSchema.safeParse({
       ...form,
       weightKg: Number(form.weightKg),
+      heightCm: Number(form.heightCm),
       dateOfBirth: new Date(form.dateOfBirth),
     });
 
@@ -56,6 +65,21 @@ export default function RegisterScreen() {
       </View>
       <TextInput style={styles.input} placeholder="Date of birth (YYYY-MM-DD)" value={form.dateOfBirth} onChangeText={(v) => update('dateOfBirth', v)} />
       <TextInput style={styles.input} placeholder="Weight (kg)" value={form.weightKg} onChangeText={(v) => update('weightKg', v)} keyboardType="numeric" />
+      <TextInput style={styles.input} placeholder="Height (cm)" value={form.heightCm} onChangeText={(v) => update('heightCm', v)} keyboardType="numeric" />
+      <View style={styles.sexRow}>
+        <TouchableOpacity
+          style={[styles.sexBtn, form.sex === 'male' && styles.sexBtnActive]}
+          onPress={() => update('sex', 'male')}
+        >
+          <Text style={[styles.sexBtnText, form.sex === 'male' && styles.sexBtnTextActive]}>Male</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.sexBtn, form.sex === 'female' && styles.sexBtnActive]}
+          onPress={() => update('sex', 'female')}
+        >
+          <Text style={[styles.sexBtnText, form.sex === 'female' && styles.sexBtnTextActive]}>Female</Text>
+        </TouchableOpacity>
+      </View>
       <TouchableOpacity style={[styles.button, loading && styles.buttonDisabled]} onPress={() => void handleRegister()} disabled={loading}>
         <Text style={styles.buttonText}>{loading ? 'Creating...' : 'Create account'}</Text>
       </TouchableOpacity>
@@ -78,4 +102,9 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.5 },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   link: { textAlign: 'center', color: '#16a34a', fontSize: 14 },
+  sexRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
+  sexBtn: { flex: 1, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  sexBtnActive: { backgroundColor: '#22c55e', borderColor: '#22c55e' },
+  sexBtnText: { fontSize: 16, color: '#374151', fontWeight: '500' },
+  sexBtnTextActive: { color: '#fff' },
 });

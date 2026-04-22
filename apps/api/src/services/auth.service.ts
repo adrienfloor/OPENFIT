@@ -40,6 +40,8 @@ export class AuthService {
         name: input.name,
         dateOfBirth: input.dateOfBirth,
         weightKg: input.weightKg,
+        heightCm: input.heightCm,
+        sex: input.sex,
         role: 'user',
       },
     });
@@ -175,6 +177,8 @@ export class AuthService {
     name: string;
     dateOfBirth: Date;
     weightKg: number;
+    heightCm: number;
+    sex: string;
     role: string;
     createdAt: Date;
     updatedAt: Date;
@@ -185,6 +189,8 @@ export class AuthService {
       name: user.name,
       dateOfBirth: user.dateOfBirth,
       weightKg: user.weightKg,
+      heightCm: user.heightCm,
+      sex: user.sex as 'male' | 'female',
       role: user.role as 'user' | 'admin',
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,

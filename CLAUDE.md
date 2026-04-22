@@ -188,6 +188,17 @@ Rework the Today tab to show three key scores like Zepp's dashboard:
 - Animations and transitions (react-native-reanimated)
 - Polished splash screen and app icon
 
+### 2.6 — Nutrition Tracking (AI Food Photo Analysis)
+Log food and track macros/calories by taking a picture of a meal.
+- **Photo capture**: Mobile screen to snap or pick a plate photo (expo-image-picker / expo-camera)
+- **AI analysis**: Upload image to backend, forward to vision model (Claude, GPT-4o vision, or similar) that returns structured JSON — food items, portion estimates, total calories, protein/carbs/fat grams
+- **User confirmation**: User reviews/edits the AI-detected items before logging (AI can be wrong on portions)
+- **Food log**: `FoodLog` model with items, macros, calories, photo URL, timestamp
+- **Daily totals**: Today tab shows calorie intake (consumed) alongside active calories and passive calories (BMR + daily activity)
+- **Macro goals**: User sets daily targets (calories, protein, carbs, fat). Progress bars / rings show % of goal consumed
+- **Calorie balance**: Intake vs (passive + active) expenditure — show surplus/deficit for the day
+- **History**: Browse past meals with photos and macros
+
 ### Phase 3 (future)
 - Offline sync testing and hardening
 - Exercise-specific progress charts (e.g. bench press 1RM trend over time)

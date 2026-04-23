@@ -44,7 +44,7 @@ async function main(): Promise<void> {
       email: 'bob@openfit.dev',
       passwordHash,
       name: 'Bob Lifter',
-      dateOfBirth: new Date('1985-08-22'),
+      dateOfBirth: new Date('1990-02-22'),
       weightKg: 80,
       heightCm: 180,
       sex: 'male',

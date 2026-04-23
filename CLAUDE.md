@@ -69,7 +69,7 @@ npx expo run:android
   - **BMR** via Mifflin-St Jeor (`packages/fitness-core/src/bmr.ts`) using weight + height + age + sex. Used by the Today tab to derive active daily calories as `TotalCaloriesBurned − bmrCaloriesElapsed(BMR, now)` — the same definition Zepp/Garmin/Whoop use.
   - **Workout calories** via Keytel et al. 2005 (`packages/fitness-core/src/calories.ts`) — a sex-specific regression that maps HR + weight + age to kcal/min. Integrated over the workout's HR samples (uneven sample gaps handled). A MET-based fallback exists for activities without HR.
 - **Daily wellness scores** (`packages/fitness-core/src/scores.ts`): transparent published composites, not Zepp reverse-engineering.
-  - **`sleepScore`** — 0.50 · duration-vs-target + 0.20 · efficiency + 0.15 · deep-ratio + 0.15 · REM-ratio (re-normalises to duration 80 % / efficiency 20 % without stage data). Default target 480 min (8 h).
+  - **`sleepScore`** — 5-component composite: 0.35 · duration + 0.15 · efficiency (docks 5 pts/awakening past the 2nd) + 0.15 · deep-ratio (squared below the 13–23 % sweet spot, 0 at lo/2) + 0.15 · REM-ratio (same curve, 20–25 % sweet spot) + 0.20 · regularity (7-day bedtime stddev; 0 min → 100, 180 min → 0). Missing components renormalise the remaining weights. Default duration target 480 min (8 h). Tuned on 2026-04-23 against Zepp on Bob's data — within ~5 pts.
   - **`effortScore`** (Slice 2, pending) — HUNT Fitness Study PAI algorithm over 24 h HR.
   - **`readinessScore`** (Slice 3, pending) — HRV + RHR baseline deviation + sleep + training-load decay.
 - **User profile**: `weightKg`, `heightCm`, `sex`, and `dateOfBirth` are required fields. Height isn't needed for Keytel but is needed for BMR, and both are needed so future workouts / runs log real calorie numbers.
@@ -112,10 +112,10 @@ POST   /health/bulk           — Bulk upsert (up to 90 days, for mobile sync)
 ```
 
 ## Testing
-- `packages/fitness-core`: 66 Vitest tests (heart rate zones, pace, ACWR, BMR Mifflin-St Jeor, Keytel calories, sleep score composite)
+- `packages/fitness-core`: 73 Vitest tests (heart rate zones, pace, ACWR, BMR Mifflin-St Jeor, Keytel calories, sleep score composite with regularity + awakenings)
 - `apps/api`: 34 Vitest tests (auth, unified workout CRUD, health, multi-tenancy)
 - Run with: `cd apps/api && npx vitest run` or `cd packages/fitness-core && npx vitest run`
-- Total: 100 tests passing
+- Total: 107 tests passing
 
 ## Database
 - PostgreSQL via Docker: `docker compose up -d`

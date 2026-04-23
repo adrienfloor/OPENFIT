@@ -134,28 +134,36 @@ export async function getDailyStats(
     // across data sources (e.g. phone pedometer + Zepp both writing Steps)
     // using its priority rules; readRecords would return raw per-source
     // records and summing them double-counts overlapping windows.
-    const [sleep, stepsAgg, activeCalAgg, totalCalAgg, restingHRAgg, spo2] =
-      await Promise.all([
-        getSleepSummary(current).catch(() => null),
-        aggregateRecord({ recordType: 'Steps', timeRangeFilter }).catch(
-          () => null,
-        ),
-        aggregateRecord({
-          recordType: 'ActiveCaloriesBurned',
-          timeRangeFilter,
-        }).catch(() => null),
-        aggregateRecord({
-          recordType: 'TotalCaloriesBurned',
-          timeRangeFilter,
-        }).catch(() => null),
-        aggregateRecord({
-          recordType: 'RestingHeartRate',
-          timeRangeFilter,
-        }).catch(() => null),
-        readRecords('OxygenSaturation', { timeRangeFilter }).catch(
-          () => ({ records: [] }),
-        ),
-      ]);
+    const [
+      sleep,
+      stepsAgg,
+      activeCalAgg,
+      totalCalAgg,
+      restingHRAgg,
+      spo2,
+      regularity,
+    ] = await Promise.all([
+      getSleepSummary(current).catch(() => null),
+      aggregateRecord({ recordType: 'Steps', timeRangeFilter }).catch(
+        () => null,
+      ),
+      aggregateRecord({
+        recordType: 'ActiveCaloriesBurned',
+        timeRangeFilter,
+      }).catch(() => null),
+      aggregateRecord({
+        recordType: 'TotalCaloriesBurned',
+        timeRangeFilter,
+      }).catch(() => null),
+      aggregateRecord({
+        recordType: 'RestingHeartRate',
+        timeRangeFilter,
+      }).catch(() => null),
+      readRecords('OxygenSaturation', { timeRangeFilter }).catch(
+        () => ({ records: [] }),
+      ),
+      getSleepRegularity(current).catch(() => null),
+    ]);
 
     // HRV is a sleep / wake-transition metric — its value comes from the
     // autonomic state at rest. Averaging over the calendar day would mix in
@@ -229,14 +237,17 @@ export async function getDailyStats(
 
     // Health Connect doesn't write a sleep score, so we compute our own from
     // the stage breakdown using the published composite in @openfit/fitness-core.
+    // Regularity comes from the last 7 nights of SleepSession (null if <3 nights).
     const computedSleepScore =
       sleep !== null && sleep.durationMinutes > 0
         ? sleepScore({
             durationMinutes: sleep.durationMinutes,
             awakeMinutes: sleep.awakeMinutes,
+            awakeningCount: sleep.awakeningCount,
             deepMinutes: sleep.deepMinutes,
             remMinutes: sleep.remMinutes,
             lightMinutes: sleep.lightMinutes,
+            regularityScore: regularity ?? undefined,
           }).score
         : null;
 
@@ -278,6 +289,8 @@ export async function getSleepSummary(
   remMinutes: number;
   lightMinutes: number;
   awakeMinutes: number;
+  /** Count of contiguous awake segments during the session. */
+  awakeningCount: number;
 } | null> {
   assertInitialized();
 
@@ -318,6 +331,8 @@ export async function getSleepSummary(
   let remMinutes = 0;
   let lightMinutes = 0;
   let awakeMinutes = 0;
+  let awakeningCount = 0;
+  let prevAwake = false;
 
   if (session.stages) {
     for (const stage of session.stages) {
@@ -328,6 +343,10 @@ export async function getSleepSummary(
 
       // Health Connect sleep stage constants
       // 1 = Awake, 2 = Sleeping, 3 = Out of bed, 4 = Light, 5 = Deep, 6 = REM
+      const isAwake = stage.stage === 1 || stage.stage === 3;
+      if (isAwake && !prevAwake) awakeningCount++;
+      prevAwake = isAwake;
+
       switch (stage.stage) {
         case 1:
         case 3:
@@ -359,7 +378,65 @@ export async function getSleepSummary(
     remMinutes,
     lightMinutes,
     awakeMinutes,
+    awakeningCount,
   };
+}
+
+/**
+ * Compute a 0–100 bedtime-regularity score from the last N sleep sessions.
+ *
+ * Returns null if fewer than 3 sessions are available — statistical noise on
+ * stddev of 1–2 values makes the number meaningless.
+ *
+ * Algorithm: for each session, compute bedtime in minutes past 18:00 (this
+ * anchor puts every reasonable bedtime in the 0–720 range, avoiding the
+ * midnight-wraparound issue). Take the population stddev. Map linearly:
+ * stddev 0 min → 100, stddev 180 min (3 h) → 0.
+ */
+export async function getSleepRegularity(
+  date: Date,
+  lookbackDays = 7,
+): Promise<number | null> {
+  assertInitialized();
+
+  const windowStart = new Date(date);
+  windowStart.setDate(windowStart.getDate() - lookbackDays);
+  windowStart.setHours(18, 0, 0, 0);
+
+  const result = await readRecords('SleepSession', {
+    timeRangeFilter: {
+      operator: 'between' as const,
+      startTime: windowStart.toISOString(),
+      endTime: endOfDay(date).toISOString(),
+    },
+  });
+
+  // One bedtime per calendar day — if the device logged multiple sessions for
+  // a nap + main sleep, keep only the longest (main) session.
+  const byDay = new Map<string, { start: Date; durationMs: number }>();
+  for (const r of result.records as Array<{ startTime: string; endTime: string }>) {
+    const start = new Date(r.startTime);
+    const durationMs = new Date(r.endTime).getTime() - start.getTime();
+    const key = start.toISOString().slice(0, 10);
+    const existing = byDay.get(key);
+    if (!existing || durationMs > existing.durationMs) {
+      byDay.set(key, { start, durationMs });
+    }
+  }
+
+  if (byDay.size < 3) return null;
+
+  const bedtimes = [...byDay.values()].map(({ start }) => {
+    const mins = start.getHours() * 60 + start.getMinutes() - 18 * 60;
+    return mins < 0 ? mins + 24 * 60 : mins;
+  });
+
+  const mean = bedtimes.reduce((a, b) => a + b, 0) / bedtimes.length;
+  const variance =
+    bedtimes.reduce((s, v) => s + (v - mean) ** 2, 0) / bedtimes.length;
+  const stdMinutes = Math.sqrt(variance);
+
+  return Math.round(Math.max(0, Math.min(100, 100 * (1 - stdMinutes / 180))));
 }
 
 /** Fetch resting heart rate for a given day (null if unavailable). */

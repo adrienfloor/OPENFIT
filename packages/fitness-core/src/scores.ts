@@ -289,6 +289,11 @@ export interface ReadinessScoreInput {
   recentLoad: number | null;
   /** Number of days of baseline history available (both HRV + RHR). */
   baselineDays: number;
+  /**
+   * Effort minutes accumulated *today*. Drains readiness through the day
+   * the way Zepp's BioCharge empties as you train. Default 0 (no drain).
+   */
+  todayEarnedMinutes?: number | null;
 }
 
 export interface ReadinessScoreResult {
@@ -348,8 +353,15 @@ export function readinessScore(input: ReadinessScoreInput): ReadinessScoreResult
 
   const overall = totalWeight > 0 ? weighted / totalWeight : 50;
 
+  // Intraday drain — readiness is a battery, activity empties it through the
+  // day. 0 earned → no drain, 200 earned → −30 pts, capped at −30 so a monster
+  // session can't drive readiness below 0 on its own (baseline inputs still
+  // determine the morning starting point).
+  const todayEarned = Math.max(0, input.todayEarnedMinutes ?? 0);
+  const intradayDrain = Math.min(30, todayEarned * 0.15);
+
   return {
-    score: clamp0to100(Math.round(overall)),
+    score: clamp0to100(Math.round(overall - intradayDrain)),
     calibrating: false,
     components: {
       hrv: hrvSub !== null ? Math.round(hrvSub) : null,
@@ -400,4 +412,44 @@ export function recentTrainingLoad(
     if (v != null) load += v * (weights[i] as number);
   }
   return load;
+}
+
+/**
+ * Daily effort target scaled to the user's fitness level, using resting HR
+ * and HRV as open-data proxies for VO2max (Zepp-style, no fancy sensors
+ * required).
+ *
+ * Formula:
+ *
+ *   target = 20                                              // WHO baseline
+ *          + max(0, (68 − restingHR) × 0.4)                  // RHR bonus
+ *          + max(0, (hrvRmssd − 30) × 0.2)                   // HRV bonus
+ *          − max(0, (ageYears − 35) × 0.3)                   // age penalty
+ *          clamped to [20, 120]
+ *
+ * Population anchors: adult RHR average 68 bpm, adult RMSSD average 30 ms,
+ * age 35 as the no-penalty reference. A fit 35-year-old (RHR 50, HRV 50)
+ * lands around 35; an average adult at 22; an elite endurance athlete up
+ * into the 60s.
+ *
+ * Returns 50 (moderate default) when RHR or age is missing — we won't fake
+ * a fitness estimate from nothing.
+ */
+export function personalisedEffortTarget({
+  restingHR,
+  hrvRmssd,
+  ageYears,
+}: {
+  restingHR: number | null;
+  hrvRmssd: number | null;
+  ageYears: number | null;
+}): number {
+  if (restingHR == null || ageYears == null) return 50;
+
+  let target = 20;
+  target += Math.max(0, (68 - restingHR) * 0.4);
+  if (hrvRmssd != null) target += Math.max(0, (hrvRmssd - 30) * 0.2);
+  target -= Math.max(0, (ageYears - 35) * 0.3);
+
+  return Math.max(20, Math.min(120, Math.round(target)));
 }

@@ -4,6 +4,7 @@ import {
   effortScore,
   readinessScore,
   recentTrainingLoad,
+  personalisedEffortTarget,
   DEFAULT_SLEEP_NEED_MINUTES,
   READINESS_MIN_BASELINE_DAYS,
   type EffortHRSample,
@@ -471,6 +472,82 @@ describe('readinessScore — morning recovery composite', () => {
       recentLoad: 200,
     });
     expect(r.score).toBeLessThan(40);
+  });
+});
+
+describe('readinessScore — intraday drain from todayEarnedMinutes', () => {
+  const base = {
+    hrvToday: 50,
+    hrvBaseline: 50,
+    rhrToday: 55,
+    rhrBaseline: 55,
+    sleepScore: 80,
+    recentLoad: 0,
+    baselineDays: 7,
+  } as const;
+
+  it('no drain when today earned is 0 or missing', () => {
+    expect(readinessScore(base).score).toBe(79);
+    expect(readinessScore({ ...base, todayEarnedMinutes: 0 }).score).toBe(79);
+    expect(readinessScore({ ...base, todayEarnedMinutes: null }).score).toBe(79);
+  });
+
+  it('drains proportionally through the day', () => {
+    // 50 earned × 0.15 = 7.5 drain → 79 − 8 = 71
+    const mid = readinessScore({ ...base, todayEarnedMinutes: 50 });
+    expect(mid.score).toBe(72);
+  });
+
+  it('caps drain at 30 points (monster workout)', () => {
+    const hard = readinessScore({ ...base, todayEarnedMinutes: 500 });
+    expect(hard.score).toBe(79 - 30);
+  });
+
+  it('morning readiness unchanged — drain does not affect components', () => {
+    const r = readinessScore({ ...base, todayEarnedMinutes: 200 });
+    expect(r.components.hrv).toBe(70);
+    expect(r.components.sleep).toBe(80);
+  });
+});
+
+describe('personalisedEffortTarget', () => {
+  it('returns 50 fallback when RHR or age is missing', () => {
+    expect(personalisedEffortTarget({ restingHR: null, hrvRmssd: 50, ageYears: 30 })).toBe(50);
+    expect(personalisedEffortTarget({ restingHR: 55, hrvRmssd: 50, ageYears: null })).toBe(50);
+  });
+
+  it('matches a fit athlete profile (Bob)', () => {
+    // RHR 47, HRV 64, age 36 → 20 + 8.4 + 6.8 − 0.3 = 34.9 → 35
+    const t = personalisedEffortTarget({ restingHR: 47, hrvRmssd: 64, ageYears: 36 });
+    expect(t).toBe(35);
+  });
+
+  it('floors at 20 for very unfit profiles', () => {
+    const t = personalisedEffortTarget({ restingHR: 85, hrvRmssd: 20, ageYears: 50 });
+    expect(t).toBe(20);
+  });
+
+  it('caps at 120 for extreme profiles', () => {
+    const t = personalisedEffortTarget({ restingHR: 35, hrvRmssd: 120, ageYears: 25 });
+    expect(t).toBeLessThanOrEqual(120);
+  });
+
+  it('penalises older users to keep targets realistic', () => {
+    const young = personalisedEffortTarget({ restingHR: 55, hrvRmssd: 40, ageYears: 35 });
+    const old = personalisedEffortTarget({ restingHR: 55, hrvRmssd: 40, ageYears: 70 });
+    expect(old).toBeLessThan(young);
+  });
+
+  it('rewards better HRV with a higher target', () => {
+    const low = personalisedEffortTarget({ restingHR: 55, hrvRmssd: 25, ageYears: 35 });
+    const high = personalisedEffortTarget({ restingHR: 55, hrvRmssd: 70, ageYears: 35 });
+    expect(high).toBeGreaterThan(low);
+  });
+
+  it('works without HRV data (RHR + age only)', () => {
+    const t = personalisedEffortTarget({ restingHR: 55, hrvRmssd: null, ageYears: 35 });
+    // 20 + 5.2 + 0 - 0 = 25.2 → 25
+    expect(t).toBe(25);
   });
 });
 

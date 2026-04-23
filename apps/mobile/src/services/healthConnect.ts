@@ -42,6 +42,7 @@ import {
   effortScore,
   readinessScore,
   recentTrainingLoad,
+  personalisedEffortTarget,
   type EffortHRSample,
 } from '@openfit/fitness-core';
 
@@ -628,14 +629,17 @@ export async function getTodayDashboard(
     .map((d) => d.effortEarnedMinutes);
   const load = recentTrainingLoad(earnedMostRecentFirst.slice(0, 3));
 
-  // Personalised effort target — falls back to default 100 if history is too thin.
-  const allEarned = range
-    .map((d) => d.effortEarnedMinutes)
-    .filter((v): v is number => v != null);
-  const personalisedTarget =
-    allEarned.length >= 3
-      ? Math.max(30, Math.round(median(allEarned) * 1.5))
-      : 100;
+  // Fitness-level-based target using RHR + HRV as VO2max proxies. Prefers
+  // baselines (stable over 7 days) but falls back to today's values if the
+  // user has < 3 days of history.
+  const ageYears = userProfile
+    ? ageYearsFromDob(userProfile.dateOfBirth)
+    : null;
+  const personalisedTarget = personalisedEffortTarget({
+    restingHR: rhrBaseline ?? todayRecord.heartRateResting,
+    hrvRmssd: hrvBaseline ?? todayRecord.hrvRmssd,
+    ageYears,
+  });
 
   // Rescale today's effort score against the personalised target.
   const rescaledEffortScore =
@@ -654,6 +658,7 @@ export async function getTodayDashboard(
     sleepScore: todayRecord.sleepScore,
     recentLoad: load,
     baselineDays,
+    todayEarnedMinutes: todayRecord.effortEarnedMinutes,
   });
 
   return {
@@ -666,10 +671,3 @@ export async function getTodayDashboard(
   };
 }
 
-function median(xs: number[]): number {
-  const sorted = [...xs].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0
-    ? ((sorted[mid - 1] as number) + (sorted[mid] as number)) / 2
-    : (sorted[mid] as number);
-}

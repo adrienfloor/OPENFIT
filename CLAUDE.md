@@ -71,7 +71,7 @@ npx expo run:android
 - **Daily wellness scores** (`packages/fitness-core/src/scores.ts`): transparent published composites, not Zepp reverse-engineering.
   - **`sleepScore`** — 5-component composite: 0.35 · duration + 0.15 · efficiency (docks 5 pts/awakening past the 2nd) + 0.15 · deep-ratio (squared below the 13–23 % sweet spot, 0 at lo/2) + 0.15 · REM-ratio (same curve, 20–25 % sweet spot) + 0.20 · regularity (7-day bedtime stddev; 0 min → 100, 180 min → 0). Missing components renormalise the remaining weights. Default duration target 480 min (8 h). Tuned on 2026-04-23 against Zepp on Bob's data — within ~5 pts.
   - **`effortScore`** — PAI-style. Integrates %HRR (Karvonen) over 24 h HR samples with 5 intensity tiers (<40/40–60/60–80/80–90/≥90 % → 0/1/2/3/4 pts·min). Daily target 100 intensity-minutes → 100. Max HR via Tanaka (`calculateMaxHR`). Device-off gaps >10 min are dropped so idle-strap windows don't fake activity.
-  - **`readinessScore`** (Slice 3, pending) — HRV + RHR baseline deviation + sleep + training-load decay.
+  - **`readinessScore`** — weighted composite (0.30 HRV + 0.20 RHR + 0.30 Sleep + 0.20 Load). HRV / RHR scored vs 7-day baselines with "at baseline = 70" anchor (normal day reads as "good"). Recent training load (last 3 days of earned effort minutes, exponentially decayed) drags readiness down. Returns `{ score, calibrating, components }` — when baseline < 3 days, score falls back to 50 with `calibrating: true` so the UI can show "3/7 days" instead of a fake number.
 - **User profile**: `weightKg`, `heightCm`, `sex`, and `dateOfBirth` are required fields. Height isn't needed for Keytel but is needed for BMR, and both are needed so future workouts / runs log real calorie numbers.
 
 ## Project Structure
@@ -112,10 +112,10 @@ POST   /health/bulk           — Bulk upsert (up to 90 days, for mobile sync)
 ```
 
 ## Testing
-- `packages/fitness-core`: 83 Vitest tests (heart rate zones, pace, ACWR, BMR Mifflin-St Jeor, Keytel calories, sleep score composite with regularity + awakenings, PAI-style effort score)
+- `packages/fitness-core`: 96 Vitest tests (heart rate zones, pace, ACWR, BMR Mifflin-St Jeor, Keytel calories, sleep score composite with regularity + awakenings, PAI-style effort score, readiness composite + training-load decay)
 - `apps/api`: 34 Vitest tests (auth, unified workout CRUD, health, multi-tenancy)
 - Run with: `cd apps/api && npx vitest run` or `cd packages/fitness-core && npx vitest run`
-- Total: 117 tests passing
+- Total: 130 tests passing
 
 ## Database
 - PostgreSQL via Docker: `docker compose up -d`
@@ -173,7 +173,13 @@ First of three Zepp-style wellness rings shipped on the Today tab.
 - **Data flow**: `getDailyStats` now computes `sleepScore` from the already-parsed stage breakdown and stamps it into the returned `DailyHealth.sleepScore`. No DB persistence yet (deferred to Slice 3 when readiness needs the history).
 - **Dep added**: `react-native-svg` for the arc rings.
 
-Still open in 2.2: **Slice 3** (readiness/BioCharge with 7-day HRV+RHR baselines backfilled on first connect).
+### Phase 2.2 — Today tab rework, Slice 3: BioCharge + personalised target (done)
+All three rings live. Data flow:
+- New `getTodayDashboard(profile)` in `healthConnect.ts` — single entry point that pulls the last 7 days of stats from HC, derives HRV + RHR baselines, computes readiness, and rescales effort against a personalised target (`max(30, median(7d earned) × 1.5)`).
+- `useDailyStats` now calls `getTodayDashboard` instead of single-day `getDailyStats`.
+- `DailyHealth.recoveryScore` holds the readiness score (persistable); `effortEarnedMinutes` is a new Float? column used for the rolling median.
+- First run (<3 baseline days): readiness returns `{ score: 50, calibrating: true }`. The green ring shows 50 with tier `CAL.` (ScoreRing's new `tierOverride` prop) and caption `X/7 days`.
+- Sequential 7× HC reads make the first Today-tab load ~2 s. Not optimised yet; bulk-sync via `/health/bulk` is a natural follow-up if it becomes annoying.
 
 ### Phase 2.2 — Today tab rework, Slice 2: Effort score (done)
 Second ring lit. PAI-style algorithm in `scores.ts`, data flow:
@@ -192,9 +198,8 @@ Bigger than the originally-scoped jiu-jitsu addition: consolidated the entire ac
 
 ## What's Next (Phase 2)
 
-### 2.2 — Today Tab Rework, remaining slice
-Sleep (Slice 1) and Effort (Slice 2) shipped. Philosophy: transparent published algorithms, not Zepp reverse-engineering. Computed on mobile, not server.
-- **Slice 3 — Readiness / BioCharge** (like Zepp / Garmin Body Battery / Whoop Recovery): weighted combination of sleep contribution + HRV-vs-baseline + RHR-vs-baseline + training-load decay from recent `WorkoutLog`s. On first successful HC connect, **backfill last 7 days of HRV + RHR via `/health/bulk`** to seed the baseline. If <3 days of baseline data available, show neutral score (50) with a "Calibrating — needs 7 days" caption. Lights up the green ring.
+### 2.2 — Today Tab Rework (done)
+All three rings shipped across slices 1–3. Philosophy remained: transparent published algorithms, not Zepp reverse-engineering. Computed on mobile, not server.
 
 ### 2.4 — Mike Thurston Workout Library
 - Pre-built 5-week workout programs based on Mike Thurston's programming (content provided by user)

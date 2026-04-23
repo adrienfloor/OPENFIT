@@ -20,7 +20,7 @@ export const DailyHealthSchema = z.object({
   sleepDurationMinutes: z.number().int().nonnegative().nullable(),
   sleepScore: z.number().min(0).max(100).nullable(),
   recoveryScore: z.number().min(0).max(100).nullable(),
-  strainScore: z.number().min(0).max(21).nullable(),
+  effortScore: z.number().min(0).max(100).nullable(),
 });
 
 // --- Input schemas for CRUD operations ---
@@ -35,7 +35,7 @@ export const UpsertDailyHealthInputSchema = z.object({
   sleepDurationMinutes: z.number().int().nonnegative().nullable().optional(),
   sleepScore: z.number().min(0).max(100).nullable().optional(),
   recoveryScore: z.number().min(0).max(100).nullable().optional(),
-  strainScore: z.number().min(0).max(21).nullable().optional(),
+  effortScore: z.number().min(0).max(100).nullable().optional(),
 });
 
 export const BulkUpsertDailyHealthInputSchema = z.object({

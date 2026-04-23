@@ -213,7 +213,7 @@ async function main(): Promise<void> {
           sleepDurationMinutes: Math.floor(360 + Math.random() * 120),
           sleepScore: Math.floor(60 + Math.random() * 35),
           recoveryScore: Math.floor(50 + Math.random() * 45),
-          strainScore: Math.floor(5 + Math.random() * 12),
+          effortScore: Math.floor(30 + Math.random() * 60),
         },
       });
     }

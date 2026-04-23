@@ -244,7 +244,7 @@ model DailyHealth {
   sleepDurationMinutes Int?
   sleepScore           Float?
   recoveryScore        Float?
-  strainScore          Float?
+  effortScore          Float?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

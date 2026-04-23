@@ -26,7 +26,7 @@ interface DailyHealthRecord {
   sleepDurationMinutes: number | null;
   sleepScore: number | null;
   recoveryScore: number | null;
-  strainScore: number | null;
+  effortScore: number | null;
   hrvRmssd: number | null;
 }
 
@@ -67,7 +67,7 @@ export default function HealthPage() {
     sleepHours: d.sleepDurationMinutes != null ? +(d.sleepDurationMinutes / 60).toFixed(1) : null,
     sleepScore: d.sleepScore,
     recovery: d.recoveryScore,
-    strain: d.strainScore,
+    effort: d.effortScore,
   }));
 
   // Averages for the period
@@ -172,18 +172,17 @@ export default function HealthPage() {
               </ResponsiveContainer>
             </div>
 
-            {/* Recovery & Strain */}
+            {/* Recovery & Effort */}
             <div className="rounded-xl bg-white p-6 shadow-sm">
-              <h2 className="mb-4 text-base font-semibold">Recovery &amp; Strain</h2>
+              <h2 className="mb-4 text-base font-semibold">Recovery &amp; Effort</h2>
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={data}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="date" tick={{ fontSize: 10 }} interval={Math.max(0, Math.floor(data.length / 8) - 1)} />
-                  <YAxis yAxisId="recovery" tick={{ fontSize: 10 }} domain={[0, 100]} unit="%" />
-                  <YAxis yAxisId="strain" orientation="right" tick={{ fontSize: 10 }} domain={[0, 21]} />
+                  <YAxis tick={{ fontSize: 10 }} domain={[0, 100]} unit="%" />
                   <Tooltip />
-                  <Line yAxisId="recovery" type="monotone" dataKey="recovery" name="Recovery" stroke="#22c55e" strokeWidth={2} dot={false} connectNulls />
-                  <Line yAxisId="strain" type="monotone" dataKey="strain" name="Strain" stroke="#f97316" strokeWidth={2} dot={false} connectNulls />
+                  <Line type="monotone" dataKey="recovery" name="Recovery" stroke="#22c55e" strokeWidth={2} dot={false} connectNulls />
+                  <Line type="monotone" dataKey="effort" name="Effort" stroke="#f97316" strokeWidth={2} dot={false} connectNulls />
                 </LineChart>
               </ResponsiveContainer>
             </div>

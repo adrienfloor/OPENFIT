@@ -13,7 +13,7 @@ const mockDailyHealth = {
   sleepDurationMinutes: 480,
   sleepScore: 82,
   recoveryScore: 75,
-  strainScore: 12.5,
+  effortScore: 62.5,
 };
 
 function createMockPrisma() {

@@ -263,7 +263,7 @@ export async function getDailyStats(
       sleepDurationMinutes: sleep?.durationMinutes ?? null,
       sleepScore: computedSleepScore,
       recoveryScore: null,
-      strainScore: null,
+      effortScore: null,
     });
 
     // Unused but available: avgSpO2

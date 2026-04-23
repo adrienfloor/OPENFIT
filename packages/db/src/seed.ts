@@ -214,6 +214,7 @@ async function main(): Promise<void> {
           sleepScore: Math.floor(60 + Math.random() * 35),
           recoveryScore: Math.floor(50 + Math.random() * 45),
           effortScore: Math.floor(30 + Math.random() * 60),
+          effortEarnedMinutes: Math.floor(20 + Math.random() * 120),
         },
       });
     }

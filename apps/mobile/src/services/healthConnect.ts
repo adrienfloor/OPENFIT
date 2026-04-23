@@ -16,12 +16,12 @@ import {
 import type { DailyHealth, UserProfile } from '@openfit/types';
 
 /**
- * DailyHealth plus UI-only effort detail that isn't persisted to the server.
- * `effortEarnedMinutes` is the raw intensity-weighted minutes from the
- * effort-score computation — useful for showing "124/100" inside the ring.
+ * DailyHealth plus UI-only effort detail. `effortEarnedMinutes` lives on
+ * `DailyHealth` itself (persisted, used by readiness + personalised target),
+ * but the daily target is computed per-refresh from the 7-day rolling median
+ * and is not persisted.
  */
 export type TodayDailyStats = DailyHealth & {
-  effortEarnedMinutes: number | null;
   effortTargetMinutes: number | null;
 };
 import {

@@ -24,6 +24,7 @@ interface DailyHealthRecord {
   sleepScore: number | null;
   recoveryScore: number | null;
   effortScore: number | null;
+  effortEarnedMinutes: number | null;
   hrvRmssd: number | null;
 }
 

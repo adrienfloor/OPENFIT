@@ -72,9 +72,8 @@ export function useDailyStats(): {
       setLoading(true);
       setError(null);
       try {
-        console.log('[useDailyStats] fetching stats...');
-        const { getDailyStats } = await import('../services/healthConnect');
-        const date = new Date();
+        console.log('[useDailyStats] fetching dashboard (7d window)...');
+        const { getTodayDashboard } = await import('../services/healthConnect');
         const profile = user
           ? {
               weightKg: user.weightKg,
@@ -83,9 +82,9 @@ export function useDailyStats(): {
               dateOfBirth: new Date(user.dateOfBirth),
             }
           : undefined;
-        const results = await getDailyStats(date, date, profile);
-        console.log('[useDailyStats] results:', JSON.stringify(results));
-        setToday(results[0] ?? null);
+        const result = await getTodayDashboard(profile);
+        console.log('[useDailyStats] dashboard result:', JSON.stringify(result));
+        setToday(result);
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Failed to fetch daily stats'));
         setToday(null);

@@ -16,13 +16,22 @@ import {
 import type { DailyHealth, UserProfile } from '@openfit/types';
 
 /**
- * DailyHealth plus UI-only effort detail. `effortEarnedMinutes` lives on
- * `DailyHealth` itself (persisted, used by readiness + personalised target),
- * but the daily target is computed per-refresh from the 7-day rolling median
- * and is not persisted.
+ * DailyHealth plus UI-only detail.
+ *
+ * `effortTargetMinutes` is the personalised daily target (median-over-7d × 1.5,
+ * floor 30) computed per-refresh and not persisted — it's pure derivation from
+ * the stored effortEarnedMinutes history.
+ *
+ * `readinessCalibrating` is true when we have < 3 days of baseline data for
+ * HRV/RHR, so the UI can show a "Calibrating" caption instead of the tier.
+ *
+ * `readinessBaselineDays` is the count of baseline days we actually used,
+ * for the "3/7" caption.
  */
 export type TodayDailyStats = DailyHealth & {
   effortTargetMinutes: number | null;
+  readinessCalibrating: boolean;
+  readinessBaselineDays: number;
 };
 import {
   computeBMR,
@@ -31,6 +40,8 @@ import {
   calculateMaxHR,
   sleepScore,
   effortScore,
+  readinessScore,
+  recentTrainingLoad,
   type EffortHRSample,
 } from '@openfit/fitness-core';
 
@@ -288,10 +299,12 @@ export async function getDailyStats(
       hrvRmssd: avgHRV,
       sleepDurationMinutes: sleep?.durationMinutes ?? null,
       sleepScore: computedSleepScore,
-      recoveryScore: null,
+      recoveryScore: null, // filled in by getTodayDashboard once baselines are in play
       effortScore: effort?.score ?? null,
       effortEarnedMinutes: effort?.earnedMinutes ?? null,
       effortTargetMinutes: effort?.targetMinutes ?? null,
+      readinessCalibrating: false,
+      readinessBaselineDays: 0,
     });
 
     // Unused but available: avgSpO2
@@ -568,4 +581,95 @@ export async function getSpO2(date: Date): Promise<number | null> {
       0,
     ) / result.records.length
   );
+}
+
+/**
+ * Today's stats enriched with readiness + a personalised effort target.
+ *
+ * Pulls the last 7 days of daily stats from Health Connect (today + 6 prior),
+ * derives HRV / RHR baselines from the history, computes readiness, and
+ * rescales today's effort score against a median-based personal target so
+ * a user who typically trains hard doesn't see 100 % for a routine session.
+ *
+ * Personalised target formula: max(30, median(last7.earnedMinutes) × 1.5).
+ * Floor 30 prevents the score from collapsing on rest-heavy weeks. Ceiling
+ * is natural — there's no cap, just 100 % clamp on the final score.
+ */
+export async function getTodayDashboard(
+  userProfile?: Pick<UserProfile, 'weightKg' | 'heightCm' | 'sex' | 'dateOfBirth'>,
+): Promise<TodayDailyStats | null> {
+  const today = new Date();
+  const sixDaysAgo = new Date();
+  sixDaysAgo.setDate(sixDaysAgo.getDate() - 6);
+
+  const range = await getDailyStats(sixDaysAgo, today, userProfile);
+  if (range.length === 0) return null;
+
+  const todayRecord = range[range.length - 1] as TodayDailyStats;
+  const history = range.slice(0, -1);
+
+  const hrvValues = history
+    .map((d) => d.hrvRmssd)
+    .filter((v): v is number => v != null);
+  const rhrValues = history
+    .map((d) => d.heartRateResting)
+    .filter((v): v is number => v != null);
+
+  const avg = (xs: number[]): number | null =>
+    xs.length === 0 ? null : xs.reduce((a, b) => a + b, 0) / xs.length;
+
+  const hrvBaseline = avg(hrvValues);
+  const rhrBaseline = avg(rhrValues);
+  const baselineDays = Math.min(hrvValues.length, rhrValues.length);
+
+  // Recent 3-day load — history is oldest→newest, so reverse to get most-recent-first.
+  const earnedMostRecentFirst = [...history]
+    .reverse()
+    .map((d) => d.effortEarnedMinutes);
+  const load = recentTrainingLoad(earnedMostRecentFirst.slice(0, 3));
+
+  // Personalised effort target — falls back to default 100 if history is too thin.
+  const allEarned = range
+    .map((d) => d.effortEarnedMinutes)
+    .filter((v): v is number => v != null);
+  const personalisedTarget =
+    allEarned.length >= 3
+      ? Math.max(30, Math.round(median(allEarned) * 1.5))
+      : 100;
+
+  // Rescale today's effort score against the personalised target.
+  const rescaledEffortScore =
+    todayRecord.effortEarnedMinutes !== null
+      ? Math.min(
+          100,
+          Math.round((todayRecord.effortEarnedMinutes / personalisedTarget) * 100),
+        )
+      : null;
+
+  const readiness = readinessScore({
+    hrvToday: todayRecord.hrvRmssd,
+    hrvBaseline,
+    rhrToday: todayRecord.heartRateResting,
+    rhrBaseline,
+    sleepScore: todayRecord.sleepScore,
+    recentLoad: load,
+    baselineDays,
+  });
+
+  return {
+    ...todayRecord,
+    effortScore: rescaledEffortScore,
+    effortTargetMinutes: personalisedTarget,
+    recoveryScore: readiness.score,
+    readinessCalibrating: readiness.calibrating,
+    readinessBaselineDays: baselineDays,
+  };
+}
+
+function median(xs: number[]): number {
+  const sorted = [...xs].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? ((sorted[mid - 1] as number) + (sorted[mid] as number)) / 2
+    : (sorted[mid] as number);
 }

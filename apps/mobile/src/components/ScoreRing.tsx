@@ -14,6 +14,8 @@ interface Props {
   strokeWidth?: number;
   /** Optional caption below the label (e.g. "Calibrating"). */
   caption?: string;
+  /** If provided, shown inside the ring instead of the computed tier (e.g. "CAL."). */
+  tierOverride?: string;
 }
 
 /**
@@ -30,6 +32,7 @@ export function ScoreRing({
   size = 96,
   strokeWidth = 8,
   caption,
+  tierOverride,
 }: Props): React.JSX.Element {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -71,7 +74,7 @@ export function ScoreRing({
               {score !== null ? Math.round(score) : '—'}
             </Text>
             {score !== null && (
-              <Text style={styles.tier}>{tierFor(score)}</Text>
+              <Text style={styles.tier}>{tierOverride ?? tierFor(score)}</Text>
             )}
           </View>
         </View>

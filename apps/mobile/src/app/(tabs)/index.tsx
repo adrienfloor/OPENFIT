@@ -45,7 +45,9 @@ export default function TodayScreen() {
         effortScore={today?.effortScore ?? null}
         effortEarnedMinutes={today?.effortEarnedMinutes ?? null}
         effortTargetMinutes={today?.effortTargetMinutes ?? null}
-        readinessScore={null}
+        readinessScore={today?.recoveryScore ?? null}
+        readinessCalibrating={today?.readinessCalibrating ?? false}
+        readinessBaselineDays={today?.readinessBaselineDays ?? 0}
       />
 
       <View style={styles.grid}>

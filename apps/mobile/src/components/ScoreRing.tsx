@@ -70,6 +70,9 @@ export function ScoreRing({
             <Text style={[styles.value, { color: score !== null ? '#111827' : '#9ca3af' }]}>
               {score !== null ? Math.round(score) : '—'}
             </Text>
+            {score !== null && (
+              <Text style={styles.tier}>{tierFor(score)}</Text>
+            )}
           </View>
         </View>
       </View>
@@ -79,10 +82,20 @@ export function ScoreRing({
   );
 }
 
+/** Zepp-style qualitative label. Matches their French tiers (Optimal/Bien/Normal/Passable/Mauvais). */
+function tierFor(score: number): string {
+  if (score >= 90) return 'Excellent';
+  if (score >= 75) return 'Good';
+  if (score >= 60) return 'Fair';
+  if (score >= 45) return 'Poor';
+  return 'Very poor';
+}
+
 const styles = StyleSheet.create({
   wrap: { alignItems: 'center' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  value: { fontSize: 24, fontWeight: '700' },
+  value: { fontSize: 24, fontWeight: '700', lineHeight: 28 },
+  tier: { fontSize: 9, color: '#6b7280', fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase' },
   label: { marginTop: 8, fontSize: 13, color: '#374151', fontWeight: '500' },
   caption: { marginTop: 2, fontSize: 10, color: '#9ca3af' },
 });

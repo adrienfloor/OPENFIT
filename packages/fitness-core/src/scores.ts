@@ -170,3 +170,88 @@ function scoreStageRatio(ratio: number, lo: number, hi: number): number {
 function clamp0to100(v: number): number {
   return Math.max(0, Math.min(100, v));
 }
+
+// ──────────────────────────────────────────────────────────────────────────
+// Effort score — PAI-style daily activity intensity
+// ──────────────────────────────────────────────────────────────────────────
+
+export interface EffortHRSample {
+  time: Date;
+  bpm: number;
+}
+
+export interface EffortScoreInput {
+  /** 24 h heart-rate samples — unevenly spaced is fine. */
+  samples: EffortHRSample[];
+  /** Resting HR for the %HRR (Karvonen) calculation. */
+  restingHR: number;
+  /** Age-predicted max HR, e.g. `calculateMaxHR(age)` from heart-rate.ts. */
+  maxHR: number;
+  /**
+   * Daily target of intensity-weighted minutes. A sedentary day scores near 0;
+   * ~30 min of vigorous exercise plus a day of light activity lands around
+   * 60–80; a heavy training day clamps at 100. Default 100.
+   */
+  targetMinutes?: number;
+  /**
+   * Gaps larger than this (in minutes) between consecutive samples are
+   * dropped — treats device-off windows as "no data", not as a long block at
+   * the last recorded HR. Default 10.
+   */
+  maxGapMinutes?: number;
+}
+
+/**
+ * Daily effort score in the style of Zepp's "Effort", Whoop "Strain", and
+ * HUNT Fitness Study PAI. Not strictly PAI — we use %HRR (heart rate reserve)
+ * rather than %MHR, with 5 published intensity tiers. Transparent and
+ * auditable, which is the OpenFit ethos.
+ *
+ * Intensity tiers (%HRR → pts/min):
+ *
+ *   < 40  →  0   (rest / incidental)
+ *   40–60 →  1   (moderate — brisk walk, easy cycling)
+ *   60–80 →  2   (vigorous — run, hard cycling)
+ *   80–90 →  3   (hard — tempo, intervals)
+ *   ≥ 90  →  4   (near max — sprints)
+ *
+ * Integrates the weight over time gaps between consecutive samples; returns
+ * 0–100 where 100 means the daily intensity-minute target was met.
+ */
+export function effortScore({
+  samples,
+  restingHR,
+  maxHR,
+  targetMinutes = 100,
+  maxGapMinutes = 10,
+}: EffortScoreInput): number {
+  if (samples.length < 2) return 0;
+  const hrr = maxHR - restingHR;
+  if (hrr <= 0) return 0;
+
+  const sorted = [...samples].sort(
+    (a, b) => a.time.getTime() - b.time.getTime(),
+  );
+
+  let intensityMinutes = 0;
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const s1 = sorted[i] as EffortHRSample;
+    const s2 = sorted[i + 1] as EffortHRSample;
+    const gapMinutes = (s2.time.getTime() - s1.time.getTime()) / 60000;
+    if (gapMinutes <= 0 || gapMinutes > maxGapMinutes) continue;
+
+    const avgBpm = (s1.bpm + s2.bpm) / 2;
+    const intensity = Math.max(0, (avgBpm - restingHR) / hrr);
+    intensityMinutes += gapMinutes * weightForIntensity(intensity);
+  }
+
+  return clamp0to100(Math.round((intensityMinutes / targetMinutes) * 100));
+}
+
+function weightForIntensity(hrrFraction: number): number {
+  if (hrrFraction >= 0.9) return 4;
+  if (hrrFraction >= 0.8) return 3;
+  if (hrrFraction >= 0.6) return 2;
+  if (hrrFraction >= 0.4) return 1;
+  return 0;
+}

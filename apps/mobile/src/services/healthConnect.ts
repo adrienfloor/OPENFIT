@@ -18,7 +18,10 @@ import {
   computeBMR,
   bmrCaloriesElapsed,
   ageYearsFromDob,
+  calculateMaxHR,
   sleepScore,
+  effortScore,
+  type EffortHRSample,
 } from '@openfit/fitness-core';
 
 export class HealthConnectError extends Error {
@@ -142,6 +145,7 @@ export async function getDailyStats(
       restingHRAgg,
       spo2,
       regularity,
+      hrSamples,
     ] = await Promise.all([
       getSleepSummary(current).catch(() => null),
       aggregateRecord({ recordType: 'Steps', timeRangeFilter }).catch(
@@ -163,6 +167,7 @@ export async function getDailyStats(
         () => ({ records: [] }),
       ),
       getSleepRegularity(current).catch(() => null),
+      getDayHRSamples(current).catch(() => [] as EffortHRSample[]),
     ]);
 
     // HRV is a sleep / wake-transition metric — its value comes from the
@@ -251,6 +256,17 @@ export async function getDailyStats(
           }).score
         : null;
 
+    // Effort score needs user age (→ max HR via Tanaka) and a resting HR. If
+    // either is missing we leave it null rather than fake a number.
+    const computedEffortScore =
+      userProfile !== undefined && latestRestingHR && hrSamples.length >= 2
+        ? effortScore({
+            samples: hrSamples,
+            restingHR: latestRestingHR,
+            maxHR: calculateMaxHR(ageYearsFromDob(userProfile.dateOfBirth)),
+          })
+        : null;
+
     results.push({
       id: `hc-${dayStart.toISOString().slice(0, 10)}`,
       date: dayStart,
@@ -263,7 +279,7 @@ export async function getDailyStats(
       sleepDurationMinutes: sleep?.durationMinutes ?? null,
       sleepScore: computedSleepScore,
       recoveryScore: null,
-      effortScore: null,
+      effortScore: computedEffortScore,
     });
 
     // Unused but available: avgSpO2
@@ -437,6 +453,35 @@ export async function getSleepRegularity(
   const stdMinutes = Math.sqrt(variance);
 
   return Math.round(Math.max(0, Math.min(100, 100 * (1 - stdMinutes / 180))));
+}
+
+/**
+ * Fetch every heart-rate sample for a single calendar day.
+ *
+ * Health Connect's HeartRate records are "sessions" that each contain a
+ * nested `samples` array. This flattens them into a single chronological
+ * list that the effort-score integrator can walk through.
+ */
+export async function getDayHRSamples(date: Date): Promise<EffortHRSample[]> {
+  assertInitialized();
+
+  const result = await readRecords('HeartRate', {
+    timeRangeFilter: {
+      operator: 'between' as const,
+      startTime: startOfDay(date).toISOString(),
+      endTime: endOfDay(date).toISOString(),
+    },
+  });
+
+  const samples: EffortHRSample[] = [];
+  for (const rec of result.records as Array<{
+    samples: Array<{ time: string; beatsPerMinute: number }>;
+  }>) {
+    for (const s of rec.samples) {
+      samples.push({ time: new Date(s.time), bpm: s.beatsPerMinute });
+    }
+  }
+  return samples;
 }
 
 /** Fetch resting heart rate for a given day (null if unavailable). */

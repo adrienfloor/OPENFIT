@@ -16,6 +16,13 @@ interface Props {
   caption?: string;
   /** If provided, shown inside the ring instead of the computed tier (e.g. "CAL."). */
   tierOverride?: string;
+  /**
+   * Tier label vocabulary. `quality` (default) uses Excellent/Good/Fair/Poor
+   * for metrics where higher is qualitatively better (Sleep, Effort). `battery`
+   * uses Full/Charged/Half/Low/Depleted for BioCharge, where a low number
+   * means "spent today's energy" rather than "in poor condition".
+   */
+  variant?: 'quality' | 'battery';
 }
 
 /**
@@ -33,6 +40,7 @@ export function ScoreRing({
   strokeWidth = 8,
   caption,
   tierOverride,
+  variant = 'quality',
 }: Props): React.JSX.Element {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -74,7 +82,7 @@ export function ScoreRing({
               {score !== null ? Math.round(score) : '—'}
             </Text>
             {score !== null && (
-              <Text style={styles.tier}>{tierOverride ?? tierFor(score)}</Text>
+              <Text style={styles.tier}>{tierOverride ?? tierFor(score, variant)}</Text>
             )}
           </View>
         </View>
@@ -85,8 +93,21 @@ export function ScoreRing({
   );
 }
 
-/** Zepp-style qualitative label. Matches their French tiers (Optimal/Bien/Normal/Passable/Mauvais). */
-function tierFor(score: number): string {
+/**
+ * Tier labels vary by ring semantics:
+ *
+ *   `quality` — Sleep & Effort. Higher is better; low = something's wrong.
+ *   `battery` — BioCharge. Low ≠ bad, it just means "spent today's energy";
+ *               a depleted battery after training is expected, not alarming.
+ */
+function tierFor(score: number, variant: 'quality' | 'battery'): string {
+  if (variant === 'battery') {
+    if (score >= 80) return 'Full';
+    if (score >= 60) return 'Charged';
+    if (score >= 40) return 'Half';
+    if (score >= 20) return 'Low';
+    return 'Depleted';
+  }
   if (score >= 90) return 'Excellent';
   if (score >= 75) return 'Good';
   if (score >= 60) return 'Fair';

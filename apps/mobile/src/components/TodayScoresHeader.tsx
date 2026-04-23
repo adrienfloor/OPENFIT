@@ -58,6 +58,7 @@ export function TodayScoresHeader({
         color="#10b981"
         caption={readinessCaption}
         tierOverride={readinessCalibrating ? 'CAL.' : undefined}
+        variant="battery"
       />
     </View>
   );

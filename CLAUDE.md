@@ -54,6 +54,8 @@ npx expo run:android
 - **MainActivity.kt** must register `HealthConnectPermissionDelegate.setPermissionDelegate(this)` in `onCreate`
 - **BLE permissions** (BLUETOOTH_SCAN, BLUETOOTH_CONNECT) must be requested at runtime on Android 12+
 - **Splash screen**: `android/app/src/main/res/drawable/splashscreen_logo.xml` must exist after prebuild
+- **Prebuild manifest quirk**: `react-native-health-connect`'s config plugin pushes an `ACTION_SHOW_PERMISSIONS_RATIONALE` intent-filter without dedup, so every `expo prebuild` adds another duplicate. After each prebuild run `git diff apps/mobile/android/app/src/main/AndroidManifest.xml` and delete any duplicate intent-filter. Avoid `--clean` (nukes MainActivity.kt + splash drawable). `apps/mobile/android/` is gitignored but the manifest and MainActivity are force-tracked — use `git add -f` to commit changes to them.
+- **react-native-svg** is a dependency (used by `TodayScoresHeader` rings). Installed via `expo install`; auto-linked by prebuild.
 
 ## Architecture Decisions
 - **Auth**: Custom JWT with access (15min) + refresh (30d) token rotation. No third-party auth provider. See `apps/api/src/services/auth.service.ts`.
@@ -66,6 +68,10 @@ npx expo run:android
 - **Energy estimation**:
   - **BMR** via Mifflin-St Jeor (`packages/fitness-core/src/bmr.ts`) using weight + height + age + sex. Used by the Today tab to derive active daily calories as `TotalCaloriesBurned − bmrCaloriesElapsed(BMR, now)` — the same definition Zepp/Garmin/Whoop use.
   - **Workout calories** via Keytel et al. 2005 (`packages/fitness-core/src/calories.ts`) — a sex-specific regression that maps HR + weight + age to kcal/min. Integrated over the workout's HR samples (uneven sample gaps handled). A MET-based fallback exists for activities without HR.
+- **Daily wellness scores** (`packages/fitness-core/src/scores.ts`): transparent published composites, not Zepp reverse-engineering.
+  - **`sleepScore`** — 0.50 · duration-vs-target + 0.20 · efficiency + 0.15 · deep-ratio + 0.15 · REM-ratio (re-normalises to duration 80 % / efficiency 20 % without stage data). Default target 480 min (8 h).
+  - **`effortScore`** (Slice 2, pending) — HUNT Fitness Study PAI algorithm over 24 h HR.
+  - **`readinessScore`** (Slice 3, pending) — HRV + RHR baseline deviation + sleep + training-load decay.
 - **User profile**: `weightKg`, `heightCm`, `sex`, and `dateOfBirth` are required fields. Height isn't needed for Keytel but is needed for BMR, and both are needed so future workouts / runs log real calorie numbers.
 
 ## Project Structure
@@ -75,7 +81,7 @@ apps/web/         — Next.js dashboard (auth, dashboard with Recharts, program 
 apps/mobile/      — Expo app (auth, today stats, unified Workout tab with Strength/Run/Jiu-Jitsu picker, history)
 packages/types/   — Zod schemas + TypeScript types (all domain types + input schemas)
 packages/db/      — Prisma schema + seed script (2 users, 10 exercises, 3 programs, 60 daily-health rows, 16 strength logs, 12 run logs)
-packages/fitness-core/ — Pure business logic (HR zones, pace calc, ACWR, BMR, Keytel calories) + Vitest tests
+packages/fitness-core/ — Pure business logic (HR zones, pace calc, ACWR, BMR, Keytel calories, sleep score) + Vitest tests
 packages/ui/      — Shared React components (scaffold only)
 ```
 
@@ -106,10 +112,10 @@ POST   /health/bulk           — Bulk upsert (up to 90 days, for mobile sync)
 ```
 
 ## Testing
-- `packages/fitness-core`: 48 Vitest tests (heart rate zones, pace, ACWR, BMR Mifflin-St Jeor, Keytel calories)
+- `packages/fitness-core`: 66 Vitest tests (heart rate zones, pace, ACWR, BMR Mifflin-St Jeor, Keytel calories, sleep score composite)
 - `apps/api`: 34 Vitest tests (auth, unified workout CRUD, health, multi-tenancy)
 - Run with: `cd apps/api && npx vitest run` or `cd packages/fitness-core && npx vitest run`
-- Total: 82 tests passing
+- Total: 100 tests passing
 
 ## Database
 - PostgreSQL via Docker: `docker compose up -d`
@@ -160,6 +166,15 @@ Compared every Today-tab metric against Zepp (source of truth) and Health Connec
 - **HRV**: no aggregate API exists, so we now average all `HeartRateVariabilityRmssd` records **within the sleep session window** (fallback: 22:00 prev → 08:00 current). Matches Zepp. Individual RMSSD samples bounce 40–100 ms per minute — mean is the meaningful value, last-sample was arbitrary.
 - Added `heightCm` and `sex` (male/female) to `User` model with a new `Sex` enum, exposed through register / `/auth/me`, required on registration.
 
+### Phase 2.2 — Today tab rework, Slice 1: Sleep score (done)
+First of three Zepp-style wellness rings shipped on the Today tab.
+- **Sleep score algorithm**: published composite (see Architecture Decisions / `scores.ts`). 18 Vitest tests covering duration, efficiency, stage sweet spots, realistic night scenarios.
+- **UI**: new `TodayScoresHeader` + reusable `ScoreRing` components (`apps/mobile/src/components/`). Three rings side-by-side: Sleep (blue, lit), Effort (orange, "Soon"), BioCharge (green, "Soon"). Old "Recovery" grid card removed — the header replaces it.
+- **Data flow**: `getDailyStats` now computes `sleepScore` from the already-parsed stage breakdown and stamps it into the returned `DailyHealth.sleepScore`. No DB persistence yet (deferred to Slice 3 when readiness needs the history).
+- **Dep added**: `react-native-svg` for the arc rings.
+
+Still open in 2.2: **Slice 2** (PAI effort score from 24 h HR) and **Slice 3** (readiness/BioCharge with 7-day HRV+RHR baselines backfilled on first connect).
+
 ### Phase 2.3 — Unified workout model + Jiu-Jitsu type + HR calories (done)
 Bigger than the originally-scoped jiu-jitsu addition: consolidated the entire activity data model.
 - **Data model**: deleted `RunSession` entirely. A single `WorkoutLog` with a `WorkoutType` enum (`strength | run | jiu_jitsu`) holds every trained activity. Run fields (`distanceMeters`, `durationSeconds`, pace, elevation) and `gpsPoints` are nullable; `exerciseLogs` can be empty for non-strength. `HeartRateSample` and `GPSPoint` FK now points at `workoutLogId` directly. Seed migrated.
@@ -170,14 +185,10 @@ Bigger than the originally-scoped jiu-jitsu addition: consolidated the entire ac
 
 ## What's Next (Phase 2)
 
-### 2.2 — Today Tab Rework (Zepp/Garmin/Whoop style)
-Rework the Today tab to show three key scores like Zepp's dashboard:
-- **BioCharge score** (like Zepp PAI / Garmin Body Battery / Whoop Recovery):
-  Calculated from sleep quality, recovery metrics, previous workout accumulation, and energy spent during the day. Check Zepp documentation and replicate their algorithm.
-- **Effort score** (like Zepp Activity / Whoop Strain):
-  Percentage of total available effort used during the day, based on HR data, workout intensity, and movement.
-- **Sleep score** (like Zepp Sleep Score):
-  Calculated from sleep duration, regularity, quality (deep/REM/light/awake stages). Replicate Zepp's sleep scoring methodology.
+### 2.2 — Today Tab Rework, remaining slices
+Sleep score shipped (Slice 1). Philosophy: transparent published algorithms, not Zepp reverse-engineering. Computed on mobile, not server.
+- **Slice 2 — Effort score** (like Zepp Activity / Whoop Strain): HUNT Fitness Study PAI algorithm. Requires adding a **24 h HR pull** from Health Connect (new data source — we only pull sleep-window HRV + aggregated resting HR today). Lights up the orange ring.
+- **Slice 3 — Readiness / BioCharge** (like Zepp / Garmin Body Battery / Whoop Recovery): weighted combination of sleep contribution + HRV-vs-baseline + RHR-vs-baseline + training-load decay from recent `WorkoutLog`s. On first successful HC connect, **backfill last 7 days of HRV + RHR via `/health/bulk`** to seed the baseline. If <3 days of baseline data available, show neutral score (50) with a "Calibrating — needs 7 days" caption. Lights up the green ring.
 
 ### 2.4 — Mike Thurston Workout Library
 - Pre-built 5-week workout programs based on Mike Thurston's programming (content provided by user)

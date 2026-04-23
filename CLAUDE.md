@@ -71,7 +71,8 @@ npx expo run:android
 - **Daily wellness scores** (`packages/fitness-core/src/scores.ts`): transparent published composites, not Zepp reverse-engineering.
   - **`sleepScore`** — 5-component composite: 0.35 · duration + 0.15 · efficiency (docks 5 pts/awakening past the 2nd) + 0.15 · deep-ratio (squared below the 13–23 % sweet spot, 0 at lo/2) + 0.15 · REM-ratio (same curve, 20–25 % sweet spot) + 0.20 · regularity (7-day bedtime stddev; 0 min → 100, 180 min → 0). Missing components renormalise the remaining weights. Default duration target 480 min (8 h). Tuned on 2026-04-23 against Zepp on Bob's data — within ~5 pts.
   - **`effortScore`** — PAI-style. Integrates %HRR (Karvonen) over 24 h HR samples with 5 intensity tiers (<40/40–60/60–80/80–90/≥90 % → 0/1/2/3/4 pts·min). Daily target 100 intensity-minutes → 100. Max HR via Tanaka (`calculateMaxHR`). Device-off gaps >10 min are dropped so idle-strap windows don't fake activity.
-  - **`readinessScore`** — weighted composite (0.30 HRV + 0.20 RHR + 0.30 Sleep + 0.20 Load). HRV / RHR scored vs 7-day baselines with "at baseline = 70" anchor (normal day reads as "good"). Recent training load (last 3 days of earned effort minutes, exponentially decayed) drags readiness down. Returns `{ score, calibrating, components }` — when baseline < 3 days, score falls back to 50 with `calibrating: true` so the UI can show "3/7 days" instead of a fake number.
+  - **`readinessScore`** — weighted composite (0.30 HRV + 0.20 RHR + 0.30 Sleep + 0.20 Load). HRV / RHR scored vs 7-day baselines with "at baseline = 70" anchor. Recent load = last 3 days of earned effort minutes, exponentially decayed (yest ×1, −2d ×0.6, −3d ×0.3). **Intraday drain**: `todayEarnedMinutes × 0.15` capped at 30, subtracted after the weighted mean — matches Zepp's "BioCharge empties as you train" behaviour. Returns `{ score, calibrating, components }`; score → 50 + `calibrating: true` when < 3 days of baseline.
+  - **`personalisedEffortTarget`** — daily target from RHR + HRV + age (no VO2max needed). Formula: `20 + max(0, (68−RHR)·0.4) + max(0, (HRV−30)·0.2) − max(0, (age−35)·0.3)`, clamped [20, 120]. On a fit 36yo (RHR 47, HRV 64) = 35; matches Zepp's observed target within ~3 pts. Falls back to 50 when RHR or age is missing.
 - **User profile**: `weightKg`, `heightCm`, `sex`, and `dateOfBirth` are required fields. Height isn't needed for Keytel but is needed for BMR, and both are needed so future workouts / runs log real calorie numbers.
 
 ## Project Structure
@@ -112,10 +113,10 @@ POST   /health/bulk           — Bulk upsert (up to 90 days, for mobile sync)
 ```
 
 ## Testing
-- `packages/fitness-core`: 96 Vitest tests (heart rate zones, pace, ACWR, BMR Mifflin-St Jeor, Keytel calories, sleep score composite with regularity + awakenings, PAI-style effort score, readiness composite + training-load decay)
+- `packages/fitness-core`: 107 Vitest tests (heart rate zones, pace, ACWR, BMR Mifflin-St Jeor, Keytel calories, sleep score composite with regularity + awakenings, PAI-style effort score, readiness composite with intraday drain, personalisedEffortTarget from RHR/HRV/age)
 - `apps/api`: 34 Vitest tests (auth, unified workout CRUD, health, multi-tenancy)
 - Run with: `cd apps/api && npx vitest run` or `cd packages/fitness-core && npx vitest run`
-- Total: 130 tests passing
+- Total: 141 tests passing
 
 ## Database
 - PostgreSQL via Docker: `docker compose up -d`

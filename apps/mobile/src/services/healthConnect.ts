@@ -14,7 +14,12 @@ import {
   SdkAvailabilityStatus,
 } from 'react-native-health-connect';
 import type { DailyHealth, UserProfile } from '@openfit/types';
-import { computeBMR, bmrCaloriesElapsed, ageYearsFromDob } from '@openfit/fitness-core';
+import {
+  computeBMR,
+  bmrCaloriesElapsed,
+  ageYearsFromDob,
+  sleepScore,
+} from '@openfit/fitness-core';
 
 export class HealthConnectError extends Error {
   constructor(message: string) {
@@ -222,6 +227,19 @@ export async function getDailyStats(
           ) / spo2.records.length
         : null;
 
+    // Health Connect doesn't write a sleep score, so we compute our own from
+    // the stage breakdown using the published composite in @openfit/fitness-core.
+    const computedSleepScore =
+      sleep !== null && sleep.durationMinutes > 0
+        ? sleepScore({
+            durationMinutes: sleep.durationMinutes,
+            awakeMinutes: sleep.awakeMinutes,
+            deepMinutes: sleep.deepMinutes,
+            remMinutes: sleep.remMinutes,
+            lightMinutes: sleep.lightMinutes,
+          }).score
+        : null;
+
     results.push({
       id: `hc-${dayStart.toISOString().slice(0, 10)}`,
       date: dayStart,
@@ -232,7 +250,7 @@ export async function getDailyStats(
       heartRateResting: latestRestingHR,
       hrvRmssd: avgHRV,
       sleepDurationMinutes: sleep?.durationMinutes ?? null,
-      sleepScore: sleep?.score ?? null,
+      sleepScore: computedSleepScore,
       recoveryScore: null,
       strainScore: null,
     });

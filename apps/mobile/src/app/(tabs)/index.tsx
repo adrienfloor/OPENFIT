@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
 import { useDailyStats } from '../../hooks/useDailyStats';
 import { useAuth } from '../../hooks/useAuth';
+import { TodayScoresHeader } from '../../components/TodayScoresHeader';
 
 export default function TodayScreen() {
   const { user, logout } = useAuth();
@@ -12,7 +13,6 @@ export default function TodayScreen() {
     { label: 'Resting HR', value: today?.heartRateResting ? `${today.heartRateResting} bpm` : '--' },
     { label: 'HRV', value: today?.hrvRmssd ? `${Math.round(today.hrvRmssd)} ms` : '--' },
     { label: 'Sleep', value: today?.sleepDurationMinutes ? `${Math.floor(today.sleepDurationMinutes / 60)}h ${today.sleepDurationMinutes % 60}m` : '--' },
-    { label: 'Recovery', value: today?.recoveryScore ? `${Math.round(today.recoveryScore)}%` : '--' },
   ];
 
   return (
@@ -39,6 +39,12 @@ export default function TodayScreen() {
           <Text style={styles.connectBtnSub}>Tap to grant Health Connect permissions</Text>
         </TouchableOpacity>
       )}
+
+      <TodayScoresHeader
+        sleepScore={today?.sleepScore ?? null}
+        effortScore={null}
+        readinessScore={null}
+      />
 
       <View style={styles.grid}>
         {stats.map((stat) => (

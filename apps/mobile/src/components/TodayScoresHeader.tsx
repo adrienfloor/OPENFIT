@@ -4,20 +4,32 @@ import { ScoreRing } from './ScoreRing';
 interface Props {
   sleepScore: number | null;
   effortScore: number | null;
+  /** Optional: raw intensity-minutes earned today, shown as "earned/target" caption. */
+  effortEarnedMinutes?: number | null;
+  effortTargetMinutes?: number | null;
   readinessScore: number | null;
 }
 
 /**
  * Zepp-style header: three colored rings side by side.
  *
- * Effort and Readiness are greyed with a "Soon" caption until Slices 2 & 3
- * light them up.
+ * Effort shows "earned/target" intensity-minutes underneath its label, the
+ * same way Zepp shows 124/32. Readiness stays greyed with "Soon" until Slice 3.
  */
 export function TodayScoresHeader({
   sleepScore,
   effortScore,
+  effortEarnedMinutes,
+  effortTargetMinutes,
   readinessScore,
 }: Props): React.JSX.Element {
+  const effortCaption =
+    effortScore === null
+      ? 'Soon'
+      : effortEarnedMinutes != null && effortTargetMinutes != null
+        ? `${effortEarnedMinutes}/${effortTargetMinutes}`
+        : undefined;
+
   return (
     <View style={styles.container}>
       <ScoreRing score={sleepScore} label="Sleep" color="#38bdf8" />
@@ -25,7 +37,7 @@ export function TodayScoresHeader({
         score={effortScore}
         label="Effort"
         color="#f97316"
-        caption={effortScore === null ? 'Soon' : undefined}
+        caption={effortCaption}
       />
       <ScoreRing
         score={readinessScore}

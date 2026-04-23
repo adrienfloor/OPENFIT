@@ -201,6 +201,15 @@ export interface EffortScoreInput {
   maxGapMinutes?: number;
 }
 
+export interface EffortScoreResult {
+  /** 0–100, clamped. */
+  score: number;
+  /** Intensity-weighted minutes earned today (uncapped — can exceed target). */
+  earnedMinutes: number;
+  /** Daily target that `earnedMinutes` is compared against. */
+  targetMinutes: number;
+}
+
 /**
  * Daily effort score in the style of Zepp's "Effort", Whoop "Strain", and
  * HUNT Fitness Study PAI. Not strictly PAI — we use %HRR (heart rate reserve)
@@ -224,10 +233,11 @@ export function effortScore({
   maxHR,
   targetMinutes = 100,
   maxGapMinutes = 10,
-}: EffortScoreInput): number {
-  if (samples.length < 2) return 0;
+}: EffortScoreInput): EffortScoreResult {
+  const empty: EffortScoreResult = { score: 0, earnedMinutes: 0, targetMinutes };
+  if (samples.length < 2) return empty;
   const hrr = maxHR - restingHR;
-  if (hrr <= 0) return 0;
+  if (hrr <= 0) return empty;
 
   const sorted = [...samples].sort(
     (a, b) => a.time.getTime() - b.time.getTime(),
@@ -245,7 +255,11 @@ export function effortScore({
     intensityMinutes += gapMinutes * weightForIntensity(intensity);
   }
 
-  return clamp0to100(Math.round((intensityMinutes / targetMinutes) * 100));
+  return {
+    score: clamp0to100(Math.round((intensityMinutes / targetMinutes) * 100)),
+    earnedMinutes: Math.round(intensityMinutes),
+    targetMinutes,
+  };
 }
 
 function weightForIntensity(hrrFraction: number): number {

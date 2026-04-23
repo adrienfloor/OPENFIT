@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { DailyHealth } from '@openfit/types';
+import type { TodayDailyStats } from '../services/healthConnect';
 import { useAuth } from './useAuth';
 
 export function useDailyStats(): {
-  today: DailyHealth | null;
+  today: TodayDailyStats | null;
   loading: boolean;
   error: Error | null;
   healthConnectAvailable: boolean | null;
@@ -12,7 +12,7 @@ export function useDailyStats(): {
   requestPermissions: () => Promise<void>;
 } {
   const { user } = useAuth();
-  const [today, setToday] = useState<DailyHealth | null>(null);
+  const [today, setToday] = useState<TodayDailyStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [healthConnectAvailable, setHealthConnectAvailable] = useState<boolean | null>(null);

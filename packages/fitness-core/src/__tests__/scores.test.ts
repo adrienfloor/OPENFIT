@@ -265,106 +265,122 @@ describe('effortScore — PAI-style daily effort', () => {
   const MAX = 183;
   const HRR = MAX - RESTING; // 123
 
-  it('returns 0 with no samples', () => {
-    expect(effortScore({ samples: [], restingHR: RESTING, maxHR: MAX })).toBe(0);
+  it('returns zero result with no samples', () => {
+    const r = effortScore({ samples: [], restingHR: RESTING, maxHR: MAX });
+    expect(r.score).toBe(0);
+    expect(r.earnedMinutes).toBe(0);
+    expect(r.targetMinutes).toBe(100);
   });
 
-  it('returns 0 with a single sample', () => {
-    expect(
-      effortScore({
-        samples: [{ time: new Date(), bpm: 140 }],
-        restingHR: RESTING,
-        maxHR: MAX,
-      }),
-    ).toBe(0);
+  it('returns zero with a single sample', () => {
+    const r = effortScore({
+      samples: [{ time: new Date(), bpm: 140 }],
+      restingHR: RESTING,
+      maxHR: MAX,
+    });
+    expect(r.score).toBe(0);
   });
 
-  it('returns 0 when max ≤ resting (bad profile)', () => {
-    expect(
-      effortScore({
-        samples: constantSamples(140, 60),
-        restingHR: 180,
-        maxHR: 180,
-      }),
-    ).toBe(0);
+  it('returns zero when max ≤ resting (bad profile)', () => {
+    const r = effortScore({
+      samples: constantSamples(140, 60),
+      restingHR: 180,
+      maxHR: 180,
+    });
+    expect(r.score).toBe(0);
   });
 
   it('gives 0 pts for a resting day', () => {
     // 480 min at 65 bpm → HRR = (65-60)/123 = 0.04 → below 0.40 threshold
-    const score = effortScore({
+    const r = effortScore({
       samples: constantSamples(65, 480),
       restingHR: RESTING,
       maxHR: MAX,
     });
-    expect(score).toBe(0);
+    expect(r.score).toBe(0);
+    expect(r.earnedMinutes).toBe(0);
   });
 
   it('60 min in the moderate zone scores 60', () => {
     // HRR = 0.50 → need bpm such that (bpm-60)/123 = 0.50 → bpm ≈ 122
-    const score = effortScore({
+    const r = effortScore({
       samples: constantSamples(122, 60),
       restingHR: RESTING,
       maxHR: MAX,
     });
     // 60 min × 1 pt/min = 60 → 60/100 = 60 %
-    expect(score).toBe(60);
+    expect(r.score).toBe(60);
+    expect(r.earnedMinutes).toBe(60);
   });
 
   it('30 min in the vigorous zone scores 60', () => {
     // HRR = 0.70 → bpm ≈ 60 + 0.70·123 = 146
-    const score = effortScore({
+    const r = effortScore({
       samples: constantSamples(146, 30),
       restingHR: RESTING,
       maxHR: MAX,
     });
     // 30 × 2 = 60 → 60 %
-    expect(score).toBe(60);
+    expect(r.score).toBe(60);
+    expect(r.earnedMinutes).toBe(60);
   });
 
-  it('clamps at 100 for very intense + long workouts', () => {
-    // 90 min at HRR ~0.85 → 90 × 3 = 270 pts → clamps to 100
+  it('clamps at 100 for very intense + long workouts (but earnedMinutes uncapped)', () => {
+    // 90 min at HRR ~0.85 → 90 × 3 = 270 pts → clamps score to 100, earned stays 270
     const bpm = Math.round(RESTING + 0.85 * HRR); // ≈165
-    const score = effortScore({
+    const r = effortScore({
       samples: constantSamples(bpm, 90),
       restingHR: RESTING,
       maxHR: MAX,
     });
-    expect(score).toBe(100);
+    expect(r.score).toBe(100);
+    expect(r.earnedMinutes).toBeGreaterThan(100);
   });
 
   it('near-max effort gets peak weight (4 pts/min)', () => {
     // 25 min at HRR 0.92 → 25 × 4 = 100 → 100 %
     const bpm = Math.round(RESTING + 0.92 * HRR); // ≈173
-    const score = effortScore({
+    const r = effortScore({
       samples: constantSamples(bpm, 25),
       restingHR: RESTING,
       maxHR: MAX,
     });
-    expect(score).toBe(100);
+    expect(r.score).toBe(100);
+    expect(r.earnedMinutes).toBe(100);
   });
 
   it('drops gaps larger than maxGapMinutes (device off)', () => {
-    // 30 min moderate, then 120 min gap, then 30 min moderate again.
     const first = constantSamples(122, 30, new Date('2026-04-22T08:00:00Z'));
     const second = constantSamples(122, 30, new Date('2026-04-22T10:30:00Z'));
     const merged = [...first, ...second];
-    const score = effortScore({
+    const r = effortScore({
       samples: merged,
       restingHR: RESTING,
       maxHR: MAX,
     });
-    // Should NOT credit the 120-min gap. Two separate 30-min moderate blocks =
-    // 60 pts. With the gap credited wrongly it would be >> 100.
-    expect(score).toBe(60);
+    expect(r.score).toBe(60);
   });
 
   it('sorts unsorted samples before integrating', () => {
     const reversed = [...constantSamples(122, 60)].reverse();
-    const score = effortScore({
+    const r = effortScore({
       samples: reversed,
       restingHR: RESTING,
       maxHR: MAX,
     });
-    expect(score).toBe(60);
+    expect(r.score).toBe(60);
+  });
+
+  it('respects a custom target', () => {
+    // 30 min vigorous (60 pts) vs target 30 = 200 % → clamp to 100
+    const r = effortScore({
+      samples: constantSamples(146, 30),
+      restingHR: RESTING,
+      maxHR: MAX,
+      targetMinutes: 30,
+    });
+    expect(r.score).toBe(100);
+    expect(r.earnedMinutes).toBe(60);
+    expect(r.targetMinutes).toBe(30);
   });
 });

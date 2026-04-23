@@ -14,6 +14,16 @@ import {
   SdkAvailabilityStatus,
 } from 'react-native-health-connect';
 import type { DailyHealth, UserProfile } from '@openfit/types';
+
+/**
+ * DailyHealth plus UI-only effort detail that isn't persisted to the server.
+ * `effortEarnedMinutes` is the raw intensity-weighted minutes from the
+ * effort-score computation — useful for showing "124/100" inside the ring.
+ */
+export type TodayDailyStats = DailyHealth & {
+  effortEarnedMinutes: number | null;
+  effortTargetMinutes: number | null;
+};
 import {
   computeBMR,
   bmrCaloriesElapsed,
@@ -104,10 +114,10 @@ export async function getDailyStats(
   startDate: Date,
   endDate: Date,
   userProfile?: Pick<UserProfile, 'weightKg' | 'heightCm' | 'sex' | 'dateOfBirth'>,
-): Promise<DailyHealth[]> {
+): Promise<TodayDailyStats[]> {
   assertInitialized();
 
-  const results: DailyHealth[] = [];
+  const results: TodayDailyStats[] = [];
   const current = startOfDay(startDate);
   const end = startOfDay(endDate);
 
@@ -258,7 +268,7 @@ export async function getDailyStats(
 
     // Effort score needs user age (→ max HR via Tanaka) and a resting HR. If
     // either is missing we leave it null rather than fake a number.
-    const computedEffortScore =
+    const effort =
       userProfile !== undefined && latestRestingHR && hrSamples.length >= 2
         ? effortScore({
             samples: hrSamples,
@@ -279,7 +289,9 @@ export async function getDailyStats(
       sleepDurationMinutes: sleep?.durationMinutes ?? null,
       sleepScore: computedSleepScore,
       recoveryScore: null,
-      effortScore: computedEffortScore,
+      effortScore: effort?.score ?? null,
+      effortEarnedMinutes: effort?.earnedMinutes ?? null,
+      effortTargetMinutes: effort?.targetMinutes ?? null,
     });
 
     // Unused but available: avgSpO2

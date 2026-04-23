@@ -43,6 +43,8 @@ export default function TodayScreen() {
       <TodayScoresHeader
         sleepScore={today?.sleepScore ?? null}
         effortScore={today?.effortScore ?? null}
+        effortEarnedMinutes={today?.effortEarnedMinutes ?? null}
+        effortTargetMinutes={today?.effortTargetMinutes ?? null}
         readinessScore={null}
       />
 

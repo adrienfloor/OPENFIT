@@ -2,7 +2,10 @@ import { describe, it, expect } from 'vitest';
 import {
   sleepScore,
   effortScore,
+  readinessScore,
+  recentTrainingLoad,
   DEFAULT_SLEEP_NEED_MINUTES,
+  READINESS_MIN_BASELINE_DAYS,
   type EffortHRSample,
 } from '../scores';
 
@@ -382,5 +385,110 @@ describe('effortScore — PAI-style daily effort', () => {
     expect(r.score).toBe(100);
     expect(r.earnedMinutes).toBe(60);
     expect(r.targetMinutes).toBe(30);
+  });
+});
+
+describe('readinessScore — morning recovery composite', () => {
+  const base = {
+    hrvToday: 50,
+    hrvBaseline: 50,
+    rhrToday: 55,
+    rhrBaseline: 55,
+    sleepScore: 80,
+    recentLoad: 0,
+    baselineDays: 7,
+  } as const;
+
+  it('returns neutral 50 + calibrating flag when baseline is thin', () => {
+    const r = readinessScore({ ...base, baselineDays: 2 });
+    expect(r.score).toBe(50);
+    expect(r.calibrating).toBe(true);
+    // All components null when calibrating — nothing trustworthy to show.
+    expect(r.components.hrv).toBeNull();
+    expect(r.components.rhr).toBeNull();
+    expect(r.components.sleep).toBeNull();
+    expect(r.components.load).toBeNull();
+  });
+
+  it(`requires at least ${READINESS_MIN_BASELINE_DAYS} baseline days`, () => {
+    const calibrating = readinessScore({
+      ...base,
+      baselineDays: READINESS_MIN_BASELINE_DAYS - 1,
+    });
+    expect(calibrating.calibrating).toBe(true);
+
+    const ok = readinessScore({ ...base, baselineDays: READINESS_MIN_BASELINE_DAYS });
+    expect(ok.calibrating).toBe(false);
+  });
+
+  it('baseline day with average sleep + no load lands in the 70s', () => {
+    // HRV at baseline = 70, RHR at baseline = 70, sleep 80, load 0 (100) →
+    // 0.30·70 + 0.20·70 + 0.30·80 + 0.20·100 = 21 + 14 + 24 + 20 = 79
+    const r = readinessScore(base);
+    expect(r.calibrating).toBe(false);
+    expect(r.score).toBe(79);
+    expect(r.components.hrv).toBe(70);
+    expect(r.components.rhr).toBe(70);
+  });
+
+  it('boosts when HRV is 20 % above baseline', () => {
+    const r = readinessScore({ ...base, hrvToday: 60 });
+    expect(r.components.hrv).toBe(100);
+    // 0.30·100 + 0.20·70 + 0.30·80 + 0.20·100 = 30 + 14 + 24 + 20 = 88
+    expect(r.score).toBe(88);
+  });
+
+  it('penalises when RHR is well above baseline (poor recovery)', () => {
+    // RHR 66 vs baseline 55 = +20 % elevation → inverted reading: "current=55, baseline=66"
+    // deviation = (55-66)/66 = -0.167 → 70 + (-0.167/0.2)*50 ≈ 28
+    const r = readinessScore({ ...base, rhrToday: 66 });
+    expect(r.components.rhr).toBeLessThan(40);
+    expect(r.components.rhr).toBeGreaterThan(20);
+  });
+
+  it('heavy recent load drags the score down', () => {
+    const r = readinessScore({ ...base, recentLoad: 300 });
+    expect(r.components.load).toBe(0);
+    // 0.30·70 + 0.20·70 + 0.30·80 + 0.20·0 = 21 + 14 + 24 + 0 = 59
+    expect(r.score).toBe(59);
+  });
+
+  it('drops components whose data is missing and renormalises', () => {
+    // No HRV data at all → formula falls back to RHR + sleep + load only
+    const r = readinessScore({ ...base, hrvToday: null, hrvBaseline: null });
+    expect(r.components.hrv).toBeNull();
+    expect(r.components.rhr).not.toBeNull();
+    expect(r.components.sleep).not.toBeNull();
+    expect(r.components.load).not.toBeNull();
+  });
+
+  it('bad night + bad HRV + bad RHR tanks the score', () => {
+    const r = readinessScore({
+      ...base,
+      hrvToday: 40, // 20 % below baseline → 20
+      rhrToday: 66, // 20 % above baseline → 20
+      sleepScore: 35,
+      recentLoad: 200,
+    });
+    expect(r.score).toBeLessThan(40);
+  });
+});
+
+describe('recentTrainingLoad', () => {
+  it('weighs yesterday heavier than older days', () => {
+    // 100 each day: 100*1.0 + 100*0.6 + 100*0.3 = 190
+    expect(recentTrainingLoad([100, 100, 100])).toBe(190);
+  });
+
+  it('treats missing days as zero', () => {
+    expect(recentTrainingLoad([100, null, 100])).toBeCloseTo(130, 5);
+  });
+
+  it('returns 0 for an empty history', () => {
+    expect(recentTrainingLoad([])).toBe(0);
+  });
+
+  it('ignores anything past the 3-day window', () => {
+    expect(recentTrainingLoad([100, 100, 100, 999, 999])).toBe(190);
   });
 });

@@ -269,3 +269,135 @@ function weightForIntensity(hrrFraction: number): number {
   if (hrrFraction >= 0.4) return 1;
   return 0;
 }
+
+// ──────────────────────────────────────────────────────────────────────────
+// Readiness / BioCharge — morning recovery state
+// ──────────────────────────────────────────────────────────────────────────
+
+export interface ReadinessScoreInput {
+  /** Today's HRV (RMSSD, ms) measured during last sleep window. */
+  hrvToday: number | null;
+  /** Rolling mean HRV over the last ~7 days (excluding today). */
+  hrvBaseline: number | null;
+  /** Today's resting HR. */
+  rhrToday: number | null;
+  /** Rolling mean RHR over the last ~7 days. */
+  rhrBaseline: number | null;
+  /** Last night's sleep score, 0–100. */
+  sleepScore: number | null;
+  /** Sum of last 3 days of earned effort minutes, exponentially decayed (yesterday ×1, −2d ×0.6, −3d ×0.3). */
+  recentLoad: number | null;
+  /** Number of days of baseline history available (both HRV + RHR). */
+  baselineDays: number;
+}
+
+export interface ReadinessScoreResult {
+  score: number;
+  /** When true, baseline history is too thin to trust — UI should show "Calibrating". */
+  calibrating: boolean;
+  components: {
+    hrv: number | null;
+    rhr: number | null;
+    sleep: number | null;
+    load: number | null;
+  };
+}
+
+/** Minimum days of baseline before we trust the HRV / RHR signals. */
+export const READINESS_MIN_BASELINE_DAYS = 3;
+
+/**
+ * Weighted composite of HRV-vs-baseline, RHR-vs-baseline, last night's sleep,
+ * and recent training load. Returns a "calibrating" flag when baseline data
+ * is too thin — in that case the score falls back to 50 (neutral) so the UI
+ * isn't claiming signal it doesn't have.
+ *
+ * Weights: HRV 0.30, RHR 0.20, Sleep 0.30, Load 0.20. Missing components drop
+ * out and remaining weights renormalise.
+ */
+export function readinessScore(input: ReadinessScoreInput): ReadinessScoreResult {
+  const calibrating = input.baselineDays < READINESS_MIN_BASELINE_DAYS;
+
+  if (calibrating) {
+    return {
+      score: 50,
+      calibrating: true,
+      components: { hrv: null, rhr: null, sleep: null, load: null },
+    };
+  }
+
+  const hrvSub =
+    input.hrvToday !== null && input.hrvBaseline && input.hrvBaseline > 0
+      ? scoreDeviationUpIsBetter(input.hrvToday, input.hrvBaseline)
+      : null;
+  const rhrSub =
+    input.rhrToday !== null && input.rhrBaseline && input.rhrBaseline > 0
+      ? scoreDeviationUpIsBetter(input.rhrBaseline, input.rhrToday) // invert: lower RHR = better
+      : null;
+  const sleepSub = input.sleepScore !== null ? clamp0to100(input.sleepScore) : null;
+  const loadSub = input.recentLoad !== null ? scoreRecentLoad(input.recentLoad) : null;
+
+  const W_R = { hrv: 0.3, rhr: 0.2, sleep: 0.3, load: 0.2 };
+
+  let totalWeight = 0;
+  let weighted = 0;
+  if (hrvSub !== null) { totalWeight += W_R.hrv; weighted += W_R.hrv * hrvSub; }
+  if (rhrSub !== null) { totalWeight += W_R.rhr; weighted += W_R.rhr * rhrSub; }
+  if (sleepSub !== null) { totalWeight += W_R.sleep; weighted += W_R.sleep * sleepSub; }
+  if (loadSub !== null) { totalWeight += W_R.load; weighted += W_R.load * loadSub; }
+
+  const overall = totalWeight > 0 ? weighted / totalWeight : 50;
+
+  return {
+    score: clamp0to100(Math.round(overall)),
+    calibrating: false,
+    components: {
+      hrv: hrvSub !== null ? Math.round(hrvSub) : null,
+      rhr: rhrSub !== null ? Math.round(rhrSub) : null,
+      sleep: sleepSub !== null ? Math.round(sleepSub) : null,
+      load: loadSub !== null ? Math.round(loadSub) : null,
+    },
+  };
+}
+
+/**
+ * Maps a positive deviation to a 0–100 score where "at baseline" = 70.
+ *
+ *   −20 %  →  20   (well below baseline — bad)
+ *     0 %  →  70   (at baseline — typical)
+ *   +20 %  →  100  (well above baseline — peak)
+ *
+ * The 70-at-baseline anchor means a "normal" day reads as "good", with room
+ * above for exceptional recovery.
+ */
+function scoreDeviationUpIsBetter(current: number, baseline: number): number {
+  const deviation = (current - baseline) / baseline;
+  if (deviation >= 0.2) return 100;
+  if (deviation <= -0.2) return 20;
+  if (deviation >= 0) return 70 + (deviation / 0.2) * 30;
+  return 70 + (deviation / 0.2) * 50;
+}
+
+/**
+ * Recent load drags readiness down. 0 load → 100 (fully rested); 300
+ * intensity-minutes over last 3 days (≈ 3 heavy sessions) → 0.
+ */
+function scoreRecentLoad(recentLoad: number): number {
+  return clamp0to100(100 - (recentLoad / 300) * 100);
+}
+
+/**
+ * Compute the exponentially-weighted sum of earned effort minutes over the
+ * last 3 days. Yesterday ×1.0, -2d ×0.6, -3d ×0.3. Missing days count as 0.
+ */
+export function recentTrainingLoad(
+  earnedByDayMostRecentFirst: Array<number | null>,
+): number {
+  const weights = [1.0, 0.6, 0.3];
+  let load = 0;
+  for (let i = 0; i < weights.length; i++) {
+    const v = earnedByDayMostRecentFirst[i];
+    if (v != null) load += v * (weights[i] as number);
+  }
+  return load;
+}

@@ -750,27 +750,47 @@ interface SwapModalProps {
   onPick: (newExercise: Exercise) => void;
 }
 
+// Section ordering follows the natural anatomical grouping in MuscleGroup
+// enum. Each exercise appears once under its primary (first) muscle group.
+const MUSCLE_GROUP_ORDER = [
+  'chest',
+  'back',
+  'shoulders',
+  'biceps',
+  'triceps',
+  'forearms',
+  'core',
+  'quads',
+  'hamstrings',
+  'glutes',
+  'calves',
+  'full_body',
+] as const;
+
+function prettifyMuscleGroup(m: string): string {
+  if (m === 'full_body') return 'Full Body';
+  return m.charAt(0).toUpperCase() + m.slice(1);
+}
+
 function SwapExerciseModal({ target, allExercises, onClose, onPick }: SwapModalProps) {
   const visible = target !== null;
 
-  const alternatives = useMemo(() => {
-    if (!target) return [];
-    const original = allExercises.find((e) => e.id === target.exercise.exerciseId);
-    if (!original) return [];
-    const targetMuscles = new Set(original.muscleGroups);
-    return allExercises
-      .filter(
-        (e) =>
-          e.id !== original.id &&
-          e.muscleGroups.some((m) => targetMuscles.has(m)),
-      )
-      .sort((a, b) => {
-        // Sort: most muscle-group overlap first, then alpha.
-        const overlap = (ex: Exercise) =>
-          ex.muscleGroups.filter((m) => targetMuscles.has(m)).length;
-        const diff = overlap(b) - overlap(a);
-        return diff !== 0 ? diff : a.name.localeCompare(b.name);
-      });
+  // Group every exercise (except the one being replaced) by its primary
+  // muscle group so the user can browse the whole library by section.
+  const sections = useMemo(() => {
+    if (!target) return [] as { muscle: string; items: Exercise[] }[];
+    const byGroup = new Map<string, Exercise[]>();
+    for (const ex of allExercises) {
+      if (ex.id === target.exercise.exerciseId) continue;
+      const primary = ex.muscleGroups[0] ?? 'full_body';
+      const arr = byGroup.get(primary) ?? [];
+      arr.push(ex);
+      byGroup.set(primary, arr);
+    }
+    return MUSCLE_GROUP_ORDER.filter((m) => byGroup.has(m)).map((m) => ({
+      muscle: m,
+      items: (byGroup.get(m) ?? []).sort((a, b) => a.name.localeCompare(b.name)),
+    }));
   }, [target, allExercises]);
 
   return (
@@ -790,23 +810,30 @@ function SwapExerciseModal({ target, allExercises, onClose, onPick }: SwapModalP
             </Text>
           )}
           <ScrollView style={styles.modalList}>
-            {alternatives.length === 0 ? (
-              <Text style={styles.modalEmpty}>No similar exercises in your library.</Text>
+            {sections.length === 0 ? (
+              <Text style={styles.modalEmpty}>No exercises available.</Text>
             ) : (
-              alternatives.map((ex) => (
-                <TouchableOpacity
-                  key={ex.id}
-                  style={styles.modalRow}
-                  onPress={() => onPick(ex)}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.modalRowName}>{ex.name}</Text>
-                    <Text style={styles.modalRowMeta}>
-                      {ex.muscleGroups.join(', ')} · {ex.equipment}
-                    </Text>
-                  </View>
-                  <Text style={styles.modalRowChevron}>›</Text>
-                </TouchableOpacity>
+              sections.map((section) => (
+                <View key={section.muscle}>
+                  <Text style={styles.modalSectionHeader}>
+                    {prettifyMuscleGroup(section.muscle)}
+                  </Text>
+                  {section.items.map((ex) => (
+                    <TouchableOpacity
+                      key={ex.id}
+                      style={styles.modalRow}
+                      onPress={() => onPick(ex)}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.modalRowName}>{ex.name}</Text>
+                        <Text style={styles.modalRowMeta}>
+                          {ex.muscleGroups.join(', ')} · {ex.equipment}
+                        </Text>
+                      </View>
+                      <Text style={styles.modalRowChevron}>›</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               ))
             )}
           </ScrollView>
@@ -1195,6 +1222,15 @@ const styles = StyleSheet.create({
   modalRowName: { fontSize: 15, fontWeight: '500' },
   modalRowMeta: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
   modalRowChevron: { fontSize: 22, color: '#9ca3af' },
+  modalSectionHeader: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#22c55e',
+    textTransform: 'uppercase',
+    paddingTop: 14,
+    paddingBottom: 4,
+    letterSpacing: 0.5,
+  },
   modalEmpty: { fontSize: 14, color: '#9ca3af', textAlign: 'center', paddingVertical: 24 },
   modalCancel: {
     marginTop: 12,

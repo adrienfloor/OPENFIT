@@ -12,6 +12,7 @@
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:seed": "node --env-file=.env --import tsx src/seed.ts",
+    "db:seed-exercises": "node --env-file=.env --import tsx src/seed-exercises.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

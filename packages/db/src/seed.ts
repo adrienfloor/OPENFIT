@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { computeCaloriesFromHRSamples, ageYearsFromDob } from '@openfit/fitness-core';
+import { DEFAULT_EXERCISES } from './exercises';
 
 const prisma = new PrismaClient();
 
@@ -54,47 +55,35 @@ async function main(): Promise<void> {
 
   console.log(`Created users: ${alice.email}, ${bob.email}`);
 
-  // Seed exercises
-  const exercises = await Promise.all([
-    prisma.exercise.create({
-      data: { name: 'Barbell Back Squat', muscleGroups: ['quads', 'glutes', 'hamstrings'], equipment: 'barbell' },
-    }),
-    prisma.exercise.create({
-      data: { name: 'Barbell Bench Press', muscleGroups: ['chest', 'triceps', 'shoulders'], equipment: 'barbell' },
-    }),
-    prisma.exercise.create({
-      data: { name: 'Deadlift', muscleGroups: ['back', 'glutes', 'hamstrings'], equipment: 'barbell' },
-    }),
-    prisma.exercise.create({
-      data: { name: 'Overhead Press', muscleGroups: ['shoulders', 'triceps'], equipment: 'barbell' },
-    }),
-    prisma.exercise.create({
-      data: { name: 'Pull-up', muscleGroups: ['back', 'biceps'], equipment: 'bodyweight' },
-    }),
-    prisma.exercise.create({
-      data: { name: 'Barbell Row', muscleGroups: ['back', 'biceps'], equipment: 'barbell' },
-    }),
-    prisma.exercise.create({
-      data: { name: 'Dumbbell Lateral Raise', muscleGroups: ['shoulders'], equipment: 'dumbbell' },
-    }),
-    prisma.exercise.create({
-      data: { name: 'Romanian Deadlift', muscleGroups: ['hamstrings', 'glutes'], equipment: 'barbell' },
-    }),
-    prisma.exercise.create({
-      data: { name: 'Leg Press', muscleGroups: ['quads', 'glutes'], equipment: 'machine' },
-    }),
-    prisma.exercise.create({
-      data: { name: 'Cable Tricep Pushdown', muscleGroups: ['triceps'], equipment: 'cable' },
-    }),
-  ]);
+  // Seed the full default library, then look up the canonical movements
+  // referenced by the program seed data below.
+  await Promise.all(
+    DEFAULT_EXERCISES.map((ex) =>
+      prisma.exercise.create({ data: ex }),
+    ),
+  );
 
-  const [squat, bench, deadlift, ohp, pullup, row, lateralRaise, rdl, legPress, tricepPushdown] = exercises as [
-    typeof exercises[0], typeof exercises[0], typeof exercises[0], typeof exercises[0],
-    typeof exercises[0], typeof exercises[0], typeof exercises[0], typeof exercises[0],
-    typeof exercises[0], typeof exercises[0],
-  ];
+  async function findExercise(name: string) {
+    const ex = await prisma.exercise.findUnique({ where: { name } });
+    if (!ex) throw new Error(`Seed exercise missing: ${name}`);
+    return ex;
+  }
 
-  console.log(`Created ${exercises.length} exercises`);
+  const [squat, bench, deadlift, ohp, pullup, row, lateralRaise, rdl, legPress, tricepPushdown] =
+    await Promise.all([
+      findExercise('Barbell Back Squat'),
+      findExercise('Barbell Bench Press'),
+      findExercise('Deadlift'),
+      findExercise('Overhead Press'),
+      findExercise('Pull-up'),
+      findExercise('Barbell Row'),
+      findExercise('Dumbbell Lateral Raise'),
+      findExercise('Romanian Deadlift'),
+      findExercise('Leg Press'),
+      findExercise('Cable Tricep Pushdown'),
+    ]);
+
+  console.log(`Created ${DEFAULT_EXERCISES.length} exercises`);
 
   // Helper to create a program for a user
   async function createProgram(
@@ -232,9 +221,11 @@ async function main(): Promise<void> {
       const durationMinutes = 40 + Math.floor(Math.random() * 30);
       const completedAt = new Date(startedAt.getTime() + durationMinutes * 60 * 1000);
 
-      // Pick 3-4 random exercises
+      // Pick 3-4 random exercises from the canonical compound pool we have
+      // local references for (matches the original seed behaviour).
+      const compoundPool = [squat, bench, deadlift, ohp, pullup, row, rdl, legPress];
       const numExercises = 3 + Math.floor(Math.random() * 2);
-      const shuffled = [...exercises].sort(() => Math.random() - 0.5).slice(0, numExercises);
+      const shuffled = [...compoundPool].sort(() => Math.random() - 0.5).slice(0, numExercises);
 
       const hrSamples: Array<{ timestamp: Date; bpm: number; zone: string }> = [];
       for (let m = 0; m < durationMinutes; m += 2) {

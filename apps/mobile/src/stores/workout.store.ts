@@ -44,6 +44,11 @@ interface WorkoutState {
     plannedExercises?: PlannedExerciseSpec[],
   ) => void;
   addSet: (exerciseId: string, exerciseName: string, set: ActiveSet) => void;
+  /**
+   * Replace a planned exercise with a different one (same set scheme).
+   * Only allowed before any set on this slot is completed — guarded in UI.
+   */
+  swapExercise: (index: number, newExerciseId: string, newExerciseName: string) => void;
   finishWorkout: () => void;
 }
 
@@ -84,6 +89,21 @@ export const useWorkoutStore = create<WorkoutState>((set) => ({
           { exerciseId, exerciseName, completedSets: [newSet] },
         ],
       };
+    });
+  },
+
+  swapExercise: (index, newExerciseId, newExerciseName) => {
+    set((state) => {
+      if (index < 0 || index >= state.plannedExercises.length) return state;
+      const next = [...state.plannedExercises];
+      const original = next[index];
+      if (!original) return state;
+      next[index] = {
+        ...original,
+        exerciseId: newExerciseId,
+        exerciseName: newExerciseName,
+      };
+      return { plannedExercises: next };
     });
   },
 

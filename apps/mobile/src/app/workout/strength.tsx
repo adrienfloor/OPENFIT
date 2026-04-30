@@ -8,6 +8,7 @@ import {
   TextInput,
   Alert,
   RefreshControl,
+  Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { apiClient } from '../../services/api';
@@ -112,9 +113,11 @@ export default function WorkoutScreen() {
     sessionName,
     startWorkout,
     addSet,
+    swapExercise,
     finishWorkout,
     sessionId,
   } = useWorkoutStore();
+  const [swapTarget, setSwapTarget] = useState<{ index: number; exercise: PlannedExerciseSpec } | null>(null);
   const user = useAuthStore((s) => s.user);
   const hrSamplesRef = useRef<() => Array<{ timestamp: Date; bpm: number; zone: string }>>(() => []);
   const restTimer = useRestTimer();
@@ -329,10 +332,12 @@ export default function WorkoutScreen() {
           <PlannedExercisesList
             plannedExercises={plannedExercises}
             activeExercises={activeExercises}
+            allExercises={exercises}
             onLogSet={(exerciseId, exerciseName, set, restSeconds) => {
               addSet(exerciseId, exerciseName, set);
               if (restSeconds > 0) restTimer.start(restSeconds);
             }}
+            onRequestSwap={(index, exercise) => setSwapTarget({ index, exercise })}
           />
         ) : (
           <FreeWorkoutInput
@@ -356,6 +361,16 @@ export default function WorkoutScreen() {
         </TouchableOpacity>
 
         <View style={{ height: 40 }} />
+
+        <SwapExerciseModal
+          target={swapTarget}
+          allExercises={exercises}
+          onClose={() => setSwapTarget(null)}
+          onPick={(newEx) => {
+            if (swapTarget) swapExercise(swapTarget.index, newEx.id, newEx.name);
+            setSwapTarget(null);
+          }}
+        />
       </ScrollView>
     );
   }
@@ -500,15 +515,23 @@ function RestTimerCard({ timer }: { timer: ReturnType<typeof useRestTimer> }) {
 interface PlannedListProps {
   plannedExercises: PlannedExerciseSpec[];
   activeExercises: { exerciseId: string; exerciseName: string; completedSets: { reps: number; weight: number; rpe: number | null; restTaken: number }[] }[];
+  allExercises: Exercise[];
   onLogSet: (
     exerciseId: string,
     exerciseName: string,
     set: { reps: number; weight: number; rpe: number | null; restTaken: number },
     restSeconds: number,
   ) => void;
+  onRequestSwap: (index: number, exercise: PlannedExerciseSpec) => void;
 }
 
-function PlannedExercisesList({ plannedExercises, activeExercises, onLogSet }: PlannedListProps) {
+function PlannedExercisesList({
+  plannedExercises,
+  activeExercises,
+  allExercises,
+  onLogSet,
+  onRequestSwap,
+}: PlannedListProps) {
   // Index of the auto-focused exercise: the first one that still has pending sets.
   const autoFocusIndex = useMemo(() => {
     for (let i = 0; i < plannedExercises.length; i++) {
@@ -530,6 +553,7 @@ function PlannedExercisesList({ plannedExercises, activeExercises, onLogSet }: P
           activeExercises.find((a) => a.exerciseId === ex.exerciseId)?.completedSets ?? [];
         const isFocused = idx === focusIndex;
 
+        const canSwap = completed.length === 0;
         return (
           <PlannedExerciseCard
             key={`${ex.exerciseId}-${idx}`}
@@ -537,6 +561,8 @@ function PlannedExercisesList({ plannedExercises, activeExercises, onLogSet }: P
             completed={completed}
             isFocused={isFocused}
             onFocus={() => setManualFocus(idx === manualFocus ? null : idx)}
+            canSwap={canSwap}
+            onSwapPress={() => onRequestSwap(idx, ex)}
             onLogSet={(set, restSeconds) => {
               onLogSet(ex.exerciseId, ex.exerciseName, set, restSeconds);
               // Once this exercise's sets are all done, auto-focus advances.
@@ -554,13 +580,23 @@ interface PlannedCardProps {
   completed: { reps: number; weight: number; rpe: number | null; restTaken: number }[];
   isFocused: boolean;
   onFocus: () => void;
+  canSwap: boolean;
+  onSwapPress: () => void;
   onLogSet: (
     set: { reps: number; weight: number; rpe: number | null; restTaken: number },
     restSeconds: number,
   ) => void;
 }
 
-function PlannedExerciseCard({ planned, completed, isFocused, onFocus, onLogSet }: PlannedCardProps) {
+function PlannedExerciseCard({
+  planned,
+  completed,
+  isFocused,
+  onFocus,
+  canSwap,
+  onSwapPress,
+  onLogSet,
+}: PlannedCardProps) {
   const currentSetIndex = completed.length;
   const isDone = currentSetIndex >= planned.sets.length;
   const currentSpec = !isDone ? planned.sets[currentSetIndex] : null;
@@ -601,6 +637,18 @@ function PlannedExerciseCard({ planned, completed, isFocused, onFocus, onLogSet 
     >
       <View style={styles.exHeader}>
         <Text style={[styles.exName, isDone && styles.exNameDone]}>{planned.exerciseName}</Text>
+        {canSwap && (
+          <TouchableOpacity
+            onPress={(e) => {
+              e.stopPropagation();
+              onSwapPress();
+            }}
+            style={styles.swapBtn}
+            hitSlop={8}
+          >
+            <Text style={styles.swapBtnText}>Swap</Text>
+          </TouchableOpacity>
+        )}
         <View style={[styles.exProgress, isDone && styles.exProgressDone]}>
           <Text style={[styles.exProgressText, isDone && styles.exProgressTextDone]}>
             {completed.length}/{planned.sets.length}
@@ -685,6 +733,89 @@ function PlannedExerciseCard({ planned, completed, isFocused, onFocus, onLogSet 
         );
       })}
     </TouchableOpacity>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Swap exercise modal — shows alternatives with at least one shared muscle
+// group with the original. User taps one to replace the planned exercise
+// in the active session (set scheme is preserved). Disabled by the parent
+// once any set on the slot is logged.
+// ──────────────────────────────────────────────────────────────────────────
+
+interface SwapModalProps {
+  target: { index: number; exercise: PlannedExerciseSpec } | null;
+  allExercises: Exercise[];
+  onClose: () => void;
+  onPick: (newExercise: Exercise) => void;
+}
+
+function SwapExerciseModal({ target, allExercises, onClose, onPick }: SwapModalProps) {
+  const visible = target !== null;
+
+  const alternatives = useMemo(() => {
+    if (!target) return [];
+    const original = allExercises.find((e) => e.id === target.exercise.exerciseId);
+    if (!original) return [];
+    const targetMuscles = new Set(original.muscleGroups);
+    return allExercises
+      .filter(
+        (e) =>
+          e.id !== original.id &&
+          e.muscleGroups.some((m) => targetMuscles.has(m)),
+      )
+      .sort((a, b) => {
+        // Sort: most muscle-group overlap first, then alpha.
+        const overlap = (ex: Exercise) =>
+          ex.muscleGroups.filter((m) => targetMuscles.has(m)).length;
+        const diff = overlap(b) - overlap(a);
+        return diff !== 0 ? diff : a.name.localeCompare(b.name);
+      });
+  }, [target, allExercises]);
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
+      <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity activeOpacity={1} style={styles.modalSheet} onPress={() => {}}>
+          <View style={styles.modalHandle} />
+          <Text style={styles.modalTitle}>Swap exercise</Text>
+          {target && (
+            <Text style={styles.modalSubtitle}>
+              Replacing {target.exercise.exerciseName} (set scheme will be kept)
+            </Text>
+          )}
+          <ScrollView style={styles.modalList}>
+            {alternatives.length === 0 ? (
+              <Text style={styles.modalEmpty}>No similar exercises in your library.</Text>
+            ) : (
+              alternatives.map((ex) => (
+                <TouchableOpacity
+                  key={ex.id}
+                  style={styles.modalRow}
+                  onPress={() => onPick(ex)}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.modalRowName}>{ex.name}</Text>
+                    <Text style={styles.modalRowMeta}>
+                      {ex.muscleGroups.join(', ')} · {ex.equipment}
+                    </Text>
+                  </View>
+                  <Text style={styles.modalRowChevron}>›</Text>
+                </TouchableOpacity>
+              ))
+            )}
+          </ScrollView>
+          <TouchableOpacity style={styles.modalCancel} onPress={onClose}>
+            <Text style={styles.modalCancelText}>Cancel</Text>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
   );
 }
 
@@ -1023,4 +1154,54 @@ const styles = StyleSheet.create({
     borderColor: '#e5e7eb',
   },
   setHint: { fontSize: 11, color: '#6b7280', marginTop: 4, marginBottom: 8 },
+
+  // ── Swap button + modal ─────────────────────────────────────────────────
+  swapBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    backgroundColor: '#eff6ff',
+    marginRight: 8,
+  },
+  swapBtnText: { fontSize: 11, fontWeight: '700', color: '#2563eb', textTransform: 'uppercase' },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  modalSheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 24,
+    maxHeight: '80%',
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  modalTitle: { fontSize: 18, fontWeight: '700' },
+  modalSubtitle: { fontSize: 13, color: '#6b7280', marginTop: 4, marginBottom: 12 },
+  modalList: { maxHeight: 480 },
+  modalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  modalRowName: { fontSize: 15, fontWeight: '500' },
+  modalRowMeta: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
+  modalRowChevron: { fontSize: 22, color: '#9ca3af' },
+  modalEmpty: { fontSize: 14, color: '#9ca3af', textAlign: 'center', paddingVertical: 24 },
+  modalCancel: {
+    marginTop: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderRadius: 10,
+    backgroundColor: '#f3f4f6',
+  },
+  modalCancelText: { fontSize: 15, fontWeight: '600', color: '#374151' },
 });

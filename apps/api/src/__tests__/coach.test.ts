@@ -234,6 +234,14 @@ describe('CoachService.gatherPromptInput', () => {
 
     const input = await service.gatherPromptInput('user_01', makeCoachingProfile());
 
+    // The library query must filter to the profile's equipment whitelist
+    // so the LLM can't reach for cable / machine exercises the user can't do.
+    expect(prisma.exercise.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { equipment: { in: ['barbell', 'dumbbell'] } },
+      }),
+    );
+
     expect(input.user.weightKg).toBe(80);
     expect(input.user.sex).toBe('male');
     expect(input.user.ageYears).toBeGreaterThan(30);

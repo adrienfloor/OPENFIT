@@ -145,7 +145,7 @@ export class CoachService {
     const [recent, topSets, exerciseLibrary] = await Promise.all([
       this.computeRecentActivity(userId),
       this.computeTopSets(userId),
-      this.loadExerciseLibrary(),
+      this.loadExerciseLibrary(profile.availableEquipment),
     ]);
 
     return {
@@ -273,8 +273,16 @@ export class CoachService {
     return [...bestPerExercise.values()];
   }
 
-  private async loadExerciseLibrary(): Promise<CoachExerciseLibraryEntry[]> {
+  /**
+   * Loads exercises filtered to the user's available equipment so the LLM
+   * literally cannot pick an exercise the user can't perform. The prompt
+   * also names the whitelist explicitly as a belt-and-braces guard.
+   */
+  private async loadExerciseLibrary(
+    availableEquipment: CoachingProfile['availableEquipment'],
+  ): Promise<CoachExerciseLibraryEntry[]> {
     const exercises = await this.prisma.exercise.findMany({
+      where: { equipment: { in: availableEquipment } },
       orderBy: { name: 'asc' },
     });
     return exercises.map((e) => ({

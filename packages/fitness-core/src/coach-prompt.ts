@@ -43,8 +43,12 @@ rest on accessories, more supersets implied).
 work where equipment allows.
 - Never prescribe loadPctOf1RM for an exercise the user has no logged \
 history of - omit the field and use rpe-only prescription instead.
-- Only use exerciseId values from the provided exercise library. Never \
-invent IDs.
+- HARD CONSTRAINT: only use exerciseId values from the provided exercise \
+library. The library is pre-filtered to the user's available equipment - \
+do not name or suggest any exercise outside this list, even in rationale \
+text. If a desired movement (e.g. cable triceps pushdown) isn't in the \
+library, substitute an equipment-compatible alternative from the list \
+(e.g. dumbbell or barbell triceps extension).
 - rationale per exercise: one sentence, plain language, why this exercise \
 fits the user's goal and current week.
 - weekly summary: one sentence, what changes vs the previous week.

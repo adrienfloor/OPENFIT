@@ -237,11 +237,21 @@ Anthropic SDK, structured output via tool-use trick constrained to `GeneratedPro
 - `ANTHROPIC_API_KEY` env var required for live generation; service constructed with
   placeholder when missing in test mode.
 
-**Slice 3 — mobile UI (next)**
-- Onboarding goal-capture flow → "Generate my program" CTA.
-- Daily-session view consumes the persisted `Program` (existing screens) plus a small
-  banner that calls `/coach/adjust-session` with today's BioCharge.
-- Settings → "Regenerate program" if goals change.
+**Slice 3 — mobile entry point (done)**
+- New `Coach` tab between `Workout` and `History`.
+- `apps/mobile/src/services/coach.ts` — typed wrappers around `/coach/profile`,
+  `/coach/generate-program`, `/coach/adjust-session`.
+- `(tabs)/coach.tsx` — full CoachingProfile editor (goal, experience, sessions/duration
+  pickers, equipment / emphasis chip multi-select, secondary-sport rows for jiu-jitsu
+  and running, injury notes textarea), Save and Generate-Program CTAs, and a
+  generated-program preview with phase chips per week and per-exercise rationale lines.
+- The persisted `Program` already renders in the existing `Strength` screen — no new
+  program-execution surface needed.
+
+**Slice 4 — daily adjustment banner (next)**
+- Small "Adjust for today" banner on the active session screen that calls
+  `/coach/adjust-session` with current BioCharge + the session's program/week/index,
+  swaps the displayed sets in place.
 
 ### 2.5 — UI Overhaul
 - Dark mode (system preference or manual toggle)

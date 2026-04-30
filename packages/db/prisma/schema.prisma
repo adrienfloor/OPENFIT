@@ -53,17 +53,20 @@ enum Equipment {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  name         String
-  dateOfBirth  DateTime
-  weightKg     Float
-  heightCm     Float
-  sex          Sex
-  role         Role     @default(user)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id              String   @id @default(cuid())
+  email           String   @unique
+  passwordHash    String
+  name            String
+  dateOfBirth     DateTime
+  weightKg        Float
+  heightCm        Float
+  sex             Sex
+  role            Role     @default(user)
+  // CoachingProfile (goal, experience, sessions/week, equipment, etc.).
+  // JSON to avoid migrations every time the coach inputs evolve.
+  coachingProfile Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   refreshTokens    RefreshToken[]
   programs         Program[]
@@ -98,8 +101,29 @@ model Program {
   userId String
   name   String
 
-  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  weeks Week[]
+  user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weeks      Week[]
+  generation ProgramGeneration?
+
+  @@index([userId])
+}
+
+// Stores the raw AI-generated program (with rationales, phase metadata,
+// and the prompt inputs) for traceability and future regeneration.
+// One per Program; absent for manually-built programs.
+model ProgramGeneration {
+  id         String   @id @default(cuid())
+  programId  String   @unique
+  userId     String
+  // Raw GeneratedProgram JSON as returned by the LLM (post Zod validation).
+  generated  Json
+  // Snapshot of the CoachPromptInput used, so we can replay or audit later.
+  promptInput Json
+  // Model + prompt version for reproducibility.
+  model      String
+  createdAt  DateTime @default(now())
+
+  program Program @relation(fields: [programId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }

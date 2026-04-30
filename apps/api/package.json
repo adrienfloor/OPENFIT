@@ -12,10 +12,12 @@
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.91.1",
     "@fastify/cookie": "^11.0.0",
     "@fastify/cors": "^10.0.0",
     "@fastify/jwt": "^9.0.0",
     "@openfit/db": "*",
+    "@openfit/fitness-core": "*",
     "@openfit/types": "*",
     "bcrypt": "^5.1.1",
     "fastify": "^5.0.0",
@@ -25,9 +27,9 @@
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
     "@types/node": "^20.14.0",
+    "@vitest/coverage-v8": "^1.6.0",
     "tsx": "^4.15.7",
     "typescript": "^5.4.5",
-    "vitest": "^1.6.0",
-    "@vitest/coverage-v8": "^1.6.0"
+    "vitest": "^1.6.0"
   }
 }

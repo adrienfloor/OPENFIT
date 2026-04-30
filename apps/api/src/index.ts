@@ -5,6 +5,7 @@ import { jwtPlugin } from './plugins/jwt.js';
 import { authRoutes } from './routes/auth/index.js';
 import { workoutRoutes } from './routes/workouts/index.js';
 import { healthRoutes } from './routes/health/index.js';
+import { coachRoutes } from './routes/coach/index.js';
 
 const server = Fastify({
   logger: {
@@ -20,6 +21,7 @@ async function bootstrap(): Promise<void> {
   await server.register(authRoutes, { prefix: '/auth' });
   await server.register(workoutRoutes, { prefix: '/workouts' });
   await server.register(healthRoutes, { prefix: '/health' });
+  await server.register(coachRoutes, { prefix: '/coach' });
 
   server.get('/healthz', async () => ({ status: 'ok' }));
 

@@ -110,13 +110,18 @@ GET    /health                — List user's daily health records
 GET    /health/:date          — Get single day
 POST   /health                — Upsert single day
 POST   /health/bulk           — Bulk upsert (up to 90 days, for mobile sync)
+
+GET    /coach/profile          — Get stored CoachingProfile (or null)
+PUT    /coach/profile          — Save / replace CoachingProfile
+POST   /coach/generate-program — Generate a 5-week mesocycle via Claude (Sonnet 4.6) and persist as Program + ProgramGeneration
+POST   /coach/adjust-session   — Apply deterministic readiness-based adjustment to a stored session
 ```
 
 ## Testing
-- `packages/fitness-core`: 107 Vitest tests (heart rate zones, pace, ACWR, BMR Mifflin-St Jeor, Keytel calories, sleep score composite with regularity + awakenings, PAI-style effort score, readiness composite with intraday drain, personalisedEffortTarget from RHR/HRV/age)
-- `apps/api`: 34 Vitest tests (auth, unified workout CRUD, health, multi-tenancy)
+- `packages/fitness-core`: 123 Vitest tests (heart rate zones, pace, ACWR, BMR Mifflin-St Jeor, Keytel calories, sleep / effort / readiness scores, personalisedEffortTarget, AI coach prompt builder + readiness-based session adjuster)
+- `apps/api`: 43 Vitest tests (auth, unified workout CRUD, health, multi-tenancy, CoachService prompt-input gathering + Anthropic call mocked + retry-on-validation-failure + GeneratedProgram → CreateProgramInput resolver)
 - Run with: `cd apps/api && npx vitest run` or `cd packages/fitness-core && npx vitest run`
-- Total: 141 tests passing
+- Total: 166 tests passing
 
 ## Database
 - PostgreSQL via Docker: `docker compose up -d`
@@ -202,12 +207,41 @@ Bigger than the originally-scoped jiu-jitsu addition: consolidated the entire ac
 ### 2.2 — Today Tab Rework (done)
 All three rings shipped across slices 1–3. Philosophy remained: transparent published algorithms, not Zepp reverse-engineering. Computed on mobile, not server.
 
-### 2.4 — Mike Thurston Workout Library
-- Pre-built 5-week workout programs based on Mike Thurston's programming (content provided by user)
-- User selects a program → follows it session by session
-- App provides: exercise names, target sets, target reps — user logs actual reps/weight
-- **Rest timer**: configurable 1 min / 1.5 min / 2 min countdown between sets with vibration alert
-- Progress tracking across the 5-week program
+### 2.4 — AI Coach (in progress)
+Bevel-style integrated coach that generates personalised mesocycles from the user's
+goals + recent activity + readiness, then adjusts each session for today's BioCharge.
+Architecture: ~10 % LLM (program generation, called once per cycle), ~90 % deterministic
+fitness-core logic (daily adjustments, load balancing). LLM = Claude Sonnet 4.6 via
+Anthropic SDK, structured output via tool-use trick constrained to `GeneratedProgramSchema`.
+
+**Slice 1 — schemas + pure logic (done)**
+- `@openfit/types/coach.ts`: `CoachingProfile`, `GeneratedProgram` (mirrors Program/Week/Session
+  shape but adds `phase`, `rationale`, `loadPctOf1RM`), `CoachPromptInput`,
+  `CoachAdjustmentContext`.
+- `fitness-core/coach-prompt.ts`: pure `buildCoachPrompt()` returning `{ system, user }`.
+- `fitness-core/coach-adjust.ts`: pure `adjustSession()` rule engine — readiness-driven
+  volume cuts (<40 / <55), boost (>85) only during intensification, never during deload.
+
+**Slice 2 — backend integration (done)**
+- Prisma: `User.coachingProfile Json?`, new `ProgramGeneration` model (1:1 with `Program`,
+  stores raw LLM output + prompt input + model name for traceability + future regeneration).
+- `apps/api/services/coach.service.ts`: `gatherPromptInput()` (DB → CoachPromptInput, computes
+  ACWR + top 1RMs via Epley + 7d readiness avg + 30d activity counts), `generateProgram()`
+  (calls Claude, validates with Zod, retries once on parse failure, persists Program +
+  ProgramGeneration), `adjustSessionForToday()` (loads stored generation, applies rule
+  engine with phase awareness), `resolveGeneratedProgram()` (strips coach metadata,
+  resolves `loadPctOf1RM` × user 1RM → kg rounded to 2.5).
+- Anthropic structured output via tool-use: hand-written JSON Schema mirror of
+  `GeneratedProgramSchema` (kept manually since `zod-to-json-schema` isn't a dep).
+- Routes: `GET/PUT /coach/profile`, `POST /coach/generate-program`, `POST /coach/adjust-session`.
+- `ANTHROPIC_API_KEY` env var required for live generation; service constructed with
+  placeholder when missing in test mode.
+
+**Slice 3 — mobile UI (next)**
+- Onboarding goal-capture flow → "Generate my program" CTA.
+- Daily-session view consumes the persisted `Program` (existing screens) plus a small
+  banner that calls `/coach/adjust-session` with today's BioCharge.
+- Settings → "Regenerate program" if goals change.
 
 ### 2.5 — UI Overhaul
 - Dark mode (system preference or manual toggle)

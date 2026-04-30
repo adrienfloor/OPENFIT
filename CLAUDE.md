@@ -99,6 +99,7 @@ GET    /workouts/programs/:id — Get single program
 POST   /workouts/programs     — Create program
 PATCH  /workouts/programs/:id — Update program name
 DELETE /workouts/programs/:id — Delete program
+POST   /workouts/programs/:id/swap-exercise — Replace an exercise across every week of a program (body: { sessionName, orderIndex, newExerciseId })
 GET    /workouts/exercises    — List all exercises
 GET    /workouts/logs              — List user's activity logs (strength + run + jiu-jitsu); ?type= filter
 GET    /workouts/logs/:id          — Get single log (with exercises OR GPS + HR, depending on type)
@@ -119,9 +120,9 @@ POST   /coach/adjust-session   — Apply deterministic readiness-based adjustmen
 
 ## Testing
 - `packages/fitness-core`: 123 Vitest tests (heart rate zones, pace, ACWR, BMR Mifflin-St Jeor, Keytel calories, sleep / effort / readiness scores, personalisedEffortTarget, AI coach prompt builder + readiness-based session adjuster)
-- `apps/api`: 43 Vitest tests (auth, unified workout CRUD, health, multi-tenancy, CoachService prompt-input gathering + Anthropic call mocked + retry-on-validation-failure + GeneratedProgram → CreateProgramInput resolver)
+- `apps/api`: 46 Vitest tests (auth, unified workout CRUD, health, multi-tenancy, CoachService prompt-input gathering + Anthropic call mocked + retry-on-validation-failure + GeneratedProgram → CreateProgramInput resolver + program-wide exercise swap propagation + equipment-filter assertion)
 - Run with: `cd apps/api && npx vitest run` or `cd packages/fitness-core && npx vitest run`
-- Total: 166 tests passing
+- Total: 169 tests passing
 
 ## Database
 - PostgreSQL via Docker: `docker compose up -d`
@@ -268,11 +269,43 @@ input + library chip strip) and ignored the prescription entirely.
   flow falls through to the original input form unchanged. No images/videos
   (Exercise model has no asset URLs).
 
+**Slice 4b — polish from on-device testing (done)**
+Three fixes after Bob's first real session with a generated program:
+- Equipment leak: LLM was prescribing cable exercises to a barbell+dumbbell-only
+  user. `CoachService.loadExerciseLibrary` now filters by `availableEquipment`
+  before sending the list to Claude, plus a HARD CONSTRAINT block in the prompt.
+  The model literally cannot reach for cable exercises if cables aren't on the
+  list.
+- max_tokens truncation: 5-week × 4-day programs were exceeding 8k output
+  tokens, leaving the SDK with a partial tool input (no `weeks` key). Bumped to
+  16k and added stop_reason / output_tokens logging on every call.
+- Exercise swap mid-session: Swap button on each planned-exercise card opens a
+  bottom-sheet modal listing the **full library** (88 exercises) grouped by
+  primary muscle group (Chest → Back → Shoulders → ... → Full Body, anatomical
+  order). Selecting an alternative calls `workout.store.swapExercise(idx, …)`
+  to update today's session AND fires `POST /workouts/programs/:id/swap-exercise`
+  to propagate the change to every week of the program (matched by session.name
+  + orderIndex). Swap is disabled once any set on the slot is logged.
+
+**Slice 4c — exercise library expansion (done)**
+Old seed had 10 exercises, too thin once equipment filtering kicks in. Added a
+canonical 88-exercise default library covering chest, back, shoulders, biceps,
+triceps, forearms, core, quads, hamstrings, glutes, calves, and full-body /
+Olympic movements across barbell / dumbbell / kettlebell / cable / machine /
+bodyweight.
+- `packages/db/src/exercises.ts`: `DEFAULT_EXERCISES`, single source of truth.
+- `packages/db/src/seed-exercises.ts`: idempotent upsert script — adds missing
+  exercises without touching users / programs / logs. Run with
+  `npm run db:seed-exercises` (safe on live DB).
+- `seed.ts` now sources from the same list; fresh seed gets all 88.
+
 **Slice 5 — daily adjustment banner (next)**
 - Small "Adjust for today" banner on the active session screen that calls
   `/coach/adjust-session` with current BioCharge + the session's
   programId/weekNumber/sessionIndex, swaps the displayed `plannedExercises`
-  in place with the adjusted set.
+  in place with the adjusted set. Service method `adjustSessionForToday`
+  already exists on the backend (deterministic rule engine in fitness-core);
+  this slice is purely the mobile UI to invoke it.
 
 ### 2.5 — UI Overhaul
 - Dark mode (system preference or manual toggle)

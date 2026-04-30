@@ -248,10 +248,31 @@ Anthropic SDK, structured output via tool-use trick constrained to `GeneratedPro
 - The persisted `Program` already renders in the existing `Strength` screen — no new
   program-execution surface needed.
 
-**Slice 4 — daily adjustment banner (next)**
+**Slice 4 — guided session execution UI (done)**
+Reworked the active strength-session screen so coach-generated programs are
+actually usable. Issue: the original `isActive` view was free-form (single
+input + library chip strip) and ignored the prescription entirely.
+- `workout.store.ts` now also holds `plannedExercises: PlannedExerciseSpec[]`
+  and `sessionName` when started from a saved Session. Free workouts pass
+  empty array.
+- `useRestTimer` hook (`apps/mobile/src/hooks`): start/skip/adjust/setRemaining,
+  vibrate at 0, foreground-only (good enough for typical 1–3 min lifting rests).
+- `workout/strength.tsx` active view: header with session name + elapsed +
+  X/Y-sets pill, kept HR card, editable rest timer card (±15/±30s, skip,
+  vibrates at zero), then a vertical list of planned-exercise cards. Each
+  set row is `pending` (greyed) / `current` (inline reps/weight/RPE inputs
+  pre-filled from the prescription + plan reminder + Log Set button) /
+  `completed` (green check + actual values). Logging the current set
+  auto-advances and starts the rest timer using `restSeconds` for that set.
+  Tap any card to refocus it (manual override of auto-advance). Free-workout
+  flow falls through to the original input form unchanged. No images/videos
+  (Exercise model has no asset URLs).
+
+**Slice 5 — daily adjustment banner (next)**
 - Small "Adjust for today" banner on the active session screen that calls
-  `/coach/adjust-session` with current BioCharge + the session's program/week/index,
-  swaps the displayed sets in place.
+  `/coach/adjust-session` with current BioCharge + the session's
+  programId/weekNumber/sessionIndex, swaps the displayed `plannedExercises`
+  in place with the adjusted set.
 
 ### 2.5 — UI Overhaul
 - Dark mode (system preference or manual toggle)

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,9 +11,13 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { apiClient } from '../../services/api';
-import { useWorkoutStore } from '../../stores/workout.store';
+import {
+  useWorkoutStore,
+  type PlannedExerciseSpec,
+} from '../../stores/workout.store';
 import { useAuthStore } from '../../stores/auth.store';
 import { useRealtimeHeartRate } from '../../hooks/useRealtimeHeartRate';
+import { useRestTimer } from '../../hooks/useRestTimer';
 import { formatDuration, calculateAge } from '../../utils';
 import {
   calculateMaxHR,
@@ -100,10 +104,20 @@ function HeartRateCard({ maxHR, onSamplesRef }: { maxHR: number; onSamplesRef: R
 
 export default function WorkoutScreen() {
   const router = useRouter();
-  const { isActive, startedAt, activeExercises, startWorkout, addSet, finishWorkout, sessionId } =
-    useWorkoutStore();
+  const {
+    isActive,
+    startedAt,
+    activeExercises,
+    plannedExercises,
+    sessionName,
+    startWorkout,
+    addSet,
+    finishWorkout,
+    sessionId,
+  } = useWorkoutStore();
   const user = useAuthStore((s) => s.user);
   const hrSamplesRef = useRef<() => Array<{ timestamp: Date; bpm: number; zone: string }>>(() => []);
+  const restTimer = useRestTimer();
 
   const [programs, setPrograms] = useState<Program[]>([]);
   const [exercises, setExercises] = useState<Exercise[]>([]);
@@ -111,8 +125,9 @@ export default function WorkoutScreen() {
   const [loading, setLoading] = useState(true);
   const [selectedProgram, setSelectedProgram] = useState<Program | null>(null);
 
-  // Set input state
+  // Free-workout exercise picker (only used when no plan).
   const [currentExercise, setCurrentExercise] = useState<Exercise | null>(null);
+  // Free-workout set inputs (separate from the per-set planned inputs).
   const [reps, setReps] = useState('');
   const [weight, setWeight] = useState('');
   const [rpe, setRpe] = useState('');
@@ -139,11 +154,21 @@ export default function WorkoutScreen() {
   }, [fetchData]);
 
   const handleStartFreeWorkout = () => {
-    startWorkout(null);
+    startWorkout(null, null, []);
   };
 
   const handleStartSession = (session: Session) => {
-    startWorkout(session.id);
+    const planned: PlannedExerciseSpec[] = session.plannedExercises.map((pe) => ({
+      exerciseId: pe.exercise.id,
+      exerciseName: pe.exercise.name,
+      sets: pe.sets.map((s) => ({
+        reps: s.reps,
+        weight: s.weight,
+        rpe: s.rpe,
+        restSeconds: s.restSeconds,
+      })),
+    }));
+    startWorkout(session.id, session.name, planned);
     if (session.plannedExercises.length > 0) {
       setCurrentExercise(session.plannedExercises[0]!.exercise);
     }
@@ -263,96 +288,67 @@ export default function WorkoutScreen() {
 
   // Active workout view
   if (isActive) {
-    const totalSets = activeExercises.reduce((sum, e) => sum + e.completedSets.length, 0);
+    const totalSetsLogged = activeExercises.reduce((sum, e) => sum + e.completedSets.length, 0);
+    const totalSetsPlanned = plannedExercises.reduce((sum, e) => sum + e.sets.length, 0);
+    const hasPlan = plannedExercises.length > 0;
 
     return (
-      <ScrollView style={styles.container}>
+      <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <TouchableOpacity onPress={handleCancel}>
             <Text style={styles.cancelText}>Cancel</Text>
           </TouchableOpacity>
-          <Text style={styles.elapsed}>{formatDuration(elapsed)}</Text>
+          <View style={{ alignItems: 'center', flex: 1 }}>
+            {sessionName && (
+              <Text style={styles.sessionTitle} numberOfLines={1}>
+                {sessionName}
+              </Text>
+            )}
+            <Text style={styles.elapsed}>{formatDuration(elapsed)}</Text>
+          </View>
+          {hasPlan ? (
+            <View style={styles.progressPill}>
+              <Text style={styles.progressPillText}>
+                {totalSetsLogged}/{totalSetsPlanned}
+              </Text>
+            </View>
+          ) : (
+            <View style={{ width: 50 }} />
+          )}
         </View>
 
         {/* Live heart rate */}
         <HeartRateCard maxHR={maxHR} onSamplesRef={hrSamplesRef} />
 
-        {/* Exercise picker */}
-        <Text style={styles.sectionTitle}>Select exercise</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.exercisePicker}>
-          {exercises.map((ex) => (
-            <TouchableOpacity
-              key={ex.id}
-              style={[styles.exerciseChip, currentExercise?.id === ex.id && styles.exerciseChipActive]}
-              onPress={() => setCurrentExercise(ex)}
-            >
-              <Text
-                style={[styles.exerciseChipText, currentExercise?.id === ex.id && styles.exerciseChipTextActive]}
-                numberOfLines={1}
-              >
-                {ex.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        {/* Rest timer — only visible while a rest is in flight or just-finished */}
+        {restTimer.isRunning || (restTimer.totalSeconds > 0 && restTimer.remainingSeconds === 0) ? (
+          <RestTimerCard timer={restTimer} />
+        ) : null}
 
-        {/* Set input */}
-        {currentExercise && (
-          <View style={styles.setInput}>
-            <Text style={styles.currentExName}>{currentExercise.name}</Text>
-            <View style={styles.inputRow}>
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Reps</Text>
-                <TextInput
-                  style={styles.input}
-                  keyboardType="number-pad"
-                  value={reps}
-                  onChangeText={setReps}
-                  placeholder="8"
-                />
-              </View>
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Weight (kg)</Text>
-                <TextInput
-                  style={styles.input}
-                  keyboardType="decimal-pad"
-                  value={weight}
-                  onChangeText={setWeight}
-                  placeholder="60"
-                />
-              </View>
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>RPE</Text>
-                <TextInput
-                  style={styles.input}
-                  keyboardType="decimal-pad"
-                  value={rpe}
-                  onChangeText={setRpe}
-                  placeholder="7"
-                />
-              </View>
-            </View>
-            <TouchableOpacity style={styles.logSetBtn} onPress={handleLogSet}>
-              <Text style={styles.logSetBtnText}>Log Set</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Logged exercises */}
-        {activeExercises.length > 0 && (
-          <View style={styles.loggedSection}>
-            <Text style={styles.sectionTitle}>Logged ({totalSets} sets)</Text>
-            {activeExercises.map((ae) => (
-              <View key={ae.exerciseId} style={styles.loggedExercise}>
-                <Text style={styles.loggedExName}>{ae.exerciseName}</Text>
-                {ae.completedSets.map((s, idx) => (
-                  <Text key={idx} style={styles.loggedSet}>
-                    Set {idx + 1}: {s.reps} x {s.weight}kg{s.rpe != null ? ` @RPE ${s.rpe}` : ''}
-                  </Text>
-                ))}
-              </View>
-            ))}
-          </View>
+        {hasPlan ? (
+          <PlannedExercisesList
+            plannedExercises={plannedExercises}
+            activeExercises={activeExercises}
+            onLogSet={(exerciseId, exerciseName, set, restSeconds) => {
+              addSet(exerciseId, exerciseName, set);
+              if (restSeconds > 0) restTimer.start(restSeconds);
+            }}
+          />
+        ) : (
+          <FreeWorkoutInput
+            exercises={exercises}
+            currentExercise={currentExercise}
+            setCurrentExercise={setCurrentExercise}
+            reps={reps}
+            setReps={setReps}
+            weight={weight}
+            setWeight={setWeight}
+            rpe={rpe}
+            setRpe={setRpe}
+            onLogSet={handleLogSet}
+            activeExercises={activeExercises}
+            totalSets={totalSetsLogged}
+          />
         )}
 
         <TouchableOpacity style={styles.finishBtn} onPress={handleFinish}>
@@ -446,6 +442,363 @@ export default function WorkoutScreen() {
 
       <View style={{ height: 40 }} />
     </ScrollView>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Rest timer card — shown only while resting. Editable: ±15s, ±30s, and a
+// long-press shortcut. Tap "Skip" to dismiss.
+// ──────────────────────────────────────────────────────────────────────────
+
+function RestTimerCard({ timer }: { timer: ReturnType<typeof useRestTimer> }) {
+  const remaining = timer.remainingSeconds;
+  const total = Math.max(1, timer.totalSeconds);
+  const pct = Math.min(100, Math.round(((total - remaining) / total) * 100));
+  const finished = remaining === 0 && total > 0;
+  const mm = Math.floor(remaining / 60);
+  const ss = remaining % 60;
+
+  return (
+    <View style={[styles.restCard, finished && styles.restCardFinished]}>
+      <View style={styles.restHeader}>
+        <Text style={styles.restLabel}>{finished ? 'Rest complete' : 'Rest'}</Text>
+        <TouchableOpacity onPress={timer.skip}>
+          <Text style={styles.restSkip}>{finished ? 'Dismiss' : 'Skip'}</Text>
+        </TouchableOpacity>
+      </View>
+      <Text style={[styles.restTime, finished && styles.restTimeFinished]}>
+        {mm}:{ss.toString().padStart(2, '0')}
+      </Text>
+      <View style={styles.restProgress}>
+        <View style={[styles.restProgressFill, { width: `${pct}%` }]} />
+      </View>
+      <View style={styles.restAdjustRow}>
+        <TouchableOpacity style={styles.restAdjustBtn} onPress={() => timer.adjust(-30)}>
+          <Text style={styles.restAdjustText}>−30s</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.restAdjustBtn} onPress={() => timer.adjust(-15)}>
+          <Text style={styles.restAdjustText}>−15s</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.restAdjustBtn} onPress={() => timer.adjust(15)}>
+          <Text style={styles.restAdjustText}>+15s</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.restAdjustBtn} onPress={() => timer.adjust(30)}>
+          <Text style={styles.restAdjustText}>+30s</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Planned exercises list — vertical scroll of exercise cards. Each card
+// shows the prescribed sets with state pending / current / completed. The
+// next pending set in the first incomplete exercise is the "current" one;
+// tapping a different card focuses it instead.
+// ──────────────────────────────────────────────────────────────────────────
+
+interface PlannedListProps {
+  plannedExercises: PlannedExerciseSpec[];
+  activeExercises: { exerciseId: string; exerciseName: string; completedSets: { reps: number; weight: number; rpe: number | null; restTaken: number }[] }[];
+  onLogSet: (
+    exerciseId: string,
+    exerciseName: string,
+    set: { reps: number; weight: number; rpe: number | null; restTaken: number },
+    restSeconds: number,
+  ) => void;
+}
+
+function PlannedExercisesList({ plannedExercises, activeExercises, onLogSet }: PlannedListProps) {
+  // Index of the auto-focused exercise: the first one that still has pending sets.
+  const autoFocusIndex = useMemo(() => {
+    for (let i = 0; i < plannedExercises.length; i++) {
+      const planned = plannedExercises[i] as PlannedExerciseSpec;
+      const done = activeExercises.find((a) => a.exerciseId === planned.exerciseId)?.completedSets.length ?? 0;
+      if (done < planned.sets.length) return i;
+    }
+    return plannedExercises.length - 1;
+  }, [plannedExercises, activeExercises]);
+
+  // Manual focus override — null means follow auto-focus.
+  const [manualFocus, setManualFocus] = useState<number | null>(null);
+  const focusIndex = manualFocus ?? autoFocusIndex;
+
+  return (
+    <View>
+      {plannedExercises.map((ex, idx) => {
+        const completed =
+          activeExercises.find((a) => a.exerciseId === ex.exerciseId)?.completedSets ?? [];
+        const isFocused = idx === focusIndex;
+
+        return (
+          <PlannedExerciseCard
+            key={`${ex.exerciseId}-${idx}`}
+            planned={ex}
+            completed={completed}
+            isFocused={isFocused}
+            onFocus={() => setManualFocus(idx === manualFocus ? null : idx)}
+            onLogSet={(set, restSeconds) => {
+              onLogSet(ex.exerciseId, ex.exerciseName, set, restSeconds);
+              // Once this exercise's sets are all done, auto-focus advances.
+              if (completed.length + 1 >= ex.sets.length) setManualFocus(null);
+            }}
+          />
+        );
+      })}
+    </View>
+  );
+}
+
+interface PlannedCardProps {
+  planned: PlannedExerciseSpec;
+  completed: { reps: number; weight: number; rpe: number | null; restTaken: number }[];
+  isFocused: boolean;
+  onFocus: () => void;
+  onLogSet: (
+    set: { reps: number; weight: number; rpe: number | null; restTaken: number },
+    restSeconds: number,
+  ) => void;
+}
+
+function PlannedExerciseCard({ planned, completed, isFocused, onFocus, onLogSet }: PlannedCardProps) {
+  const currentSetIndex = completed.length;
+  const isDone = currentSetIndex >= planned.sets.length;
+  const currentSpec = !isDone ? planned.sets[currentSetIndex] : null;
+
+  // Inputs are pre-filled from the prescription when the current set is shown.
+  // We re-key the inputs by setIndex so values reset between sets.
+  const [reps, setReps] = useState('');
+  const [weight, setWeight] = useState('');
+  const [rpe, setRpe] = useState('');
+  useEffect(() => {
+    if (currentSpec) {
+      setReps(String(currentSpec.reps));
+      setWeight(currentSpec.weight != null ? String(currentSpec.weight) : '');
+      setRpe(currentSpec.rpe != null ? String(currentSpec.rpe) : '');
+    }
+  }, [currentSpec, currentSetIndex]);
+
+  const handleLog = () => {
+    if (!currentSpec) return;
+    const r = parseInt(reps, 10);
+    const w = parseFloat(weight);
+    if (isNaN(r) || r <= 0 || isNaN(w) || w < 0) {
+      Alert.alert('Invalid input', 'Enter valid reps and weight.');
+      return;
+    }
+    const rpeVal = rpe ? parseFloat(rpe) : null;
+    onLogSet(
+      { reps: r, weight: w, rpe: rpeVal, restTaken: 0 },
+      currentSpec.restSeconds,
+    );
+  };
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.9}
+      onPress={onFocus}
+      style={[styles.exCard, isFocused && styles.exCardFocused, isDone && styles.exCardDone]}
+    >
+      <View style={styles.exHeader}>
+        <Text style={[styles.exName, isDone && styles.exNameDone]}>{planned.exerciseName}</Text>
+        <View style={[styles.exProgress, isDone && styles.exProgressDone]}>
+          <Text style={[styles.exProgressText, isDone && styles.exProgressTextDone]}>
+            {completed.length}/{planned.sets.length}
+          </Text>
+        </View>
+      </View>
+
+      {/* Set rows */}
+      {planned.sets.map((spec, idx) => {
+        const state =
+          idx < completed.length ? 'completed' : idx === currentSetIndex && isFocused ? 'current' : 'pending';
+        const done = state === 'completed' ? completed[idx] : null;
+
+        if (state === 'current') {
+          return (
+            <View key={idx} style={styles.setRowCurrent}>
+              <Text style={styles.setRowLabel}>Set {idx + 1}</Text>
+              <View style={styles.setInputRow}>
+                <View style={styles.setInputGroup}>
+                  <Text style={styles.setInputLabel}>reps</Text>
+                  <TextInput
+                    style={styles.setInputField}
+                    keyboardType="number-pad"
+                    value={reps}
+                    onChangeText={setReps}
+                  />
+                </View>
+                <View style={styles.setInputGroup}>
+                  <Text style={styles.setInputLabel}>kg</Text>
+                  <TextInput
+                    style={styles.setInputField}
+                    keyboardType="decimal-pad"
+                    value={weight}
+                    onChangeText={setWeight}
+                  />
+                </View>
+                <View style={styles.setInputGroup}>
+                  <Text style={styles.setInputLabel}>rpe</Text>
+                  <TextInput
+                    style={styles.setInputField}
+                    keyboardType="decimal-pad"
+                    value={rpe}
+                    onChangeText={setRpe}
+                  />
+                </View>
+              </View>
+              <Text style={styles.setHint}>
+                Plan: {spec.reps} reps
+                {spec.weight != null ? ` · ${spec.weight}kg` : ''}
+                {spec.rpe != null ? ` · RPE ${spec.rpe}` : ''}
+                {' · rest '}{Math.round(spec.restSeconds / 60)}:{(spec.restSeconds % 60).toString().padStart(2, '0')}
+              </Text>
+              <TouchableOpacity style={styles.logSetBtn} onPress={handleLog}>
+                <Text style={styles.logSetBtnText}>Log Set</Text>
+              </TouchableOpacity>
+            </View>
+          );
+        }
+
+        if (state === 'completed' && done) {
+          return (
+            <View key={idx} style={styles.setRowDone}>
+              <Text style={styles.setRowDoneCheck}>✓</Text>
+              <Text style={styles.setRowDoneText}>
+                Set {idx + 1}: {done.reps} × {done.weight}kg
+                {done.rpe != null ? ` @RPE ${done.rpe}` : ''}
+              </Text>
+            </View>
+          );
+        }
+
+        // pending
+        return (
+          <View key={idx} style={styles.setRowPending}>
+            <Text style={styles.setRowPendingText}>
+              Set {idx + 1}: {spec.reps} reps
+              {spec.weight != null ? ` × ${spec.weight}kg` : ''}
+              {spec.rpe != null ? ` @RPE ${spec.rpe}` : ''}
+              {' · '}{Math.round(spec.restSeconds / 60)}:{(spec.restSeconds % 60).toString().padStart(2, '0')} rest
+            </Text>
+          </View>
+        );
+      })}
+    </TouchableOpacity>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Free workout input — original chip-strip + single-form flow, kept intact
+// for sessions started with no plan ("Start Free Workout" button).
+// ──────────────────────────────────────────────────────────────────────────
+
+interface FreeWorkoutProps {
+  exercises: Exercise[];
+  currentExercise: Exercise | null;
+  setCurrentExercise: (e: Exercise) => void;
+  reps: string;
+  setReps: (s: string) => void;
+  weight: string;
+  setWeight: (s: string) => void;
+  rpe: string;
+  setRpe: (s: string) => void;
+  onLogSet: () => void;
+  activeExercises: { exerciseId: string; exerciseName: string; completedSets: { reps: number; weight: number; rpe: number | null; restTaken: number }[] }[];
+  totalSets: number;
+}
+
+function FreeWorkoutInput({
+  exercises,
+  currentExercise,
+  setCurrentExercise,
+  reps,
+  setReps,
+  weight,
+  setWeight,
+  rpe,
+  setRpe,
+  onLogSet,
+  activeExercises,
+  totalSets,
+}: FreeWorkoutProps) {
+  return (
+    <>
+      <Text style={styles.sectionTitle}>Select exercise</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.exercisePicker}>
+        {exercises.map((ex) => (
+          <TouchableOpacity
+            key={ex.id}
+            style={[styles.exerciseChip, currentExercise?.id === ex.id && styles.exerciseChipActive]}
+            onPress={() => setCurrentExercise(ex)}
+          >
+            <Text
+              style={[styles.exerciseChipText, currentExercise?.id === ex.id && styles.exerciseChipTextActive]}
+              numberOfLines={1}
+            >
+              {ex.name}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {currentExercise && (
+        <View style={styles.setInput}>
+          <Text style={styles.currentExName}>{currentExercise.name}</Text>
+          <View style={styles.inputRow}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Reps</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="number-pad"
+                value={reps}
+                onChangeText={setReps}
+                placeholder="8"
+              />
+            </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Weight (kg)</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="decimal-pad"
+                value={weight}
+                onChangeText={setWeight}
+                placeholder="60"
+              />
+            </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>RPE</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="decimal-pad"
+                value={rpe}
+                onChangeText={setRpe}
+                placeholder="7"
+              />
+            </View>
+          </View>
+          <TouchableOpacity style={styles.logSetBtn} onPress={onLogSet}>
+            <Text style={styles.logSetBtnText}>Log Set</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {activeExercises.length > 0 && (
+        <View style={styles.loggedSection}>
+          <Text style={styles.sectionTitle}>Logged ({totalSets} sets)</Text>
+          {activeExercises.map((ae) => (
+            <View key={ae.exerciseId} style={styles.loggedExercise}>
+              <Text style={styles.loggedExName}>{ae.exerciseName}</Text>
+              {ae.completedSets.map((s, idx) => (
+                <Text key={idx} style={styles.loggedSet}>
+                  Set {idx + 1}: {s.reps} x {s.weight}kg{s.rpe != null ? ` @RPE ${s.rpe}` : ''}
+                </Text>
+              ))}
+            </View>
+          ))}
+        </View>
+      )}
+    </>
   );
 }
 
@@ -575,4 +928,99 @@ const styles = StyleSheet.create({
   recentName: { fontSize: 14, fontWeight: '500' },
   recentDate: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
   recentSets: { fontSize: 13, color: '#6b7280' },
+
+  // ── Active session header additions ─────────────────────────────────────
+  sessionTitle: { fontSize: 14, fontWeight: '600', color: '#374151' },
+  progressPill: {
+    backgroundColor: '#22c55e',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+  },
+  progressPillText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+
+  // ── Rest timer ──────────────────────────────────────────────────────────
+  restCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#f97316',
+  },
+  restCardFinished: { borderLeftColor: '#22c55e' },
+  restHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  restLabel: { fontSize: 13, fontWeight: '600', color: '#f97316', textTransform: 'uppercase' },
+  restSkip: { fontSize: 13, color: '#6b7280', fontWeight: '500' },
+  restTime: { fontSize: 44, fontWeight: '700', color: '#f97316', marginVertical: 8 },
+  restTimeFinished: { color: '#22c55e' },
+  restProgress: {
+    height: 4,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  restProgressFill: { height: '100%', backgroundColor: '#f97316' },
+  restAdjustRow: { flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
+  restAdjustBtn: {
+    flex: 1,
+    backgroundColor: '#fef3c7',
+    borderRadius: 8,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  restAdjustText: { fontSize: 13, fontWeight: '600', color: '#b45309' },
+
+  // ── Planned exercise card ───────────────────────────────────────────────
+  exCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: '#e5e7eb',
+  },
+  exCardFocused: { borderLeftColor: '#22c55e' },
+  exCardDone: { opacity: 0.55, borderLeftColor: '#22c55e' },
+  exHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  exName: { fontSize: 15, fontWeight: '600', flex: 1, paddingRight: 8 },
+  exNameDone: { textDecorationLine: 'line-through', color: '#6b7280' },
+  exProgress: {
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  exProgressDone: { backgroundColor: '#dcfce7' },
+  exProgressText: { fontSize: 11, fontWeight: '700', color: '#6b7280' },
+  exProgressTextDone: { color: '#15803d' },
+
+  // ── Set rows ────────────────────────────────────────────────────────────
+  setRowPending: { paddingVertical: 6, paddingLeft: 4 },
+  setRowPendingText: { fontSize: 13, color: '#9ca3af' },
+  setRowDone: { paddingVertical: 6, paddingLeft: 4, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  setRowDoneCheck: { color: '#22c55e', fontSize: 14, fontWeight: '700' },
+  setRowDoneText: { fontSize: 13, color: '#374151' },
+  setRowCurrent: {
+    backgroundColor: '#f0fdf4',
+    borderRadius: 8,
+    padding: 10,
+    marginVertical: 4,
+  },
+  setRowLabel: { fontSize: 12, fontWeight: '700', color: '#15803d', marginBottom: 6, textTransform: 'uppercase' },
+  setInputRow: { flexDirection: 'row', gap: 8, marginBottom: 4 },
+  setInputGroup: { flex: 1 },
+  setInputLabel: { fontSize: 10, color: '#6b7280', marginBottom: 2 },
+  setInputField: {
+    backgroundColor: '#fff',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 15,
+    fontWeight: '600',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  setHint: { fontSize: 11, color: '#6b7280', marginTop: 4, marginBottom: 8 },
 });

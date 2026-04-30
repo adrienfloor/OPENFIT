@@ -30,6 +30,7 @@ function createMockPrisma() {
   return {
     exercise: {
       findMany: vi.fn(),
+      findUnique: vi.fn(),
     },
     program: {
       findMany: vi.fn(),
@@ -40,6 +41,9 @@ function createMockPrisma() {
     },
     session: {
       findFirst: vi.fn(),
+    },
+    plannedExercise: {
+      updateMany: vi.fn(),
     },
     workoutLog: {
       findMany: vi.fn(),
@@ -353,5 +357,69 @@ describe('Multi-tenancy: workout isolation', () => {
     expect(prisma.workoutLog.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'wl_01', userId: 'user_02' } }),
     );
+  });
+});
+
+describe('WorkoutService.swapProgramExercise', () => {
+  it('updates the same orderIndex slot across every week of the program', async () => {
+    const prisma = createMockPrisma();
+    const service = new WorkoutService(prisma as never);
+
+    prisma.program.findFirst.mockResolvedValue({ id: 'prog_01' });
+    prisma.exercise.findUnique.mockResolvedValue({ id: 'ex_db_bench' });
+    prisma.plannedExercise.updateMany.mockResolvedValue({ count: 5 });
+
+    const result = await service.swapProgramExercise('user_01', 'prog_01', {
+      sessionName: 'Day 1 — Push',
+      orderIndex: 0,
+      newExerciseId: 'ex_db_bench',
+    });
+
+    expect(result.updatedCount).toBe(5);
+    expect(prisma.plannedExercise.updateMany).toHaveBeenCalledWith({
+      where: {
+        orderIndex: 0,
+        session: {
+          name: 'Day 1 — Push',
+          week: { programId: 'prog_01' },
+        },
+      },
+      data: { exerciseId: 'ex_db_bench' },
+    });
+  });
+
+  it('rejects when program belongs to another user', async () => {
+    const prisma = createMockPrisma();
+    const service = new WorkoutService(prisma as never);
+
+    prisma.program.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.swapProgramExercise('user_02', 'prog_01', {
+        sessionName: 'Day 1',
+        orderIndex: 0,
+        newExerciseId: 'ex_db_bench',
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+
+    expect(prisma.plannedExercise.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects when target exercise does not exist', async () => {
+    const prisma = createMockPrisma();
+    const service = new WorkoutService(prisma as never);
+
+    prisma.program.findFirst.mockResolvedValue({ id: 'prog_01' });
+    prisma.exercise.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.swapProgramExercise('user_01', 'prog_01', {
+        sessionName: 'Day 1',
+        orderIndex: 0,
+        newExerciseId: 'ex_does_not_exist',
+      }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+
+    expect(prisma.plannedExercise.updateMany).not.toHaveBeenCalled();
   });
 });

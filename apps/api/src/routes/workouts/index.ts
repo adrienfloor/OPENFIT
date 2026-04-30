@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from 'fastify';
+import { z } from 'zod';
 import {
   CreateProgramInputSchema,
   UpdateProgramInputSchema,
@@ -7,6 +8,12 @@ import {
   WorkoutTypeSchema,
 } from '@openfit/types';
 import { WorkoutService, WorkoutError } from '../../services/workout.service.js';
+
+const SwapProgramExerciseSchema = z.object({
+  sessionName: z.string().min(1).max(200),
+  orderIndex: z.number().int().nonnegative(),
+  newExerciseId: z.string().min(1),
+});
 
 export const workoutRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', fastify.authenticate);
@@ -84,6 +91,29 @@ export const workoutRoutes: FastifyPluginAsync = async (fastify) => {
       throw err;
     }
   });
+
+  fastify.post<{ Params: { id: string } }>(
+    '/programs/:id/swap-exercise',
+    async (request, reply) => {
+      const parsed = SwapProgramExerciseSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({ error: 'Validation error', details: parsed.error.flatten() });
+      }
+      try {
+        const result = await service.swapProgramExercise(
+          request.user.sub,
+          request.params.id,
+          parsed.data,
+        );
+        return reply.send(result);
+      } catch (err) {
+        if (err instanceof WorkoutError) {
+          return reply.status(err.statusCode).send({ error: err.message });
+        }
+        throw err;
+      }
+    },
+  );
 
   // --- Workout Logs ---
 

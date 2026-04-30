@@ -111,6 +111,7 @@ export default function WorkoutScreen() {
     activeExercises,
     plannedExercises,
     sessionName,
+    programId,
     startWorkout,
     addSet,
     swapExercise,
@@ -157,10 +158,10 @@ export default function WorkoutScreen() {
   }, [fetchData]);
 
   const handleStartFreeWorkout = () => {
-    startWorkout(null, null, []);
+    startWorkout(null, null, [], null);
   };
 
-  const handleStartSession = (session: Session) => {
+  const handleStartSession = (session: Session, programIdFromCard: string) => {
     const planned: PlannedExerciseSpec[] = session.plannedExercises.map((pe) => ({
       exerciseId: pe.exercise.id,
       exerciseName: pe.exercise.name,
@@ -171,7 +172,7 @@ export default function WorkoutScreen() {
         restSeconds: s.restSeconds,
       })),
     }));
-    startWorkout(session.id, session.name, planned);
+    startWorkout(session.id, session.name, planned, programIdFromCard);
     if (session.plannedExercises.length > 0) {
       setCurrentExercise(session.plannedExercises[0]!.exercise);
     }
@@ -367,7 +368,26 @@ export default function WorkoutScreen() {
           allExercises={exercises}
           onClose={() => setSwapTarget(null)}
           onPick={(newEx) => {
-            if (swapTarget) swapExercise(swapTarget.index, newEx.id, newEx.name);
+            if (swapTarget) {
+              swapExercise(swapTarget.index, newEx.id, newEx.name);
+              // Persist the swap to the underlying program so future weeks
+              // pick it up too. Local swap already applied; if the network
+              // call fails, the in-session change still stands.
+              if (programId && sessionName) {
+                apiClient
+                  .post(`/workouts/programs/${programId}/swap-exercise`, {
+                    sessionName,
+                    orderIndex: swapTarget.index,
+                    newExerciseId: newEx.id,
+                  })
+                  .catch(() => {
+                    Alert.alert(
+                      'Swap not saved',
+                      'Applied for this session, but could not save to your program. Try again next time.',
+                    );
+                  });
+              }
+            }
             setSwapTarget(null);
           }}
         />
@@ -416,7 +436,7 @@ export default function WorkoutScreen() {
                       <TouchableOpacity
                         key={session.id}
                         style={styles.sessionCard}
-                        onPress={() => handleStartSession(session)}
+                        onPress={() => handleStartSession(session, prog.id)}
                       >
                         <Text style={styles.sessionName}>{session.name}</Text>
                         <Text style={styles.sessionMeta}>

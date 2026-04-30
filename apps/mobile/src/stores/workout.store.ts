@@ -32,6 +32,8 @@ interface WorkoutState {
   isActive: boolean;
   startedAt: Date | null;
   sessionId: string | null;
+  /** Program this session was launched from. Null for free workouts. */
+  programId: string | null;
   /** Display name of the session (e.g. "Day 1 — Push"). Null for free workouts. */
   sessionName: string | null;
   /** Prescribed plan for this session. Empty array for free workouts. */
@@ -42,6 +44,7 @@ interface WorkoutState {
     sessionId: string | null,
     sessionName?: string | null,
     plannedExercises?: PlannedExerciseSpec[],
+    programId?: string | null,
   ) => void;
   addSet: (exerciseId: string, exerciseName: string, set: ActiveSet) => void;
   /**
@@ -56,15 +59,17 @@ export const useWorkoutStore = create<WorkoutState>((set) => ({
   isActive: false,
   startedAt: null,
   sessionId: null,
+  programId: null,
   sessionName: null,
   plannedExercises: [],
   activeExercises: [],
 
-  startWorkout: (sessionId, sessionName = null, plannedExercises = []) => {
+  startWorkout: (sessionId, sessionName = null, plannedExercises = [], programId = null) => {
     set({
       isActive: true,
       startedAt: new Date(),
       sessionId,
+      programId,
       sessionName,
       plannedExercises,
       activeExercises: [],
@@ -112,6 +117,7 @@ export const useWorkoutStore = create<WorkoutState>((set) => ({
       isActive: false,
       startedAt: null,
       sessionId: null,
+      programId: null,
       sessionName: null,
       plannedExercises: [],
       activeExercises: [],

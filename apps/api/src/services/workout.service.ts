@@ -195,6 +195,46 @@ export class WorkoutService {
     await this.prisma.program.delete({ where: { id: programId } });
   }
 
+  /**
+   * Replace one exercise slot across every week of a program — i.e. when
+   * the user swaps "Bench Press" for "Dumbbell Bench Press" on Day 1, the
+   * change carries to Day 1 in every week (past and future) of this program.
+   *
+   * Sessions across weeks are matched by name (e.g. "Day 1 — Push"); the
+   * slot itself is matched by `orderIndex` so multiple instances of the
+   * same starting exercise in one session don't collide.
+   */
+  async swapProgramExercise(
+    userId: string,
+    programId: string,
+    input: { sessionName: string; orderIndex: number; newExerciseId: string },
+  ): Promise<{ updatedCount: number }> {
+    const program = await this.prisma.program.findFirst({
+      where: { id: programId, userId },
+      select: { id: true },
+    });
+    if (!program) throw new WorkoutError('Program not found', 404);
+
+    const newExercise = await this.prisma.exercise.findUnique({
+      where: { id: input.newExerciseId },
+      select: { id: true },
+    });
+    if (!newExercise) throw new WorkoutError('Exercise not found', 400);
+
+    const result = await this.prisma.plannedExercise.updateMany({
+      where: {
+        orderIndex: input.orderIndex,
+        session: {
+          name: input.sessionName,
+          week: { programId },
+        },
+      },
+      data: { exerciseId: input.newExerciseId },
+    });
+
+    return { updatedCount: result.count };
+  }
+
   // --- Exercises ---
 
   async getExercises() {

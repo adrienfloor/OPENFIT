@@ -40,12 +40,21 @@ export interface AnthropicClient {
   };
 }
 
+/** Lightweight logger interface — Fastify's logger satisfies this. Optional. */
+export interface CoachLogger {
+  info: (...args: unknown[]) => void;
+  warn: (...args: unknown[]) => void;
+  error: (...args: unknown[]) => void;
+}
+
 interface CoachServiceDeps {
   prisma: PrismaClient;
   anthropic: AnthropicClient;
   workouts: WorkoutService;
   /** Override for tests / cost control. Default `claude-sonnet-4-6`. */
   model?: string;
+  /** Optional logger; falls back to console for visibility during dev. */
+  logger?: CoachLogger;
 }
 
 export class CoachService {
@@ -53,12 +62,14 @@ export class CoachService {
   private readonly anthropic: AnthropicClient;
   private readonly workouts: WorkoutService;
   private readonly model: string;
+  private readonly logger: CoachLogger;
 
   constructor(deps: CoachServiceDeps) {
     this.prisma = deps.prisma;
     this.anthropic = deps.anthropic;
     this.workouts = deps.workouts;
     this.model = deps.model ?? COACH_MODEL;
+    this.logger = deps.logger ?? console;
   }
 
   // ──────────────────────────────────────────────────────────────────────
@@ -297,12 +308,25 @@ export class CoachService {
     for (let attempt = 0; attempt < 2; attempt++) {
       const response = await this.anthropic.messages.create({
         model: this.model,
-        max_tokens: 8192,
+        // Raised from 8k after observing a 5-week × 4-session program get
+        // truncated mid-`weeks`, leaving the SDK with a partial tool input
+        // (no `weeks` key) that failed Zod with "Required".
+        max_tokens: 16384,
         system,
         tools: [tool],
         tool_choice: { type: 'tool', name: 'submit_program' },
         messages,
       });
+
+      this.logger.info(
+        {
+          attempt,
+          stopReason: response.stop_reason,
+          inputTokens: response.usage?.input_tokens,
+          outputTokens: response.usage?.output_tokens,
+        },
+        'Coach LLM call complete',
+      );
 
       const toolUse = response.content.find(
         (block): block is Anthropic.Messages.ToolUseBlock => block.type === 'tool_use',
@@ -314,8 +338,29 @@ export class CoachService {
       const parsed = GeneratedProgramSchema.safeParse(toolUse.input);
       if (parsed.success) return parsed.data;
 
+      // Log the actual validation failure so we can debug what the model
+      // produced. Truncate the payload itself to keep logs sane.
+      const flat = parsed.error.flatten();
+      const payloadPreview = JSON.stringify(toolUse.input).slice(0, 2000);
+      this.logger.warn(
+        {
+          attempt,
+          stopReason: response.stop_reason,
+          outputTokens: response.usage?.output_tokens,
+          fieldErrors: flat.fieldErrors,
+          formErrors: flat.formErrors,
+          payloadPreview,
+        },
+        'Coach LLM output failed Zod validation',
+      );
+
       if (attempt === 0) {
         // Append the failed attempt + error feedback and try one more time.
+        // Use a verbose, prescriptive error message — flatten() alone often
+        // doesn't tell the model where to look.
+        const issuesText = parsed.error.errors
+          .map((e) => `- ${e.path.join('.')}: ${e.message}`)
+          .join('\n');
         messages.push({ role: 'assistant', content: response.content });
         messages.push({
           role: 'user',
@@ -324,14 +369,21 @@ export class CoachService {
               type: 'tool_result',
               tool_use_id: toolUse.id,
               is_error: true,
-              content: `Validation failed: ${JSON.stringify(parsed.error.flatten())}. Please retry with a corrected program.`,
+              content:
+                `The submitted program failed schema validation. Issues:\n${issuesText}\n\n` +
+                `Please call submit_program again with a corrected program. ` +
+                `Pay special attention to: array length bounds (sessions/exercises/sets), ` +
+                `string length limits, and that loadPctOf1RM is between 0 and 1.`,
             },
           ],
         });
         continue;
       }
 
-      throw new CoachError('Coach returned an invalid program after retry', 422);
+      throw new CoachError(
+        `Coach returned an invalid program after retry: ${JSON.stringify(flat)}`,
+        422,
+      );
     }
 
     throw new CoachError('Coach generation exhausted retries', 500);

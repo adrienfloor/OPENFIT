@@ -28,7 +28,12 @@ export const coachRoutes: FastifyPluginAsync = async (fastify) => {
 
   const anthropic = new Anthropic({ apiKey: apiKey ?? 'placeholder' });
   const workouts = new WorkoutService(fastify.prisma);
-  const service = new CoachService({ prisma: fastify.prisma, anthropic, workouts });
+  const service = new CoachService({
+    prisma: fastify.prisma,
+    anthropic,
+    workouts,
+    logger: fastify.log,
+  });
 
   // ── Profile ──────────────────────────────────────────────────────────
 

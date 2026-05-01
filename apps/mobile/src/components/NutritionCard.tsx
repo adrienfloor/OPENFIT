@@ -25,6 +25,7 @@ export function NutritionCard() {
 
   const handleLog = () => router.push('/nutrition/capture');
   const handleEditTargets = () => router.push('/nutrition/targets');
+  const handleHistory = () => router.push('/nutrition/history');
 
   // Calorie balance — intake (sum of today's logs) vs expenditure
   // (BMR prorated to "now" + active calories from the dashboard). Only
@@ -136,20 +137,30 @@ export function NutritionCard() {
             </View>
           )}
 
-          {/* Thumbnail strip of today's meal photos. Static preview for v1 —
-              a tap-to-edit detail screen is on the polish slice. */}
+          {/* Thumbnail strip of today's meal photos — tap to open detail. */}
           {logs.some((l) => l.photoUrl) && (
             <View style={styles.thumbsRow}>
               {logs
                 .filter((l) => l.photoUrl)
                 .slice(0, 6)
                 .map((l) => (
-                  <AuthedImage key={l.id} path={l.photoUrl} style={styles.thumb} />
+                  <TouchableOpacity
+                    key={l.id}
+                    onPress={() => router.push(`/nutrition/log/${l.id}`)}
+                  >
+                    <AuthedImage path={l.photoUrl} style={styles.thumb} />
+                  </TouchableOpacity>
                 ))}
             </View>
           )}
         </>
       )}
+
+      <TouchableOpacity onPress={handleHistory} style={styles.historyLink}>
+        <Text style={styles.historyLinkText}>
+          View history →
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -257,4 +268,6 @@ const styles = StyleSheet.create({
   balancePillLabelDeficit: { color: '#15803d' },
   balancePillValue: { fontSize: 14, fontWeight: '700', color: '#111827' },
   balancePillMeta: { fontSize: 11, color: '#6b7280', marginLeft: 'auto' },
+  historyLink: { marginTop: 14, alignItems: 'center', paddingVertical: 4 },
+  historyLinkText: { fontSize: 12, color: '#6b7280', fontWeight: '500' },
 });

@@ -139,6 +139,14 @@ export default function CaptureScreen() {
           >
             <Text style={styles.btnSecondaryText}>Pick from gallery</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => router.replace('/nutrition/manual')}
+            style={styles.manualLink}
+          >
+            <Text style={styles.manualLinkText}>
+              Or type macros manually →
+            </Text>
+          </TouchableOpacity>
         </>
       )}
     </View>
@@ -195,4 +203,6 @@ const styles = StyleSheet.create({
   btnPrimaryText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   btnSecondary: { backgroundColor: '#fff' },
   btnSecondaryText: { color: '#374151', fontSize: 15, fontWeight: '600' },
+  manualLink: { paddingVertical: 12, alignItems: 'center' },
+  manualLinkText: { color: '#22c55e', fontSize: 13, fontWeight: '600' },
 });

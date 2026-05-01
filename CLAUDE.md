@@ -340,7 +340,7 @@ bodyweight.
 - Animations and transitions (react-native-reanimated)
 - Polished splash screen and app icon
 
-### 2.6 — Nutrition Tracking (AI Food Photo Analysis) — in progress
+### 2.6 — Nutrition Tracking (AI Food Photo Analysis) — done
 Log food and track macros by snapping a meal photo. Architecture mirrors the AI
 coach: ~10% LLM (Claude vision per meal), ~90% deterministic (totals math, day
 aggregation, calorie balance). No separate `Nutrition` tab — a card on the
@@ -423,11 +423,25 @@ Today tab opens the capture flow.
   Samsung gesture-bar pill no longer overlaps the header. Other screens
   still use the hardcoded value — fold into 2.5 UI overhaul later.
 
-**Slice 5 — polish + history (next)**
-- `app/nutrition/log/[id].tsx`: tap a thumbnail → see the photo full-size,
-  edit items, delete the log.
-- Past-day browse screen.
-- Manual entry mode (skip the photo, type items directly).
+**Slice 5 — polish + history (done)**
+- `components/FoodItemEditor.tsx`: extracted shared editor (item rows +
+  meal-type picker + `blankFoodItem` + `suggestMealType`) — used by
+  Confirm, Log Detail, and Manual Entry. Confirm.tsx slimmed
+  accordingly; the duplicated styles disappeared.
+- `app/nutrition/log/[id].tsx`: tap a thumbnail or a history-row → fetch
+  via `getFoodLog`, edit items / meal type, Save (PATCH) or Delete
+  (with confirm). "Save" is greyed until the form is dirty.
+- `app/nutrition/history.tsx`: 30-day past-meals browse. GET
+  `/nutrition/logs?from=...`, group rows by day with "Today" /
+  "Yesterday" / weekday labels, day-totals header, photoless rows
+  fall back to a 🍽️ thumbnail. Pull-to-refresh.
+- `app/nutrition/manual.tsx`: photoless quick-add. Mirrors Confirm's
+  layout — totals card + meal-type chips + editable item rows + Add
+  item — but the API call uses `analysisId: null` and `photoUrl: null`.
+  Linked from the bottom of the Capture screen ("Or type macros
+  manually →").
+- `NutritionCard`: thumbnails are tappable now, and a "View history →"
+  link sits at the bottom of the card regardless of state.
 
 ### Phase 3 (future)
 - Offline sync testing and hardening

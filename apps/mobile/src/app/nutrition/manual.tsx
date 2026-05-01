@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -13,8 +13,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { FoodItem, MealType } from '@openfit/types';
 import { sumItems } from '@openfit/fitness-core';
 import { confirmFoodLog } from '../../services/nutrition';
-import { useNutritionStore } from '../../stores/nutrition.store';
-import { AuthedImage } from '../../components/AuthedImage';
 import {
   FoodItemEditor,
   MealTypePicker,
@@ -23,44 +21,17 @@ import {
 } from '../../components/FoodItemEditor';
 
 /**
- * Review the AI's analysis before logging it. The user can:
- *   - tweak portion grams or per-item macros
- *   - delete an item the AI hallucinated
- *   - add a missed item
- *   - pick a meal type
- *
- * Save → POST /nutrition/logs with the edited items, server recomputes
- * totals from the items so we never desync.
+ * Manual entry — no photo, no AI. The lightweight path for trivial things
+ * like "1 banana, 105 kcal" where the camera flow is overkill.
  */
-export default function ConfirmScreen() {
+export default function ManualEntryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { pendingAnalysis, setPendingAnalysis } = useNutritionStore();
-  const [items, setItems] = useState<FoodItem[]>([]);
+  const [items, setItems] = useState<FoodItem[]>([blankFoodItem()]);
   const [mealType, setMealType] = useState<MealType | null>(suggestMealType());
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (pendingAnalysis) setItems(pendingAnalysis.items);
-  }, [pendingAnalysis]);
-
   const totals = useMemo(() => sumItems(items), [items]);
-
-  if (!pendingAnalysis) {
-    return (
-      <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
-        <Text style={styles.placeholder}>
-          No analysis in progress. Go back and try again.
-        </Text>
-        <TouchableOpacity
-          style={styles.cancelBtn}
-          onPress={() => router.back()}
-        >
-          <Text style={styles.cancelBtnText}>Back</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
 
   const updateItem = (index: number, patch: Partial<FoodItem>) => {
     setItems((prev) =>
@@ -78,7 +49,7 @@ export default function ConfirmScreen() {
 
   const handleSave = async () => {
     if (items.length === 0) {
-      Alert.alert('No items', 'Add at least one item or cancel to discard.');
+      Alert.alert('No items', 'Add at least one item.');
       return;
     }
     if (items.some((it) => !it.name.trim())) {
@@ -88,34 +59,21 @@ export default function ConfirmScreen() {
     setSaving(true);
     try {
       await confirmFoodLog({
-        analysisId: pendingAnalysis.id,
-        photoUrl: pendingAnalysis.photoUrl,
+        analysisId: null,
+        photoUrl: null,
         items,
         mealType: mealType ?? null,
         loggedAt: new Date(),
       });
-      setPendingAnalysis(null);
       router.replace('/');
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Could not save log.';
-      Alert.alert('Save failed', msg);
+      Alert.alert(
+        'Save failed',
+        err instanceof Error ? err.message : 'Try again.',
+      );
     } finally {
       setSaving(false);
     }
-  };
-
-  const handleCancel = () => {
-    Alert.alert('Discard analysis?', 'The photo and macros will be lost.', [
-      { text: 'Keep editing', style: 'cancel' },
-      {
-        text: 'Discard',
-        style: 'destructive',
-        onPress: () => {
-          setPendingAnalysis(null);
-          router.back();
-        },
-      },
-    ]);
   };
 
   return (
@@ -125,10 +83,10 @@ export default function ConfirmScreen() {
       keyboardShouldPersistTaps="handled"
     >
       <View style={styles.titleRow}>
-        <TouchableOpacity onPress={handleCancel}>
+        <TouchableOpacity onPress={() => router.back()}>
           <Text style={styles.cancel}>Cancel</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Review</Text>
+        <Text style={styles.title}>Quick add</Text>
         <TouchableOpacity onPress={handleSave} disabled={saving}>
           {saving ? (
             <ActivityIndicator color="#22c55e" />
@@ -138,15 +96,11 @@ export default function ConfirmScreen() {
         </TouchableOpacity>
       </View>
 
-      <AuthedImage path={pendingAnalysis.photoUrl} style={styles.photo} />
+      <Text style={styles.intro}>
+        For meals where the photo flow is overkill — type the name and macros
+        directly. Use copy from a food label or your favourite database.
+      </Text>
 
-      {pendingAnalysis.notes && (
-        <View style={styles.noteCard}>
-          <Text style={styles.noteText}>{pendingAnalysis.notes}</Text>
-        </View>
-      )}
-
-      {/* Totals card */}
       <View style={styles.totalsCard}>
         <Text style={styles.totalsKcal}>{totals.kcal} kcal</Text>
         <Text style={styles.totalsMacros}>
@@ -154,11 +108,9 @@ export default function ConfirmScreen() {
         </Text>
       </View>
 
-      {/* Meal type chips */}
       <Text style={styles.sectionLabel}>Meal</Text>
       <MealTypePicker value={mealType} onChange={setMealType} />
 
-      {/* Items */}
       <Text style={styles.sectionLabel}>Items ({items.length})</Text>
       {items.map((item, idx) => (
         <FoodItemEditor
@@ -172,18 +124,12 @@ export default function ConfirmScreen() {
       <TouchableOpacity style={styles.addBtn} onPress={addItem}>
         <Text style={styles.addBtnText}>+ Add item</Text>
       </TouchableOpacity>
-
-      <View style={{ height: 40 }} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f9fafb',
-    paddingHorizontal: 16,
-  },
+  container: { flex: 1, backgroundColor: '#f9fafb', paddingHorizontal: 16 },
   titleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -199,37 +145,12 @@ const styles = StyleSheet.create({
     minWidth: 60,
     textAlign: 'right',
   },
-  placeholder: {
-    fontSize: 14,
-    color: '#9ca3af',
-    textAlign: 'center',
-    marginTop: 64,
+  intro: {
+    fontSize: 13,
+    color: '#6b7280',
+    lineHeight: 18,
     marginBottom: 16,
   },
-  cancelBtn: {
-    backgroundColor: '#f3f4f6',
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginHorizontal: 24,
-  },
-  cancelBtnText: { color: '#374151', fontWeight: '600' },
-  photo: {
-    width: '100%',
-    aspectRatio: 16 / 9,
-    borderRadius: 12,
-    backgroundColor: '#e5e7eb',
-    marginBottom: 12,
-  },
-  noteCard: {
-    backgroundColor: '#fffbeb',
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 12,
-    borderLeftWidth: 3,
-    borderLeftColor: '#f59e0b',
-  },
-  noteText: { fontSize: 12, color: '#92400e' },
   totalsCard: {
     backgroundColor: '#fff',
     borderRadius: 12,

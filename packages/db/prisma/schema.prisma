@@ -52,6 +52,13 @@ enum Equipment {
   other
 }
 
+enum MealType {
+  breakfast
+  lunch
+  dinner
+  snack
+}
+
 model User {
   id              String   @id @default(cuid())
   email           String   @unique
@@ -65,6 +72,10 @@ model User {
   // CoachingProfile (goal, experience, sessions/week, equipment, etc.).
   // JSON to avoid migrations every time the coach inputs evolve.
   coachingProfile Json?
+  // Daily macro targets ({ kcal, proteinG, carbsG, fatG }). Optional —
+  // set via the nutrition settings screen, defaults to BMR-driven suggestion
+  // on the client until set.
+  macroTargets    Json?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -72,6 +83,8 @@ model User {
   programs         Program[]
   workoutLogs      WorkoutLog[]
   dailyHealth      DailyHealth[]
+  foodAnalyses     FoodAnalysis[]
+  foodLogs         FoodLog[]
 }
 
 model RefreshToken {
@@ -254,6 +267,58 @@ model HeartRateSample {
   workoutLog WorkoutLog @relation(fields: [workoutLogId], references: [id], onDelete: Cascade)
 
   @@index([workoutLogId])
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Nutrition — AI photo analysis + confirmed food logs.
+//
+// The vision model returns a structured FoodAnalysis. Items are stored as JSON
+// on the analysis (and again on the FoodLog when the user confirms) — they're
+// arbitrary user-edited content, not relational entities, so a JSON column is
+// the right granularity.
+// ──────────────────────────────────────────────────────────────────────────
+
+model FoodAnalysis {
+  id        String   @id @default(cuid())
+  userId    String
+  photoUrl  String
+  // VisionAnalysisOutput JSON — { items: [...], notes? }
+  items     Json
+  // MacroTotals JSON — { kcal, proteinG, carbsG, fatG }
+  totals    Json
+  model     String
+  notes     String?
+  createdAt DateTime @default(now())
+
+  // Set when the user confirms this analysis as a FoodLog. Null while the
+  // analysis is unresolved — useful for debugging accuracy and for offering
+  // "resume" UX if the user backgrounds the app mid-flow.
+  foodLogId String?  @unique
+  foodLog   FoodLog? @relation(fields: [foodLogId], references: [id], onDelete: SetNull)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, createdAt])
+}
+
+model FoodLog {
+  id         String    @id @default(cuid())
+  userId     String
+  photoUrl   String?
+  // FoodItem[] JSON — confirmed/edited by the user.
+  items      Json
+  totals     Json
+  mealType   MealType?
+  loggedAt   DateTime
+  createdAt  DateTime  @default(now())
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Backref of the FoodAnalysis whose foodLogId points at this row, if any.
+  analysis FoodAnalysis?
+
+  @@index([userId])
+  @@index([userId, loggedAt])
 }
 
 model DailyHealth {

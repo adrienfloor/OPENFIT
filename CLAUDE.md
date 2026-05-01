@@ -116,13 +116,23 @@ GET    /coach/profile          — Get stored CoachingProfile (or null)
 PUT    /coach/profile          — Save / replace CoachingProfile
 POST   /coach/generate-program — Generate a 5-week mesocycle via Claude (Sonnet 4.6) and persist as Program + ProgramGeneration
 POST   /coach/adjust-session   — Apply deterministic readiness-based adjustment to a stored session
+
+POST   /nutrition/analyze              — Vision analysis of a meal photo (base64 in JSON, max 8MB body)
+POST   /nutrition/logs                 — Confirm an analysis as a FoodLog (or log manually with analysisId=null)
+GET    /nutrition/logs?from&to         — List FoodLogs in a date range, ordered loggedAt desc
+GET    /nutrition/logs/:id             — Single FoodLog
+PATCH  /nutrition/logs/:id             — Update items / mealType / loggedAt; totals recomputed server-side
+DELETE /nutrition/logs/:id             — Delete log
+GET    /nutrition/photos/:userId/:fn   — Authenticated photo retrieval (URL userId must equal JWT userId)
+GET    /nutrition/targets              — Current MacroTargets or null
+PUT    /nutrition/targets              — Save / replace MacroTargets
 ```
 
 ## Testing
-- `packages/fitness-core`: 123 Vitest tests (heart rate zones, pace, ACWR, BMR Mifflin-St Jeor, Keytel calories, sleep / effort / readiness scores, personalisedEffortTarget, AI coach prompt builder + readiness-based session adjuster)
-- `apps/api`: 46 Vitest tests (auth, unified workout CRUD, health, multi-tenancy, CoachService prompt-input gathering + Anthropic call mocked + retry-on-validation-failure + GeneratedProgram → CreateProgramInput resolver + program-wide exercise swap propagation + equipment-filter assertion)
+- `packages/fitness-core`: 135 Vitest tests (heart rate zones, pace, ACWR, BMR Mifflin-St Jeor, Keytel calories, sleep / effort / readiness scores, personalisedEffortTarget, AI coach prompt builder + readiness-based session adjuster, nutrition macro aggregation + calorie balance)
+- `apps/api`: 66 Vitest tests (auth, unified workout CRUD, health, multi-tenancy, CoachService prompt-input gathering + Anthropic call mocked + retry-on-validation-failure + GeneratedProgram → CreateProgramInput resolver + program-wide exercise swap propagation + equipment-filter assertion, NutritionService vision retry + photo multi-tenancy + log CRUD + macro targets)
 - Run with: `cd apps/api && npx vitest run` or `cd packages/fitness-core && npx vitest run`
-- Total: 169 tests passing
+- Total: 201 tests passing
 
 ## Database
 - PostgreSQL via Docker: `docker compose up -d`
@@ -330,16 +340,77 @@ bodyweight.
 - Animations and transitions (react-native-reanimated)
 - Polished splash screen and app icon
 
-### 2.6 — Nutrition Tracking (AI Food Photo Analysis)
-Log food and track macros/calories by taking a picture of a meal.
-- **Photo capture**: Mobile screen to snap or pick a plate photo (expo-image-picker / expo-camera)
-- **AI analysis**: Upload image to backend, forward to vision model (Claude, GPT-4o vision, or similar) that returns structured JSON — food items, portion estimates, total calories, protein/carbs/fat grams
-- **User confirmation**: User reviews/edits the AI-detected items before logging (AI can be wrong on portions)
-- **Food log**: `FoodLog` model with items, macros, calories, photo URL, timestamp
-- **Daily totals**: Today tab shows calorie intake (consumed) alongside active calories and passive calories (BMR + daily activity)
-- **Macro goals**: User sets daily targets (calories, protein, carbs, fat). Progress bars / rings show % of goal consumed
-- **Calorie balance**: Intake vs (passive + active) expenditure — show surplus/deficit for the day
-- **History**: Browse past meals with photos and macros
+### 2.6 — Nutrition Tracking (AI Food Photo Analysis) — in progress
+Log food and track macros by snapping a meal photo. Architecture mirrors the AI
+coach: ~10% LLM (Claude vision per meal), ~90% deterministic (totals math, day
+aggregation, calorie balance). No separate `Nutrition` tab — a card on the
+Today tab opens the capture flow.
+
+**Slice 1 — schemas + Prisma + helpers (done)**
+- `@openfit/types/nutrition.ts`: `FoodItem`, `FoodAnalysis`, `FoodLog`,
+  `MacroTotals`, `MacroTargets`, `ConfirmFoodLogInput`,
+  `VisionAnalysisOutput`. Per-item macros are absolute (already multiplied by
+  portion) so summing is direct.
+- Prisma: `FoodLog` (confirmed) + `FoodAnalysis` (raw vision output, nullable
+  FK back to its FoodLog when the user confirms). `MealType` enum.
+  `User.macroTargets Json?` so goals evolve without migrations. Items kept as
+  Json columns (user-edited, not relational).
+- `fitness-core/nutrition.ts`: `sumItems`, `sumDayTotals`, `calorieBalance`
+  (BMR-prorated for mid-day reads), `defaultMacroTargets` (30/40/30 P/C/F).
+  12 Vitest tests.
+
+**Slice 2 — backend vision API + persistence (done)**
+- `NutritionService` mirrors `CoachService`: Anthropic vision via tool-use
+  trick (`submit_food_analysis` tool whose `input_schema` mirrors
+  `VisionAnalysisOutputSchema`), Zod validation, single retry on parse
+  failure with the error fed back to the model.
+- Photos as base64 in JSON (no multipart) — Anthropic vision takes base64
+  directly so the server doesn't transcode. 8 MB body limit on `/analyze`
+  accommodates uncompressed phone photos.
+- Storage: `apps/api/uploads/{userId}/{cuid}.{ext}`, served via authenticated
+  `GET /nutrition/photos/:userId/:filename` (URL userId must equal JWT
+  userId; filename regex blocks path-traversal). `apps/api/uploads/` added
+  to `.gitignore`.
+- Totals always recomputed server-side from items so the client can't
+  desync. 20 Vitest tests covering vision retry, photo multi-tenancy, log
+  CRUD multi-tenancy, totals recomputation, macro targets.
+- `ANTHROPIC_API_KEY` already configured for the coach — same key is reused.
+
+**Slice 3 — mobile capture + confirm + Today card (done)**
+- `services/nutrition.ts`: typed wrappers for the eight nutrition endpoints.
+- `hooks/useTodayNutrition.ts`: pulls today's logs + targets, exposes
+  `sumDayTotals` totals. Drives the Today card.
+- `components/NutritionCard.tsx`: day totals (kcal big number + P/C/F bars),
+  meal-photo thumbnail strip, "+ Log meal" CTA. Lives at the bottom of the
+  Today tab, no new tab navigation.
+- `components/AuthedImage.tsx`: thin wrapper around RN `<Image>` that
+  forwards the JWT bearer header — needed because photos are auth-gated.
+- `app/nutrition/capture.tsx`: camera or gallery picker via
+  `expo-image-picker`, compresses to 1024px JPEG q=70 via
+  `expo-image-manipulator` (a 4 MB iPhone photo lands at ~150-300 KB),
+  uploads base64 to `/analyze`, stashes the result in a Zustand store, and
+  navigates to confirm.
+- `app/nutrition/confirm.tsx`: AI items in editable rows (name + grams +
+  kcal + P/C/F), low-confidence flag, add/remove items, meal-type chips,
+  Save → POST `/logs`. Time-of-day suggests the meal type
+  (breakfast/lunch/dinner/snack).
+- `stores/nutrition.store.ts`: in-memory `pendingAnalysis` only; cleared on
+  save/cancel, never persisted.
+- `app.json` + AndroidManifest: `CAMERA` and `READ_MEDIA_IMAGES`
+  permissions added; `expo-image-picker` plugin entry with photos/camera
+  rationales.
+
+**Slice 4 — macro targets editor + Today balance (next)**
+- Settings screen (or first-time prompt) to set kcal + P/C/F targets, with
+  a "Suggest from BMR" button using `defaultMacroTargets`.
+- Today card extension: a small kcal-balance pill (intake vs BMR + active),
+  using `calorieBalance` from fitness-core.
+
+**Slice 5 — polish + history (next)**
+- `app/nutrition/log/[id].tsx`: tap a thumbnail → see the photo full-size,
+  edit items, delete the log.
+- Past-day browse screen.
+- Manual entry mode (skip the photo, type items directly).
 
 ### Phase 3 (future)
 - Offline sync testing and hardening

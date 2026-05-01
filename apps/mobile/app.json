@@ -32,7 +32,9 @@
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_LOCATION"
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.READ_MEDIA_IMAGES"
       ]
     },
     "plugins": [
@@ -50,6 +52,13 @@
           "requestPermissionsRationale": {
             "action": "androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE"
           }
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "OpenFit needs access to your photos to log meals.",
+          "cameraPermission": "OpenFit needs access to your camera to snap meal photos."
         }
       ]
     ],

@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } 
 import { useDailyStats } from '../../hooks/useDailyStats';
 import { useAuth } from '../../hooks/useAuth';
 import { TodayScoresHeader } from '../../components/TodayScoresHeader';
+import { NutritionCard } from '../../components/NutritionCard';
 
 export default function TodayScreen() {
   const { user, logout } = useAuth();
@@ -58,6 +59,10 @@ export default function TodayScreen() {
           </View>
         ))}
       </View>
+
+      <NutritionCard />
+
+      <View style={{ height: 32 }} />
     </ScrollView>
   );
 }

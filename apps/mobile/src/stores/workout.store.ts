@@ -34,10 +34,23 @@ interface WorkoutState {
   sessionId: string | null;
   /** Program this session was launched from. Null for free workouts. */
   programId: string | null;
+  /**
+   * Position of the session within the generated program — required by
+   * `/coach/adjust-session`. Null for free workouts and for programs that
+   * weren't created via the AI coach (no ProgramGeneration row exists).
+   */
+  weekNumber: number | null;
+  sessionIndex: number | null;
   /** Display name of the session (e.g. "Day 1 — Push"). Null for free workouts. */
   sessionName: string | null;
   /** Prescribed plan for this session. Empty array for free workouts. */
   plannedExercises: PlannedExerciseSpec[];
+  /**
+   * Snapshot of the original prescription, captured at session start. Used
+   * by the "Adjust for today" banner to revert an applied adjustment back
+   * to the as-prescribed plan. Null when no plan was loaded.
+   */
+  originalPlannedExercises: PlannedExerciseSpec[] | null;
   activeExercises: ActiveExercise[];
 
   startWorkout: (
@@ -45,6 +58,8 @@ interface WorkoutState {
     sessionName?: string | null,
     plannedExercises?: PlannedExerciseSpec[],
     programId?: string | null,
+    weekNumber?: number | null,
+    sessionIndex?: number | null,
   ) => void;
   addSet: (exerciseId: string, exerciseName: string, set: ActiveSet) => void;
   /**
@@ -52,6 +67,14 @@ interface WorkoutState {
    * Only allowed before any set on this slot is completed — guarded in UI.
    */
   swapExercise: (index: number, newExerciseId: string, newExerciseName: string) => void;
+  /**
+   * Replace the entire prescription, e.g. after the daily-readiness adjuster
+   * trims volume or adds a back-off set. The `originalPlannedExercises`
+   * snapshot is preserved so the user can revert.
+   */
+  applyAdjustedPlan: (next: PlannedExerciseSpec[]) => void;
+  /** Restore `plannedExercises` from the `originalPlannedExercises` snapshot. */
+  revertAdjustedPlan: () => void;
   finishWorkout: () => void;
 }
 
@@ -60,18 +83,31 @@ export const useWorkoutStore = create<WorkoutState>((set) => ({
   startedAt: null,
   sessionId: null,
   programId: null,
+  weekNumber: null,
+  sessionIndex: null,
   sessionName: null,
   plannedExercises: [],
+  originalPlannedExercises: null,
   activeExercises: [],
 
-  startWorkout: (sessionId, sessionName = null, plannedExercises = [], programId = null) => {
+  startWorkout: (
+    sessionId,
+    sessionName = null,
+    plannedExercises = [],
+    programId = null,
+    weekNumber = null,
+    sessionIndex = null,
+  ) => {
     set({
       isActive: true,
       startedAt: new Date(),
       sessionId,
       programId,
+      weekNumber,
+      sessionIndex,
       sessionName,
       plannedExercises,
+      originalPlannedExercises: plannedExercises.length > 0 ? plannedExercises : null,
       activeExercises: [],
     });
   },
@@ -108,8 +144,36 @@ export const useWorkoutStore = create<WorkoutState>((set) => ({
         exerciseId: newExerciseId,
         exerciseName: newExerciseName,
       };
-      return { plannedExercises: next };
+      // Also re-snapshot so a subsequent "Revert" of the daily-readiness
+      // adjustment lands the user back on the swapped slot, not the
+      // as-prescribed exercise they had already replaced.
+      const nextOriginal = state.originalPlannedExercises
+        ? [...state.originalPlannedExercises]
+        : null;
+      if (nextOriginal && index < nextOriginal.length) {
+        const orig = nextOriginal[index];
+        if (orig) {
+          nextOriginal[index] = {
+            ...orig,
+            exerciseId: newExerciseId,
+            exerciseName: newExerciseName,
+          };
+        }
+      }
+      return { plannedExercises: next, originalPlannedExercises: nextOriginal };
     });
+  },
+
+  applyAdjustedPlan: (next) => {
+    set({ plannedExercises: next });
+  },
+
+  revertAdjustedPlan: () => {
+    set((state) =>
+      state.originalPlannedExercises
+        ? { plannedExercises: state.originalPlannedExercises }
+        : state,
+    );
   },
 
   finishWorkout: () => {
@@ -118,8 +182,11 @@ export const useWorkoutStore = create<WorkoutState>((set) => ({
       startedAt: null,
       sessionId: null,
       programId: null,
+      weekNumber: null,
+      sessionIndex: null,
       sessionName: null,
       plannedExercises: [],
+      originalPlannedExercises: null,
       activeExercises: [],
     });
   },

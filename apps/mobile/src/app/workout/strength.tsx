@@ -19,6 +19,7 @@ import {
 import { useAuthStore } from '../../stores/auth.store';
 import { useRealtimeHeartRate } from '../../hooks/useRealtimeHeartRate';
 import { useRestTimer } from '../../hooks/useRestTimer';
+import { AdjustForTodayBanner } from '../../components/AdjustForTodayBanner';
 import { formatDuration, calculateAge } from '../../utils';
 import {
   calculateMaxHR,
@@ -161,7 +162,12 @@ export default function WorkoutScreen() {
     startWorkout(null, null, [], null);
   };
 
-  const handleStartSession = (session: Session, programIdFromCard: string) => {
+  const handleStartSession = (
+    session: Session,
+    programIdFromCard: string,
+    weekNumber: number,
+    sessionIndex: number,
+  ) => {
     const planned: PlannedExerciseSpec[] = session.plannedExercises.map((pe) => ({
       exerciseId: pe.exercise.id,
       exerciseName: pe.exercise.name,
@@ -172,7 +178,14 @@ export default function WorkoutScreen() {
         restSeconds: s.restSeconds,
       })),
     }));
-    startWorkout(session.id, session.name, planned, programIdFromCard);
+    startWorkout(
+      session.id,
+      session.name,
+      planned,
+      programIdFromCard,
+      weekNumber,
+      sessionIndex,
+    );
     if (session.plannedExercises.length > 0) {
       setCurrentExercise(session.plannedExercises[0]!.exercise);
     }
@@ -324,6 +337,10 @@ export default function WorkoutScreen() {
         {/* Live heart rate */}
         <HeartRateCard maxHR={maxHR} onSamplesRef={hrSamplesRef} />
 
+        {/* Daily-readiness adjustment — only visible for generated programs
+            and only before the first set is logged. */}
+        {plannedExercises.length > 0 ? <AdjustForTodayBanner /> : null}
+
         {/* Rest timer — only visible while a rest is in flight or just-finished */}
         {restTimer.isRunning || (restTimer.totalSeconds > 0 && restTimer.remainingSeconds === 0) ? (
           <RestTimerCard timer={restTimer} />
@@ -432,11 +449,13 @@ export default function WorkoutScreen() {
                 prog.weeks.map((week) => (
                   <View key={week.weekNumber} style={styles.weekSection}>
                     <Text style={styles.weekLabel}>Week {week.weekNumber}</Text>
-                    {week.sessions.map((session) => (
+                    {week.sessions.map((session, sIdx) => (
                       <TouchableOpacity
                         key={session.id}
                         style={styles.sessionCard}
-                        onPress={() => handleStartSession(session, prog.id)}
+                        onPress={() =>
+                          handleStartSession(session, prog.id, week.weekNumber, sIdx)
+                        }
                       >
                         <Text style={styles.sessionName}>{session.name}</Text>
                         <Text style={styles.sessionMeta}>

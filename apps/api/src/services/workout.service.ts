@@ -30,6 +30,10 @@ export class WorkoutService {
           orderBy: { weekNumber: 'asc' },
           include: {
             sessions: {
+              // cuid v1 IDs are time-sortable; ordering by id preserves
+              // insert order, which matches the GeneratedProgram session
+              // index used by /coach/adjust-session.
+              orderBy: { id: 'asc' },
               include: {
                 plannedExercises: {
                   orderBy: { orderIndex: 'asc' },
@@ -54,6 +58,10 @@ export class WorkoutService {
           orderBy: { weekNumber: 'asc' },
           include: {
             sessions: {
+              // cuid v1 IDs are time-sortable; ordering by id preserves
+              // insert order, which matches the GeneratedProgram session
+              // index used by /coach/adjust-session.
+              orderBy: { id: 'asc' },
               include: {
                 plannedExercises: {
                   orderBy: { orderIndex: 'asc' },
@@ -134,6 +142,10 @@ export class WorkoutService {
           orderBy: { weekNumber: 'asc' },
           include: {
             sessions: {
+              // cuid v1 IDs are time-sortable; ordering by id preserves
+              // insert order, which matches the GeneratedProgram session
+              // index used by /coach/adjust-session.
+              orderBy: { id: 'asc' },
               include: {
                 plannedExercises: {
                   orderBy: { orderIndex: 'asc' },
@@ -167,6 +179,10 @@ export class WorkoutService {
           orderBy: { weekNumber: 'asc' },
           include: {
             sessions: {
+              // cuid v1 IDs are time-sortable; ordering by id preserves
+              // insert order, which matches the GeneratedProgram session
+              // index used by /coach/adjust-session.
+              orderBy: { id: 'asc' },
               include: {
                 plannedExercises: {
                   orderBy: { orderIndex: 'asc' },

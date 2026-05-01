@@ -299,13 +299,28 @@ bodyweight.
   `npm run db:seed-exercises` (safe on live DB).
 - `seed.ts` now sources from the same list; fresh seed gets all 88.
 
-**Slice 5 — daily adjustment banner (next)**
-- Small "Adjust for today" banner on the active session screen that calls
-  `/coach/adjust-session` with current BioCharge + the session's
-  programId/weekNumber/sessionIndex, swaps the displayed `plannedExercises`
-  in place with the adjusted set. Service method `adjustSessionForToday`
-  already exists on the backend (deterministic rule engine in fitness-core);
-  this slice is purely the mobile UI to invoke it.
+**Slice 5 — daily adjustment banner (done)**
+- New `AdjustForTodayBanner` component (`apps/mobile/src/components/`) renders
+  above the planned-exercise list whenever the active session was launched
+  from a generated program AND no set has been logged yet. It pulls today's
+  BioCharge from `useDailyStats` (also exposes `recentLoad` now), POSTs to
+  `/coach/adjust-session`, and swaps the displayed prescription in place.
+  The original prescription is snapshot at session start (and re-snapshotted
+  on user swaps) so "Revert" restores it.
+- `workout.store.ts`: added `weekNumber`, `sessionIndex`, `originalPlannedExercises`,
+  `applyAdjustedPlan`, `revertAdjustedPlan`. `startWorkout` now takes the
+  generated-program coordinates; free workouts pass nulls. `swapExercise` also
+  updates the snapshot so reverting an adjustment doesn't undo a user swap.
+- Adjusted `CoachSession` carries `loadPctOf1RM`, not absolute kg, so the
+  banner inherits weight from the matching original set — works because the
+  rule engine only truncates from the back or appends a duplicate of the
+  last set.
+- API: `WorkoutService` now does `orderBy: { id: 'asc' }` on session includes;
+  cuid v1 IDs are time-sortable so insert order (= GeneratedProgram session
+  index) is preserved deterministically. The service used to rely on
+  Postgres' implicit row-return order.
+- `getTodayDashboard` now also returns `recentLoad` so the banner can pass
+  the same exponentially-decayed 3-day load that fed today's readiness.
 
 ### 2.5 — UI Overhaul
 - Dark mode (system preference or manual toggle)

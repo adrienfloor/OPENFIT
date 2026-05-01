@@ -32,6 +32,12 @@ export type TodayDailyStats = DailyHealth & {
   effortTargetMinutes: number | null;
   readinessCalibrating: boolean;
   readinessBaselineDays: number;
+  /**
+   * Exponentially-decayed sum of the last 3 days of earned effort minutes.
+   * Surfaced for the daily-adjust banner so the coach service receives the
+   * same load signal that fed today's readiness score.
+   */
+  recentLoad: number;
 };
 import {
   computeBMR,
@@ -306,6 +312,7 @@ export async function getDailyStats(
       effortTargetMinutes: effort?.targetMinutes ?? null,
       readinessCalibrating: false,
       readinessBaselineDays: 0,
+      recentLoad: 0,
     });
 
     // Unused but available: avgSpO2
@@ -668,6 +675,7 @@ export async function getTodayDashboard(
     recoveryScore: readiness.score,
     readinessCalibrating: readiness.calibrating,
     readinessBaselineDays: baselineDays,
+    recentLoad: load,
   };
 }
 

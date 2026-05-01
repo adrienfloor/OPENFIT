@@ -11,6 +11,7 @@ import {
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { analyzeFoodPhoto } from '../../services/nutrition';
 import { useNutritionStore } from '../../stores/nutrition.store';
 
@@ -27,6 +28,7 @@ import { useNutritionStore } from '../../stores/nutrition.store';
  */
 export default function CaptureScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const setPendingAnalysis = useNutritionStore((s) => s.setPendingAnalysis);
   const [busy, setBusy] = useState(false);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
@@ -96,7 +98,7 @@ export default function CaptureScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
       <View style={styles.titleRow}>
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={styles.back}>‹ Back</Text>
@@ -148,7 +150,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f9fafb',
     paddingHorizontal: 16,
-    paddingTop: 56,
   },
   titleRow: {
     flexDirection: 'row',

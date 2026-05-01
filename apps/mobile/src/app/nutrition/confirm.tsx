@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { FoodItem, MealType } from '@openfit/types';
 import { sumItems } from '@openfit/fitness-core';
 import { confirmFoodLog } from '../../services/nutrition';
@@ -35,6 +36,7 @@ const MEAL_TYPES: { value: MealType; label: string }[] = [
  */
 export default function ConfirmScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { pendingAnalysis, setPendingAnalysis } = useNutritionStore();
   const [items, setItems] = useState<FoodItem[]>([]);
   const [mealType, setMealType] = useState<MealType | null>(suggestMealType());
@@ -48,7 +50,7 @@ export default function ConfirmScreen() {
 
   if (!pendingAnalysis) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
         <Text style={styles.placeholder}>
           No analysis in progress. Go back and try again.
         </Text>
@@ -129,7 +131,11 @@ export default function ConfirmScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: 32 }}
+      keyboardShouldPersistTaps="handled"
+    >
       <View style={styles.titleRow}>
         <TouchableOpacity onPress={handleCancel}>
           <Text style={styles.cancel}>Cancel</Text>
@@ -299,7 +305,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f9fafb',
     paddingHorizontal: 16,
-    paddingTop: 56,
   },
   titleRow: {
     flexDirection: 'row',

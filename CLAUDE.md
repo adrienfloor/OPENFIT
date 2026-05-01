@@ -400,11 +400,28 @@ Today tab opens the capture flow.
   permissions added; `expo-image-picker` plugin entry with photos/camera
   rationales.
 
-**Slice 4 — macro targets editor + Today balance (next)**
-- Settings screen (or first-time prompt) to set kcal + P/C/F targets, with
-  a "Suggest from BMR" button using `defaultMacroTargets`.
-- Today card extension: a small kcal-balance pill (intake vs BMR + active),
-  using `calorieBalance` from fitness-core.
+**Slice 4 — macro targets editor + Today balance pill (done)**
+- `app/nutrition/targets.tsx`: full kcal + P/C/F targets editor. Suggestion
+  button computes BMR × 1.5 (light-active multiplier) and runs through
+  `defaultMacroTargets` (30/40/30 P/C/F split). Live "macros add up to X kcal
+  but target is Y" drift warning when the two diverge by > 50 kcal.
+- `NutritionCard` extension:
+  - "Edit targets" / "Set targets" link in the header → opens the editor.
+  - Calorie-balance pill rendered when there's at least one logged meal
+    today AND user profile is loaded. Computed via `calorieBalance` with
+    BMR-prorated `dayFraction` and Health Connect's `caloriesActive` for
+    the active component. Surplus = orange, deficit = green (greater
+    deficit usually means a workout day or low-intake morning).
+- Vision prompt tuned (slice 3 polish): explicit cooking-fat handling
+  (glossy/oil-slicked surfaces, browned starches, skin-on poultry, sautéed
+  veg). Sanity-check rule: a typical full lunch/dinner plate is rarely
+  under 600 kcal or over 1500 kcal — if the sum lands far outside that,
+  re-check portions and added oil before submitting.
+- Safe-area insets: SafeAreaProvider wired into root layout
+  (`app/_layout.tsx`); nutrition capture/confirm/targets screens now use
+  `useSafeAreaInsets()` instead of hardcoded `paddingTop: 56` so the
+  Samsung gesture-bar pill no longer overlaps the header. Other screens
+  still use the hardcoded value — fold into 2.5 UI overhaul later.
 
 **Slice 5 — polish + history (next)**
 - `app/nutrition/log/[id].tsx`: tap a thumbnail → see the photo full-size,

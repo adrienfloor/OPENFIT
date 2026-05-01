@@ -1,6 +1,13 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
+import {
+  ageYearsFromDob,
+  calorieBalance,
+  computeBMR,
+} from '@openfit/fitness-core';
 import { useTodayNutrition } from '../hooks/useTodayNutrition';
+import { useDailyStats } from '../hooks/useDailyStats';
+import { useAuth } from '../hooks/useAuth';
 import { AuthedImage } from './AuthedImage';
 
 /**
@@ -13,13 +20,50 @@ import { AuthedImage } from './AuthedImage';
 export function NutritionCard() {
   const router = useRouter();
   const { logs, totals, targets, loading } = useTodayNutrition();
+  const { today } = useDailyStats();
+  const { user } = useAuth();
 
   const handleLog = () => router.push('/nutrition/capture');
+  const handleEditTargets = () => router.push('/nutrition/targets');
+
+  // Calorie balance — intake (sum of today's logs) vs expenditure
+  // (BMR prorated to "now" + active calories from the dashboard). Only
+  // shown when we have BMR inputs AND at least one logged meal — we want
+  // to encourage logging before showing a balance.
+  const balance =
+    user && logs.length > 0
+      ? (() => {
+          const bmr = computeBMR({
+            weightKg: user.weightKg,
+            heightCm: user.heightCm,
+            ageYears: ageYearsFromDob(new Date(user.dateOfBirth)),
+            sex: user.sex,
+          });
+          const now = new Date();
+          const startOfDay = new Date(now);
+          startOfDay.setHours(0, 0, 0, 0);
+          const dayFraction =
+            (now.getTime() - startOfDay.getTime()) / (24 * 60 * 60 * 1000);
+          return calorieBalance({
+            intakeKcal: totals.kcal,
+            bmrKcal: bmr,
+            activeKcal: today?.caloriesActive ?? 0,
+            dayFraction,
+          });
+        })()
+      : null;
 
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <Text style={styles.title}>Nutrition</Text>
+        <View style={styles.headerLeft}>
+          <Text style={styles.title}>Nutrition</Text>
+          <TouchableOpacity onPress={handleEditTargets} hitSlop={8}>
+            <Text style={styles.targetsLink}>
+              {targets ? 'Edit targets' : 'Set targets'}
+            </Text>
+          </TouchableOpacity>
+        </View>
         <TouchableOpacity onPress={handleLog} style={styles.logBtn}>
           <Text style={styles.logBtnText}>+ Log meal</Text>
         </TouchableOpacity>
@@ -61,6 +105,36 @@ export function NutritionCard() {
               />
             </View>
           </View>
+
+          {/* Calorie balance pill: intake vs (BMR-prorated + active). */}
+          {balance && (
+            <View
+              style={[
+                styles.balancePill,
+                balance.balanceKcal >= 0
+                  ? styles.balancePillSurplus
+                  : styles.balancePillDeficit,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.balancePillLabel,
+                  balance.balanceKcal >= 0
+                    ? styles.balancePillLabelSurplus
+                    : styles.balancePillLabelDeficit,
+                ]}
+              >
+                {balance.balanceKcal >= 0 ? 'Surplus' : 'Deficit'}
+              </Text>
+              <Text style={styles.balancePillValue}>
+                {balance.balanceKcal >= 0 ? '+' : ''}
+                {balance.balanceKcal} kcal
+              </Text>
+              <Text style={styles.balancePillMeta}>
+                in {balance.intakeKcal} · out {balance.expenditureKcal}
+              </Text>
+            </View>
+          )}
 
           {/* Thumbnail strip of today's meal photos. Static preview for v1 —
               a tap-to-edit detail screen is on the polish slice. */}
@@ -118,7 +192,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
+  headerLeft: { flexDirection: 'row', alignItems: 'baseline', gap: 10 },
   title: { fontSize: 16, fontWeight: '700', color: '#111827' },
+  targetsLink: { fontSize: 12, color: '#22c55e', fontWeight: '600' },
   logBtn: {
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -160,4 +236,25 @@ const styles = StyleSheet.create({
   },
   thumbsRow: { flexDirection: 'row', gap: 6, marginTop: 12, flexWrap: 'wrap' },
   thumb: { width: 56, height: 56, borderRadius: 8, backgroundColor: '#f3f4f6' },
+  balancePill: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 8,
+    marginTop: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  balancePillSurplus: { backgroundColor: '#fff7ed' },
+  balancePillDeficit: { backgroundColor: '#ecfdf5' },
+  balancePillLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  balancePillLabelSurplus: { color: '#c2410c' },
+  balancePillLabelDeficit: { color: '#15803d' },
+  balancePillValue: { fontSize: 14, fontWeight: '700', color: '#111827' },
+  balancePillMeta: { fontSize: 11, color: '#6b7280', marginLeft: 'auto' },
 });

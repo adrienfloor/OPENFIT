@@ -115,24 +115,17 @@ export class NutritionService {
 
     const photoUrl = await this.persistPhoto(userId, buffer, input.mimeType);
 
-    let visionOutput: VisionAnalysisOutput;
-    try {
-      visionOutput = await this.callVision(input.imageBase64, input.mimeType);
-    } catch (err) {
-      // The photo is on disk and the analysis row never got created — that
-      // is the desired state when vision fails (the mobile UI will surface
-      // the error and the user can retry). No cleanup needed since the
-      // upload directory is per-user and easy to GC if it ever grows.
-      throw err;
-    }
-
+    // On vision failure the photo stays on disk and no analysis row is
+    // created — that's the desired state, so we just let the error
+    // propagate to the route handler.
+    const visionOutput = await this.callVision(input.imageBase64, input.mimeType);
     const totals = sumItems(visionOutput.items);
 
     const created = await this.prisma.foodAnalysis.create({
       data: {
         userId,
         photoUrl,
-        items: { items: visionOutput.items, notes: visionOutput.notes ?? null },
+        items: { items: visionOutput.items },
         totals: totals as unknown as object,
         model: this.model,
         notes: visionOutput.notes ?? null,
@@ -596,11 +589,31 @@ kcal to the nearest 5 and macros to the nearest 0.5 g. Set the confidence field
 between 0 and 1 for each item; lower it when lighting, plating, or angle make
 estimation hard.
 
+CRITICAL — cooking fat and visual gloss:
+Most home-cooked plates carry significant added fat that the camera flattens
+into a shine you can read. Treat these visual cues as evidence of fat:
+- Glossy, oil-slicked surfaces on potatoes, vegetables, mushrooms, or pasta
+  → assume 5–10g added oil per 150g, scale fat and kcal accordingly.
+- Browned/crispy edges on roasted starches → high-temp roasting in oil; do
+  NOT use the bare USDA "boiled" entry, use the "roasted with oil" variant.
+- Skin-on poultry visibly rendered (golden, crisp) → keep skin in the macro
+  count; don't assume the diner removes it.
+- Visible butter/cream/cheese melt or sauce pools → add a separate item if
+  it's clearly distinguishable; otherwise fold the calories into the dish
+  it's coating and call it out in the notes.
+- Sautéed mushrooms / vegetables look slick because they absorb oil; weight
+  fat similar to roasted vegetables, not steamed.
+
+Sanity check before submitting: a typical full lunch/dinner plate of meat
++ starch + vegetables for one person is rarely under 600 kcal and rarely
+over 1500 kcal. If your sum lands far outside that, re-check portion grams
+and added fat — most of the time the issue is undercounting cooking oil.
+
 If the photo doesn't show food at all, return an empty items array and explain
 in the notes why. If the photo is blurry or partial, do your best on what's
 visible and say so in the notes — don't refuse.`;
 
-const VISION_USER_PROMPT = `Analyze the food in this photo and submit your structured analysis using the submit_food_analysis tool. List each item separately (don't merge "rice + chicken" into one row). Per-item macros are absolute for the estimated portion, not per-100g.`;
+const VISION_USER_PROMPT = `Analyze the food in this photo and submit your structured analysis using the submit_food_analysis tool. List each item separately (don't merge "rice + chicken" into one row). Per-item macros are absolute for the estimated portion, not per-100g. Account for cooking method — roasted starches and sautéed vegetables carry added oil; skin-on poultry includes the rendered skin; sauces/oils visible on the plate count toward the meal's macros.`;
 
 export const VISION_TOOL_SCHEMA: Anthropic.Messages.Tool.InputSchema = {
   type: 'object',

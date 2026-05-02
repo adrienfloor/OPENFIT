@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import type { FoodLog, MacroTargets, MacroTotals } from '@openfit/types';
 import { sumDayTotals } from '@openfit/fitness-core';
 import { listFoodLogs, getMacroTargets } from '../services/nutrition';
@@ -57,6 +58,15 @@ export function useTodayNutrition(): TodayNutrition {
       cancelled = true;
     };
   }, [trigger]);
+
+  // Refetch whenever the screen hosting this hook regains focus, so
+  // edits/deletes from log detail or new logs from capture are reflected
+  // without a hard reload.
+  useFocusEffect(
+    useCallback(() => {
+      setTrigger((t) => t + 1);
+    }, []),
+  );
 
   const totals = sumDayTotals(logs);
 

@@ -1009,7 +1009,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   backText: { fontSize: 16, color: colors.accent, fontWeight: '500', width: 50 },
-  title: { fontSize: 24, fontWeight: 'bold' },
+  title: { fontSize: 24, fontWeight: 'bold' , color: colors.text },
   elapsed: { fontSize: 18, fontWeight: '600', color: colors.accent },
   cancelText: { fontSize: 15, color: colors.danger, fontWeight: '500' },
   hrCard: {
@@ -1082,7 +1082,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
   },
-  currentExName: { fontSize: 15, fontWeight: '600', marginBottom: 12 },
+  currentExName: { fontSize: 15, fontWeight: '600', marginBottom: 12 , color: colors.text },
   inputRow: { flexDirection: 'row', gap: 10 },
   inputGroup: { flex: 1 },
   inputLabel: { fontSize: 11, color: colors.textSecondary, marginBottom: 4 },
@@ -1112,7 +1112,7 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 8,
   },
-  loggedExName: { fontSize: 14, fontWeight: '600', marginBottom: 6 },
+  loggedExName: { fontSize: 14, fontWeight: '600', marginBottom: 6 , color: colors.text },
   loggedSet: { fontSize: 13, color: colors.textSecondary, marginBottom: 2 },
   finishBtn: {
     backgroundColor: colors.danger,
@@ -1130,7 +1130,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  recentName: { fontSize: 14, fontWeight: '500' },
+  recentName: { fontSize: 14, fontWeight: '500' , color: colors.text },
   recentDate: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
   recentSets: { fontSize: 13, color: colors.textSecondary },
 

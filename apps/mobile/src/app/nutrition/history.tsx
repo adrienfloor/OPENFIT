@@ -195,7 +195,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 16,
   },
-  title: { fontSize: 20, fontWeight: '700' },
+  title: { fontSize: 20, fontWeight: '700' , color: colors.text },
   back: { fontSize: 15, color: colors.accent, fontWeight: '500', minWidth: 60 },
   empty: {
     fontSize: 14,

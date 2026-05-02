@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  title: { fontSize: 20, fontWeight: '700' },
+  title: { fontSize: 20, fontWeight: '700' , color: colors.text },
   cancel: { fontSize: 15, color: colors.danger, fontWeight: '500', minWidth: 60 },
   save: {
     fontSize: 15,

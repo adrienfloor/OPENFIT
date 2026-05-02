@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  title: { fontSize: 20, fontWeight: '700' },
+  title: { fontSize: 20, fontWeight: '700' , color: colors.text },
   back: { fontSize: 15, color: colors.accent, fontWeight: '500', minWidth: 60 },
   save: {
     fontSize: 15,
@@ -274,11 +274,13 @@ const styles = StyleSheet.create({
   },
   addBtnText: { color: colors.accent, fontSize: 14, fontWeight: '600' },
   deleteBtn: {
-    backgroundColor: '#fef2f2',
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',
     marginTop: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.35)',
   },
-  deleteBtnText: { color: '#dc2626', fontSize: 14, fontWeight: '700' },
+  deleteBtnText: { color: colors.danger, fontSize: 14, fontWeight: '700' },
 });

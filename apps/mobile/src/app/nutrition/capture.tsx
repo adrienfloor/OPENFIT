@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   back: { fontSize: 16, color: colors.accent, fontWeight: '500', width: 50 },
-  title: { fontSize: 20, fontWeight: '700' },
+  title: { fontSize: 20, fontWeight: '700' , color: colors.text },
   preview: {
     width: '100%',
     aspectRatio: 1,

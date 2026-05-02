@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  title: { fontSize: 20, fontWeight: '700' },
+  title: { fontSize: 20, fontWeight: '700', color: colors.text },
   back: { fontSize: 15, color: colors.accent, fontWeight: '500', minWidth: 60 },
   save: {
     fontSize: 15,
@@ -246,13 +246,15 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   suggestBtn: {
-    backgroundColor: '#eff6ff',
+    backgroundColor: 'rgba(59, 130, 246, 0.15)',
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
     marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.30)',
   },
-  suggestBtnText: { color: '#2563eb', fontWeight: '600' },
+  suggestBtnText: { color: colors.run, fontWeight: '600' },
   sectionLabel: {
     fontSize: 12,
     fontWeight: '700',

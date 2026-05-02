@@ -496,7 +496,7 @@ function prettify(s: string): string {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: 16 },
   center: { justifyContent: 'center', alignItems: 'center' },
-  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 4 },
+  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 4, color: colors.text },
   subtitle: { fontSize: 14, color: colors.textSecondary, marginBottom: 24 },
   section: { marginBottom: 20 },
   sectionTitle: { fontSize: 14, fontWeight: '600', color: colors.text, marginBottom: 10 },
@@ -525,9 +525,9 @@ const styles = StyleSheet.create({
   },
   numberBtn: { paddingHorizontal: 14, paddingVertical: 10 },
   numberBtnText: { fontSize: 18, fontWeight: '600', color: colors.accent },
-  numberValue: { flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '600' },
+  numberValue: { flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '600' , color: colors.text },
   sportRow: { marginBottom: 12 },
-  sportLabel: { fontSize: 13, fontWeight: '600', marginBottom: 6 },
+  sportLabel: { fontSize: 13, fontWeight: '600', marginBottom: 6 , color: colors.text },
   sportPickers: { flexDirection: 'row', gap: 12 },
   notesInput: {
     backgroundColor: colors.surfaceRaised,
@@ -566,7 +566,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
   },
-  previewName: { fontSize: 18, fontWeight: '700' },
+  previewName: { fontSize: 18, fontWeight: '700' , color: colors.text },
   previewMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 4 },
   previewOverview: { fontSize: 13, color: colors.text, marginTop: 10, lineHeight: 18 },
   weekCard: {
@@ -586,14 +586,14 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 8,
   },
-  sessionName: { fontSize: 14, fontWeight: '600' },
+  sessionName: { fontSize: 14, fontWeight: '600' , color: colors.text },
   sessionFocus: { fontSize: 11, color: colors.textSecondary, marginTop: 2, marginBottom: 6 },
   exerciseRow: {
     paddingVertical: 6,
     borderTopWidth: 1,
     borderTopColor: colors.surfaceMuted,
   },
-  exerciseName: { fontSize: 13, fontWeight: '500' },
+  exerciseName: { fontSize: 13, fontWeight: '500' , color: colors.text },
   exerciseSets: { fontSize: 12, color: colors.text, marginTop: 2 },
   exerciseRationale: { fontSize: 11, color: colors.textMuted, marginTop: 2, fontStyle: 'italic' },
 });

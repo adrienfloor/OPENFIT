@@ -379,7 +379,7 @@ export default function HistoryScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: 16 },
-  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 16 },
+  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 16, color: colors.text },
   filterRow: { flexDirection: 'row', marginBottom: 16, maxHeight: 44 },
   filterChip: {
     backgroundColor: colors.surface,
@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
   cardLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
   typeBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   typeBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
-  cardTitle: { fontSize: 15, fontWeight: '600' },
+  cardTitle: { fontSize: 15, fontWeight: '600' , color: colors.text },
   cardDate: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
   cardRight: { alignItems: 'flex-end' },
   cardStat: { fontSize: 14, fontWeight: '500', color: colors.text },
@@ -407,7 +407,7 @@ const styles = StyleSheet.create({
   calBar: { fontSize: 12, color: colors.textSecondary, marginTop: 8, fontWeight: '500' },
   expandedContent: { marginTop: 12, borderTopWidth: 1, borderTopColor: colors.surfaceMuted, paddingTop: 12 },
   exerciseRow: { marginBottom: 8 },
-  exerciseName: { fontSize: 14, fontWeight: '500', marginBottom: 2 },
+  exerciseName: { fontSize: 14, fontWeight: '500', marginBottom: 2, color: colors.text },
   setText: { fontSize: 13, color: colors.textSecondary, marginLeft: 8 },
   mapContainer: { height: 250, borderRadius: 12, overflow: 'hidden', marginBottom: 12 },
   map: { flex: 1 },
@@ -416,5 +416,5 @@ const styles = StyleSheet.create({
   detailRow: { flexDirection: 'row', justifyContent: 'space-between' },
   detailItem: { flex: 1, alignItems: 'center' },
   detailLabel: { fontSize: 11, color: colors.textMuted, marginBottom: 2 },
-  detailValue: { fontSize: 14, fontWeight: '500' },
+  detailValue: { fontSize: 14, fontWeight: '500' , color: colors.text },
 });

@@ -310,20 +310,40 @@ export async function getDailyStats(
     }).catch(() => ({ records: [] }));
 
     const totalSteps = stepsAgg?.COUNT_TOTAL ?? 0;
+    // Prefer the wearable's stream, but if the wearable doesn't write
+    // calorie records (Zepp on some devices is Steps-only), fall back to
+    // whichever single package wrote the most calorie records — better
+    // than showing nothing.
+    const totalCalPackage =
+      wearablePackage !== null &&
+      totalCalRaw.records.some(
+        (r) => (r.metadata?.dataOrigin ?? 'unknown') === wearablePackage,
+      )
+        ? wearablePackage
+        : dominantSource(totalCalRaw.records);
+    const activeCalPackage =
+      wearablePackage !== null &&
+      activeCalRaw.records.some(
+        (r) => (r.metadata?.dataOrigin ?? 'unknown') === wearablePackage,
+      )
+        ? wearablePackage
+        : dominantSource(activeCalRaw.records);
     const totalTotalCal = sumBySource(
       totalCalRaw.records,
       (r) => r.energy.inKilocalories,
-      wearablePackage,
+      totalCalPackage,
     );
     const rawActiveCal = sumBySource(
       activeCalRaw.records,
       (r) => r.energy.inKilocalories,
-      wearablePackage,
+      activeCalPackage,
     );
     if (__DEV__) {
       console.log('[HC] calories breakdown', {
         date: dayStart.toISOString().slice(0, 10),
         wearablePackage,
+        totalCalPackage,
+        activeCalPackage,
         steps: bySourceSummary(stepsRaw.records, (r) => r.count),
         total: bySourceSummary(totalCalRaw.records, (r) => r.energy.inKilocalories),
         active: bySourceSummary(activeCalRaw.records, (r) => r.energy.inKilocalories),

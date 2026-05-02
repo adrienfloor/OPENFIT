@@ -44,6 +44,7 @@ import {
   bmrCaloriesElapsed,
   ageYearsFromDob,
   calculateMaxHR,
+  activeKcalFromSteps,
   sleepScore,
   effortScore,
   readinessScore,
@@ -79,29 +80,6 @@ function endOfDay(date: Date): Date {
   const d = new Date(date);
   d.setHours(23, 59, 59, 999);
   return d;
-}
-
-/**
- * Health Connect can hold multiple writers for the same record type (Zepp +
- * Samsung Health + phone pedometer). For most metrics we trust HC's
- * aggregate dedup. For diagnostics we sometimes want to see who wrote
- * what — `bySourceSummary` groups raw records by package.
- */
-type WithOrigin = { metadata?: { dataOrigin?: string } };
-
-function bySourceSummary<T extends WithOrigin>(
-  records: T[],
-  getValue: (r: T) => number,
-): Record<string, { count: number; sum: number }> {
-  const out: Record<string, { count: number; sum: number }> = {};
-  for (const r of records) {
-    const key = r.metadata?.dataOrigin ?? 'unknown';
-    const cur = out[key] ?? { count: 0, sum: 0 };
-    cur.count += 1;
-    cur.sum += getValue(r);
-    out[key] = cur;
-  }
-  return out;
 }
 
 /**
@@ -189,21 +167,17 @@ export async function getDailyStats(
     // using its priority rules; readRecords would return raw per-source
     // records and summing them double-counts overlapping windows.
     //
-    // For TotalCaloriesBurned we use HC's aggregate (not raw per-source
-    // sums) because HC synthesises a meaningful total even when individual
-    // writers leave gaps — Zepp on Helio Strap, for example, writes only
-    // ~70 kcal of TotalCaloriesBurned for a full day while the in-app
-    // display shows 1100+. HC's aggregate fills those gaps from Active +
-    // BMR records across sources. Raw reads still happen so we can log
-    // which package contributed what for diagnosis.
+    // We deliberately do NOT read HC's TotalCaloriesBurned /
+    // ActiveCaloriesBurned. On this user's setup Zepp writes ~70 kcal/day
+    // total (their app computes 1100+ internally and never syncs it), and
+    // every other writer uses a different model — the sum is unreliable.
+    // Instead we compute calories ourselves from inputs we control:
+    // BMR-prorated (Mifflin) for resting + steps × per-step coefficient
+    // for active. Workout HR data is integrated via Keytel inside each
+    // WorkoutLog at log time, not here.
     const [
       sleep,
       stepsAgg,
-      stepsRaw,
-      activeCalAgg,
-      activeCalRaw,
-      totalCalAgg,
-      totalCalRaw,
       restingHRAgg,
       spo2,
       regularity,
@@ -212,21 +186,6 @@ export async function getDailyStats(
       getSleepSummary(current).catch(() => null),
       aggregateRecord({ recordType: 'Steps', timeRangeFilter }).catch(
         () => null,
-      ),
-      readRecords('Steps', { timeRangeFilter }).catch(() => ({ records: [] })),
-      aggregateRecord({
-        recordType: 'ActiveCaloriesBurned',
-        timeRangeFilter,
-      }).catch(() => null),
-      readRecords('ActiveCaloriesBurned', { timeRangeFilter }).catch(
-        () => ({ records: [] }),
-      ),
-      aggregateRecord({
-        recordType: 'TotalCaloriesBurned',
-        timeRangeFilter,
-      }).catch(() => null),
-      readRecords('TotalCaloriesBurned', { timeRangeFilter }).catch(
-        () => ({ records: [] }),
       ),
       aggregateRecord({
         recordType: 'RestingHeartRate',
@@ -265,42 +224,23 @@ export async function getDailyStats(
     }).catch(() => ({ records: [] }));
 
     const totalSteps = stepsAgg?.COUNT_TOTAL ?? 0;
-    const totalTotalCal = totalCalAgg?.ENERGY_TOTAL.inKilocalories ?? 0;
-    const rawActiveCal = activeCalAgg?.ACTIVE_CALORIES_TOTAL.inKilocalories ?? 0;
-    if (__DEV__) {
-      console.log('[HC] calories breakdown', {
-        date: dayStart.toISOString().slice(0, 10),
-        aggregateTotal: totalTotalCal,
-        aggregateActive: rawActiveCal,
-        rawTotalBySource: bySourceSummary(
-          totalCalRaw.records,
-          (r) => r.energy.inKilocalories,
-        ),
-        rawActiveBySource: bySourceSummary(
-          activeCalRaw.records,
-          (r) => r.energy.inKilocalories,
-        ),
-        rawStepsBySource: bySourceSummary(stepsRaw.records, (r) => r.count),
-      });
-    }
 
-    // Zepp's "Consommation d'activité" = TotalCaloriesBurned − BMR.
-    // Zepp does not write BasalMetabolicRate records to Health Connect, so we
-    // compute BMR ourselves from the user profile (Mifflin-St Jeor) and
-    // prorate by the portion of the day that has elapsed — a full-day BMR
-    // would overestimate the resting component for a still-in-progress day.
-    // ActiveCaloriesBurned on its own only covers explicit workout sessions
-    // (e.g. the 540 kcal jiu-jitsu log) and misses daily walking / casual
-    // activity, so we only fall back to it when the profile is missing.
+    // Compute calories ourselves from steps + user weight. Reference:
+    // ~0.04 kcal/step at 68 kg, scaled linearly with mass. Adding workout
+    // calories from the user's WorkoutLog rows is a future refinement
+    // (today only the casual-walking signal feeds this number).
+    //
+    // For days in progress, BMR is prorated to "now" so the resting
+    // figure doesn't claim a full day's basal at noon.
     const isToday = startOfDay(current).getTime() === startOfDay(new Date()).getTime();
     const now = isToday ? new Date() : endOfDay(current);
-    let totalActiveCal: number;
-    if (bmrPerDay !== null && totalTotalCal > 0) {
-      const basalSoFar = bmrCaloriesElapsed(bmrPerDay, now);
-      totalActiveCal = Math.max(0, totalTotalCal - basalSoFar);
-    } else {
-      totalActiveCal = rawActiveCal;
-    }
+    const totalActiveCal =
+      userProfile !== undefined
+        ? activeKcalFromSteps(totalSteps, userProfile.weightKg)
+        : 0;
+    const basalSoFar =
+      bmrPerDay !== null ? bmrCaloriesElapsed(bmrPerDay, now) : 0;
+    const totalTotalCal = basalSoFar + totalActiveCal;
 
     const latestRestingHR = restingHRAgg?.BPM_AVG ?? null;
 

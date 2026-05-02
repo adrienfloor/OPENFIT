@@ -122,3 +122,26 @@ export function computeCaloriesFromMET({
   const hours = durationSeconds / 3600;
   return mets * weightKg * hours;
 }
+
+/**
+ * Casual (non-workout) active calories from step count, weight-scaled.
+ *
+ * Reference: a 68 kg adult walking burns ≈ 0.04 kcal per step at average
+ * pace (well-cited pedometer estimate, e.g. ACSM). Energy burnt walking
+ * scales near-linearly with body mass, so we scale by `weightKg / 68`.
+ *
+ * This intentionally ignores intensity. For workouts, use the HR-based
+ * Keytel integrator (`computeCaloriesFromHRSamples`) and add its kcal on
+ * top — this function is for the casual movement that fills the gap
+ * between explicit workout sessions.
+ *
+ *   80 kg, 2086 steps  → 2086 × 0.04 × (80/68)  ≈ 98 kcal
+ *   65 kg, 8000 steps  → 8000 × 0.04 × (65/68)  ≈ 306 kcal
+ */
+export function activeKcalFromSteps(
+  steps: number,
+  weightKg: number,
+): number {
+  if (steps <= 0 || weightKg <= 0) return 0;
+  return steps * 0.04 * (weightKg / 68);
+}

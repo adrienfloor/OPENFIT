@@ -3,6 +3,7 @@ import {
   keytelKcalPerMinute,
   computeCaloriesFromHRSamples,
   computeCaloriesFromMET,
+  activeKcalFromSteps,
 } from '../calories';
 
 describe('keytelKcalPerMinute', () => {
@@ -113,5 +114,23 @@ describe('computeCaloriesFromMET', () => {
     const oneHour = computeCaloriesFromMET({ mets: 6, weightKg: 75, durationSeconds: 3600 });
     const halfHour = computeCaloriesFromMET({ mets: 6, weightKg: 75, durationSeconds: 1800 });
     expect(halfHour).toBeCloseTo(oneHour / 2, 5);
+  });
+});
+
+describe('activeKcalFromSteps', () => {
+  it('matches Zepp display for an 80kg adult at 2086 steps', () => {
+    // 2086 × 0.04 × (80/68) ≈ 98.2 — matches Zepp's "99 kcal" within 1.
+    expect(activeKcalFromSteps(2086, 80)).toBeCloseTo(98.2, 1);
+  });
+
+  it('scales linearly with weight', () => {
+    expect(activeKcalFromSteps(8000, 68)).toBeCloseTo(320, 0);
+    expect(activeKcalFromSteps(8000, 136)).toBeCloseTo(640, 0);
+  });
+
+  it('returns 0 for non-positive inputs', () => {
+    expect(activeKcalFromSteps(0, 80)).toBe(0);
+    expect(activeKcalFromSteps(-100, 80)).toBe(0);
+    expect(activeKcalFromSteps(2000, 0)).toBe(0);
   });
 });

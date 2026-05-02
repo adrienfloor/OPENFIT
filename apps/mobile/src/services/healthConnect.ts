@@ -133,6 +133,13 @@ export async function getDailyStats(
   startDate: Date,
   endDate: Date,
   userProfile?: Pick<UserProfile, 'weightKg' | 'heightCm' | 'sex' | 'dateOfBirth'>,
+  /**
+   * Optional map of `YYYY-MM-DD` → workout calories burned that day, summed
+   * across all logs with a `completedAt` on that date. Added on top of the
+   * step-based casual-activity estimate so HR-tracked workouts show up in
+   * the day's active total.
+   */
+  workoutKcalByDate?: Record<string, number>,
 ): Promise<TodayDailyStats[]> {
   assertInitialized();
 
@@ -225,19 +232,19 @@ export async function getDailyStats(
 
     const totalSteps = stepsAgg?.COUNT_TOTAL ?? 0;
 
-    // Compute calories ourselves from steps + user weight. Reference:
-    // ~0.04 kcal/step at 68 kg, scaled linearly with mass. Adding workout
-    // calories from the user's WorkoutLog rows is a future refinement
-    // (today only the casual-walking signal feeds this number).
-    //
-    // For days in progress, BMR is prorated to "now" so the resting
-    // figure doesn't claim a full day's basal at noon.
+    // Compute calories ourselves. Resting = Mifflin BMR prorated to "now"
+    // (so a partial day doesn't claim a full day's basal at noon). Active
+    // = step-based casual walk estimate + sum of HR-derived workout kcal
+    // from WorkoutLog rows completed on this date.
     const isToday = startOfDay(current).getTime() === startOfDay(new Date()).getTime();
     const now = isToday ? new Date() : endOfDay(current);
-    const totalActiveCal =
+    const stepKcal =
       userProfile !== undefined
         ? activeKcalFromSteps(totalSteps, userProfile.weightKg)
         : 0;
+    const dateKey = dayStart.toISOString().slice(0, 10);
+    const workoutKcal = workoutKcalByDate?.[dateKey] ?? 0;
+    const totalActiveCal = stepKcal + workoutKcal;
     const basalSoFar =
       bmrPerDay !== null ? bmrCaloriesElapsed(bmrPerDay, now) : 0;
     const totalTotalCal = basalSoFar + totalActiveCal;
@@ -602,12 +609,13 @@ export async function getSpO2(date: Date): Promise<number | null> {
  */
 export async function getTodayDashboard(
   userProfile?: Pick<UserProfile, 'weightKg' | 'heightCm' | 'sex' | 'dateOfBirth'>,
+  workoutKcalByDate?: Record<string, number>,
 ): Promise<TodayDailyStats | null> {
   const today = new Date();
   const sixDaysAgo = new Date();
   sixDaysAgo.setDate(sixDaysAgo.getDate() - 6);
 
-  const range = await getDailyStats(sixDaysAgo, today, userProfile);
+  const range = await getDailyStats(sixDaysAgo, today, userProfile, workoutKcalByDate);
   if (range.length === 0) return null;
 
   const todayRecord = range[range.length - 1] as TodayDailyStats;

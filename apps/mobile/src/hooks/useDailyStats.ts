@@ -1,6 +1,30 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import type { WorkoutLog } from '@openfit/types';
 import type { TodayDailyStats } from '../services/healthConnect';
+import { apiClient } from '../services/api';
 import { useAuth } from './useAuth';
+
+/**
+ * Fetch the last 7 days of workout logs and bucket them by completion date
+ * (`YYYY-MM-DD`), summing `caloriesBurned` per bucket. Logs without a
+ * `completedAt` or `caloriesBurned` are skipped. The map is consumed by
+ * `getDailyStats` to add HR-derived workout kcal to each day's active total.
+ */
+async function fetchWorkoutKcalByDate(): Promise<Record<string, number>> {
+  const res = await apiClient.get<WorkoutLog[]>('/workouts/logs');
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 7);
+
+  const map: Record<string, number> = {};
+  for (const log of res.data) {
+    if (log.completedAt == null || log.caloriesBurned == null) continue;
+    const completed = new Date(log.completedAt);
+    if (completed < cutoff) continue;
+    const key = completed.toISOString().slice(0, 10);
+    map[key] = (map[key] ?? 0) + log.caloriesBurned;
+  }
+  return map;
+}
 
 export function useDailyStats(): {
   today: TodayDailyStats | null;
@@ -82,7 +106,15 @@ export function useDailyStats(): {
               dateOfBirth: new Date(user.dateOfBirth),
             }
           : undefined;
-        const result = await getTodayDashboard(profile);
+
+        // Fetch the same 7-day window of WorkoutLogs so HR-derived workout
+        // calories (Keytel) get added on top of the step-based casual
+        // estimate inside getDailyStats. Failing this call shouldn't block
+        // the dashboard — fall back to a step-only estimate.
+        const workoutKcalByDate = await fetchWorkoutKcalByDate().catch(
+          () => ({}),
+        );
+        const result = await getTodayDashboard(profile, workoutKcalByDate);
         console.log('[useDailyStats] dashboard result:', JSON.stringify(result));
         setToday(result);
       } catch (err) {

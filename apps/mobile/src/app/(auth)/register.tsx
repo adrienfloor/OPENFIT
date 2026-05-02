@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '../../hooks/useAuth';
 import { RegisterInputSchema } from '@openfit/types';
 import { colors, spacing, radii, typography } from '../../theme';
+import { dialog } from '../../services/dialog';
 
 export default function RegisterScreen() {
   const { register } = useAuth();
@@ -32,7 +33,7 @@ export default function RegisterScreen() {
     });
 
     if (!parsed.success) {
-      Alert.alert('Validation error', parsed.error.errors[0]?.message ?? 'Invalid input');
+      dialog.alert('Validation error', parsed.error.errors[0]?.message ?? 'Invalid input');
       return;
     }
 
@@ -41,7 +42,7 @@ export default function RegisterScreen() {
       await register(parsed.data);
       router.replace('/(tabs)');
     } catch {
-      Alert.alert('Registration failed', 'Email may already be in use');
+      dialog.alert('Registration failed', 'Email may already be in use');
     } finally {
       setLoading(false);
     }
@@ -92,17 +93,17 @@ export default function RegisterScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40, backgroundColor: colors.surface },
-  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 24, textAlign: 'center' },
-  input: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12, fontSize: 16, marginBottom: 12 },
-  passwordContainer: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 10, marginBottom: 12 },
-  passwordInput: { flex: 1, paddingHorizontal: 16, paddingVertical: 12, fontSize: 16 },
+  container: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40, backgroundColor: colors.bg },
+  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 24, textAlign: 'center', color: colors.text },
+  input: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12, fontSize: 16, marginBottom: 12, backgroundColor: colors.surface, color: colors.text },
+  passwordContainer: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 10, marginBottom: 12, backgroundColor: colors.surface },
+  passwordInput: { flex: 1, paddingHorizontal: 16, paddingVertical: 12, fontSize: 16, color: colors.text },
   eyeBtn: { paddingHorizontal: 14, paddingVertical: 12 },
   eyeText: { fontSize: 18 },
   button: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginBottom: 16, marginTop: 8 },
   buttonDisabled: { opacity: 0.5 },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  link: { textAlign: 'center', color: '#16a34a', fontSize: 14 },
+  link: { textAlign: 'center', color: colors.accent, fontSize: 14 },
   sexRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
   sexBtn: { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
   sexBtnActive: { backgroundColor: colors.accent, borderColor: colors.accent },

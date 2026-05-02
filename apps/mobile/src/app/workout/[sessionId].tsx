@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { apiClient } from '../../services/api';
@@ -14,6 +13,7 @@ import { useWorkoutStore } from '../../stores/workout.store';
 import { formatDuration } from '../../utils';
 import { colors, spacing, radii, typography } from '../../theme';
 import { useScreenTopPadding } from '../../theme/useScreenPadding';
+import { dialog } from '../../services/dialog';
 
 interface PlannedSet {
   setIndex: number;
@@ -78,7 +78,7 @@ export default function ActiveWorkoutScreen() {
     const r = parseInt(reps, 10);
     const w = parseFloat(weight);
     if (isNaN(r) || r <= 0 || isNaN(w) || w < 0) {
-      Alert.alert('Invalid input', 'Enter valid reps and weight.');
+      dialog.alert('Invalid input', 'Enter valid reps and weight.');
       return;
     }
 
@@ -108,7 +108,7 @@ export default function ActiveWorkoutScreen() {
 
   const handleFinish = async () => {
     if (activeExercises.length === 0) {
-      Alert.alert('No sets logged', 'Log at least one set before finishing.');
+      dialog.alert('No sets logged', 'Log at least one set before finishing.');
       return;
     }
 
@@ -136,7 +136,7 @@ export default function ActiveWorkoutScreen() {
     try {
       await apiClient.post('/workouts/logs', payload);
     } catch {
-      Alert.alert('Saved locally', 'Will sync when back online.');
+      dialog.alert('Saved locally', 'Will sync when back online.');
     }
 
     finishWorkout();
@@ -271,12 +271,15 @@ const styles = StyleSheet.create({
   inputGroup: { flex: 1 },
   inputLabel: { fontSize: 11, color: colors.textSecondary, marginBottom: 4 },
   input: {
-    backgroundColor: colors.surfaceMuted,
+    backgroundColor: colors.surfaceRaised,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 16,
     fontWeight: '500',
+    color: colors.text,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   logBtn: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
   logBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },

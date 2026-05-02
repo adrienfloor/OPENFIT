@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { apiClient } from '../../services/api';
@@ -26,6 +25,7 @@ import {
 } from '../../services/runTracker';
 import { colors, spacing, radii, typography } from '../../theme';
 import { useScreenTopPadding } from '../../theme/useScreenPadding';
+import { dialog } from '../../services/dialog';
 
 type RunState = 'idle' | 'running' | 'paused' | 'finished';
 
@@ -168,7 +168,7 @@ export default function RunScreen() {
   const handleStart = async () => {
     const started = await startRunTracking();
     if (!started) {
-      Alert.alert('Permission required', 'Location permission is needed for run tracking.');
+      dialog.alert('Permission required', 'Location permission is needed for run tracking.');
       return;
     }
 
@@ -249,9 +249,9 @@ export default function RunScreen() {
     try {
       await apiClient.post('/workouts/logs', payload);
       const calText = caloriesBurned ? ` · ${Math.round(caloriesBurned)} kcal` : '';
-      Alert.alert('Run saved', `${distanceKm} km in ${formatDuration(elapsed)}${calText}`);
+      dialog.alert('Run saved', `${distanceKm} km in ${formatDuration(elapsed)}${calText}`);
     } catch {
-      Alert.alert('Saved locally', 'Will sync when back online.');
+      dialog.alert('Saved locally', 'Will sync when back online.');
     }
 
     setRunState('idle');
@@ -262,7 +262,7 @@ export default function RunScreen() {
   };
 
   const handleDiscard = () => {
-    Alert.alert('Discard run?', 'This cannot be undone.', [
+    dialog.alert('Discard run?', 'This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Discard',

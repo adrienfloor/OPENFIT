@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import type { CoachSession } from '@openfit/types';
 import { adjustSession } from '../services/coach';
@@ -15,6 +14,7 @@ import {
   type PlannedExerciseSpec,
 } from '../stores/workout.store';
 import { colors, spacing, radii, typography } from '../theme';
+import { dialog } from '../services/dialog';
 
 /**
  * Banner shown above the planned-exercise list when:
@@ -57,7 +57,7 @@ export function AdjustForTodayBanner() {
   const handleAdjust = async () => {
     if (programId === null || weekNumber === null || sessionIndex === null) return;
     if (readiness === null) {
-      Alert.alert(
+      dialog.alert(
         'No readiness yet',
         "We don't have today's BioCharge yet. Open the Today tab to refresh and try again.",
       );
@@ -84,7 +84,7 @@ export function AdjustForTodayBanner() {
       setAppliedReason(result.reason);
       setAppliedMultiplier(result.volumeMultiplier);
     } catch (err) {
-      Alert.alert(
+      dialog.alert(
         'Could not adjust',
         err instanceof Error ? err.message : 'Try again in a moment.',
       );

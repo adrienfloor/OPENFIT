@@ -191,11 +191,14 @@ const styles = StyleSheet.create({
   field: { flex: 1 },
   fieldLabel: { fontSize: 10, color: colors.textSecondary, marginBottom: 2 },
   fieldInput: {
-    backgroundColor: colors.surfaceMuted,
+    backgroundColor: colors.surfaceRaised,
     borderRadius: 6,
     paddingHorizontal: 10,
     paddingVertical: 8,
     fontSize: 14,
+    color: colors.text,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   lowConfidence: { fontSize: 11, color: colors.warning, marginTop: 4 },
 });

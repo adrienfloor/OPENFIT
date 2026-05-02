@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -20,6 +19,7 @@ import {
 import { getMacroTargets, setMacroTargets } from '../../services/nutrition';
 import { useAuth } from '../../hooks/useAuth';
 import { colors, spacing, radii, typography } from '../../theme';
+import { dialog } from '../../services/dialog';
 
 /**
  * Daily macro targets editor. Reachable from the Today nutrition card via a
@@ -105,7 +105,7 @@ export default function TargetsScreen() {
       Number.isNaN(parsed.carbsG) ||
       Number.isNaN(parsed.fatG)
     ) {
-      Alert.alert('Invalid input', 'All four targets are required as numbers.');
+      dialog.alert('Invalid input', 'All four targets are required as numbers.');
       return;
     }
     setSaving(true);
@@ -114,7 +114,7 @@ export default function TargetsScreen() {
       router.back();
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Could not save.';
-      Alert.alert('Save failed', msg);
+      dialog.alert('Save failed', msg);
     } finally {
       setSaving(false);
     }
@@ -284,7 +284,7 @@ const styles = StyleSheet.create({
   fieldInputBig: { fontSize: 24 },
   fieldUnit: { fontSize: 13, color: colors.textMuted },
   driftCard: {
-    backgroundColor: '#fffbeb',
+    backgroundColor: 'rgba(245, 158, 11, 0.10)',
     borderRadius: 8,
     padding: 12,
     marginTop: 16,

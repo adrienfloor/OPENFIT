@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -15,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { analyzeFoodPhoto } from '../../services/nutrition';
 import { useNutritionStore } from '../../stores/nutrition.store';
 import { colors, spacing, radii, typography } from '../../theme';
+import { dialog } from '../../services/dialog';
 
 /**
  * Capture flow:
@@ -42,7 +42,7 @@ export default function CaptureScreen() {
           ? await ImagePicker.requestCameraPermissionsAsync()
           : await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!perm.granted) {
-        Alert.alert(
+        dialog.alert(
           'Permission needed',
           source === 'camera'
             ? 'Camera access is required to snap meal photos.'
@@ -92,7 +92,7 @@ export default function CaptureScreen() {
     } catch (err) {
       const msg =
         err instanceof Error ? err.message : 'Could not analyze photo.';
-      Alert.alert('Analysis failed', msg);
+      dialog.alert('Analysis failed', msg);
     } finally {
       setBusy(false);
     }

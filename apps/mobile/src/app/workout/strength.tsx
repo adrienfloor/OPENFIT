@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Alert,
   RefreshControl,
   Modal,
 } from 'react-native';
@@ -28,6 +27,7 @@ import {
 } from '@openfit/fitness-core';
 import { colors, spacing, radii, typography } from '../../theme';
 import { useScreenTopPadding } from '../../theme/useScreenPadding';
+import { dialog } from '../../services/dialog';
 
 interface Exercise {
   id: string;
@@ -199,7 +199,7 @@ export default function WorkoutScreen() {
     const r = parseInt(reps, 10);
     const w = parseFloat(weight);
     if (isNaN(r) || r <= 0 || isNaN(w) || w < 0) {
-      Alert.alert('Invalid input', 'Enter valid reps and weight.');
+      dialog.alert('Invalid input', 'Enter valid reps and weight.');
       return;
     }
 
@@ -218,7 +218,7 @@ export default function WorkoutScreen() {
 
   const handleFinish = async () => {
     if (activeExercises.length === 0) {
-      Alert.alert('No sets logged', 'Log at least one set before finishing.');
+      dialog.alert('No sets logged', 'Log at least one set before finishing.');
       return;
     }
 
@@ -265,9 +265,9 @@ export default function WorkoutScreen() {
       await apiClient.post('/workouts/logs', payload);
       const totalSets = activeExercises.reduce((sum, e) => sum + e.completedSets.length, 0);
       const calText = caloriesBurned ? ` · ${Math.round(caloriesBurned)} kcal` : '';
-      Alert.alert('Workout saved', `${activeExercises.length} exercises, ${totalSets} sets${calText}`);
+      dialog.alert('Workout saved', `${activeExercises.length} exercises, ${totalSets} sets${calText}`);
     } catch {
-      Alert.alert('Saved locally', 'Will sync when back online.');
+      dialog.alert('Saved locally', 'Will sync when back online.');
     }
 
     finishWorkout();
@@ -290,7 +290,7 @@ export default function WorkoutScreen() {
   }, [isActive, startedAt]);
 
   const handleCancel = () => {
-    Alert.alert('Cancel workout?', 'Your logged sets will be lost.', [
+    dialog.alert('Cancel workout?', 'Your logged sets will be lost.', [
       { text: 'Keep going', style: 'cancel' },
       {
         text: 'Cancel',
@@ -401,7 +401,7 @@ export default function WorkoutScreen() {
                     newExerciseId: newEx.id,
                   })
                   .catch(() => {
-                    Alert.alert(
+                    dialog.alert(
                       'Swap not saved',
                       'Applied for this session, but could not save to your program. Try again next time.',
                     );
@@ -663,7 +663,7 @@ function PlannedExerciseCard({
     const r = parseInt(reps, 10);
     const w = parseFloat(weight);
     if (isNaN(r) || r <= 0 || isNaN(w) || w < 0) {
-      Alert.alert('Invalid input', 'Enter valid reps and weight.');
+      dialog.alert('Invalid input', 'Enter valid reps and weight.');
       return;
     }
     const rpeVal = rpe ? parseFloat(rpe) : null;
@@ -1045,7 +1045,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 8,
   },
-  programName: { fontSize: 16, fontWeight: '600' },
+  programName: { fontSize: 16, fontWeight: '600', color: colors.text },
   programMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 4 },
   weekSection: { marginLeft: 12, marginBottom: 8 },
   weekLabel: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginBottom: 6 },
@@ -1060,7 +1060,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3,
     borderLeftColor: colors.accent,
   },
-  sessionName: { fontSize: 14, fontWeight: '500' },
+  sessionName: { fontSize: 14, fontWeight: '500', color: colors.text },
   sessionMeta: { fontSize: 12, color: colors.accent },
   emptyText: { fontSize: 14, color: colors.textMuted, textAlign: 'center', marginTop: 40, paddingHorizontal: 24 },
   exercisePicker: { marginBottom: 16 },
@@ -1087,12 +1087,15 @@ const styles = StyleSheet.create({
   inputGroup: { flex: 1 },
   inputLabel: { fontSize: 11, color: colors.textSecondary, marginBottom: 4 },
   input: {
-    backgroundColor: colors.surfaceMuted,
+    backgroundColor: colors.surfaceRaised,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 16,
     fontWeight: '500',
+    color: colors.text,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   logSetBtn: {
     backgroundColor: colors.accent,
@@ -1186,7 +1189,7 @@ const styles = StyleSheet.create({
   exCardFocused: { borderLeftColor: colors.accent },
   exCardDone: { opacity: 0.55, borderLeftColor: colors.accent },
   exHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  exName: { fontSize: 15, fontWeight: '600', flex: 1, paddingRight: 8 },
+  exName: { fontSize: 15, fontWeight: '600', flex: 1, paddingRight: 8, color: colors.text },
   exNameDone: { textDecorationLine: 'line-through', color: colors.textSecondary },
   exProgress: {
     backgroundColor: colors.surfaceMuted,
@@ -1205,22 +1208,25 @@ const styles = StyleSheet.create({
   setRowDoneCheck: { color: colors.accent, fontSize: 14, fontWeight: '700' },
   setRowDoneText: { fontSize: 13, color: colors.text },
   setRowCurrent: {
-    backgroundColor: '#f0fdf4',
+    backgroundColor: 'rgba(34, 197, 94, 0.10)',
     borderRadius: 8,
     padding: 10,
     marginVertical: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(34, 197, 94, 0.25)',
   },
   setRowLabel: { fontSize: 12, fontWeight: '700', color: colors.accent, marginBottom: 6, textTransform: 'uppercase' },
   setInputRow: { flexDirection: 'row', gap: 8, marginBottom: 4 },
   setInputGroup: { flex: 1 },
   setInputLabel: { fontSize: 10, color: colors.textSecondary, marginBottom: 2 },
   setInputField: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceRaised,
     borderRadius: 6,
     paddingHorizontal: 10,
     paddingVertical: 8,
     fontSize: 15,
     fontWeight: '600',
+    color: colors.text,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -1231,10 +1237,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
-    backgroundColor: '#eff6ff',
+    backgroundColor: 'rgba(59, 130, 246, 0.15)',
     marginRight: 8,
   },
-  swapBtnText: { fontSize: 11, fontWeight: '700', color: '#2563eb', textTransform: 'uppercase' },
+  swapBtnText: { fontSize: 11, fontWeight: '700', color: colors.run, textTransform: 'uppercase' },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalSheet: {
     backgroundColor: colors.surface,
@@ -1253,7 +1259,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: 14,
   },
-  modalTitle: { fontSize: 18, fontWeight: '700' },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
   modalSubtitle: { fontSize: 13, color: colors.textSecondary, marginTop: 4, marginBottom: 12 },
   modalList: { maxHeight: 480 },
   modalRow: {
@@ -1263,7 +1269,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.surfaceMuted,
   },
-  modalRowName: { fontSize: 15, fontWeight: '500' },
+  modalRowName: { fontSize: 15, fontWeight: '500', color: colors.text },
   modalRowMeta: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
   modalRowChevron: { fontSize: 22, color: colors.textMuted },
   modalSectionHeader: {

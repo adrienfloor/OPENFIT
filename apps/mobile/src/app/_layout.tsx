@@ -7,6 +7,8 @@ import { useAuthStore } from '../stores/auth.store';
 import { getRefreshToken, setAccessToken } from '../services/api';
 import { apiClient } from '../services/api';
 import { colors } from '../theme';
+import '../theme/applyDefaults';
+import { DialogHost } from '../components/DialogHost';
 
 export default function RootLayout() {
   const router = useRouter();
@@ -84,6 +86,7 @@ export default function RootLayout() {
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
       </Stack>
+      <DialogHost />
     </SafeAreaProvider>
   );
 }

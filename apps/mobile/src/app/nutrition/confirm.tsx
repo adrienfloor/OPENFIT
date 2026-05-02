@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -22,6 +21,7 @@ import {
   suggestMealType,
 } from '../../components/FoodItemEditor';
 import { colors, spacing, radii, typography } from '../../theme';
+import { dialog } from '../../services/dialog';
 
 /**
  * Review the AI's analysis before logging it. The user can:
@@ -79,11 +79,11 @@ export default function ConfirmScreen() {
 
   const handleSave = async () => {
     if (items.length === 0) {
-      Alert.alert('No items', 'Add at least one item or cancel to discard.');
+      dialog.alert('No items', 'Add at least one item or cancel to discard.');
       return;
     }
     if (items.some((it) => !it.name.trim())) {
-      Alert.alert('Missing names', 'Every item needs a name.');
+      dialog.alert('Missing names', 'Every item needs a name.');
       return;
     }
     setSaving(true);
@@ -99,14 +99,14 @@ export default function ConfirmScreen() {
       router.replace('/');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Could not save log.';
-      Alert.alert('Save failed', msg);
+      dialog.alert('Save failed', msg);
     } finally {
       setSaving(false);
     }
   };
 
   const handleCancel = () => {
-    Alert.alert('Discard analysis?', 'The photo and macros will be lost.', [
+    dialog.alert('Discard analysis?', 'The photo and macros will be lost.', [
       { text: 'Keep editing', style: 'cancel' },
       {
         text: 'Discard',

@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -24,6 +23,7 @@ import {
   blankFoodItem,
 } from '../../../components/FoodItemEditor';
 import { colors, spacing, radii, typography } from '../../../theme';
+import { dialog } from '../../../services/dialog';
 
 /**
  * Log detail / edit screen. Reachable from a NutritionCard thumbnail tap or
@@ -55,7 +55,7 @@ export default function LogDetailScreen() {
         setMealType(fetched.mealType);
       } catch (err) {
         if (cancelled) return;
-        Alert.alert(
+        dialog.alert(
           'Could not load',
           err instanceof Error ? err.message : 'Try again later.',
         );
@@ -91,11 +91,11 @@ export default function LogDetailScreen() {
 
   const handleSave = async () => {
     if (items.length === 0) {
-      Alert.alert('No items', 'A log needs at least one item. Delete it instead?');
+      dialog.alert('No items', 'A log needs at least one item. Delete it instead?');
       return;
     }
     if (items.some((it) => !it.name.trim())) {
-      Alert.alert('Missing names', 'Every item needs a name.');
+      dialog.alert('Missing names', 'Every item needs a name.');
       return;
     }
     setSaving(true);
@@ -103,7 +103,7 @@ export default function LogDetailScreen() {
       await updateFoodLog(id, { items, mealType: mealType ?? null });
       router.back();
     } catch (err) {
-      Alert.alert(
+      dialog.alert(
         'Save failed',
         err instanceof Error ? err.message : 'Try again.',
       );
@@ -113,7 +113,7 @@ export default function LogDetailScreen() {
   };
 
   const handleDelete = () => {
-    Alert.alert(
+    dialog.alert(
       'Delete this log?',
       'The photo and macros will be permanently removed.',
       [
@@ -126,7 +126,7 @@ export default function LogDetailScreen() {
               await deleteFoodLog(id);
               router.back();
             } catch (err) {
-              Alert.alert(
+              dialog.alert(
                 'Delete failed',
                 err instanceof Error ? err.message : 'Try again.',
               );

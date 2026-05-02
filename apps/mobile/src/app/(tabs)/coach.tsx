@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Alert,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
@@ -27,6 +26,7 @@ import {
 } from '../../services/coach';
 import { colors, spacing, radii, typography } from '../../theme';
 import { useScreenTopPadding } from '../../theme/useScreenPadding';
+import { dialog } from '../../services/dialog';
 
 const GOALS: { value: TrainingGoal; label: string }[] = [
   { value: 'aesthetics', label: 'Aesthetics' },
@@ -110,9 +110,9 @@ export default function CoachScreen() {
     try {
       const saved = await saveCoachingProfile(draft);
       setProfile(saved);
-      Alert.alert('Profile saved', 'Your coaching profile has been updated.');
+      dialog.alert('Profile saved', 'Your coaching profile has been updated.');
     } catch {
-      Alert.alert('Save failed', 'Could not save your profile. Try again.');
+      dialog.alert('Save failed', 'Could not save your profile. Try again.');
     }
   };
 
@@ -123,14 +123,14 @@ export default function CoachScreen() {
       const result = await generateProgram(draft);
       setGenerated(result.generated);
       setProfile(draft);
-      Alert.alert(
+      dialog.alert(
         'Program generated',
         `${result.generated.name} is now in your program list.`,
       );
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Generation failed. Try again.';
-      Alert.alert('Generation failed', message);
+      dialog.alert('Generation failed', message);
     } finally {
       setGenerating(false);
     }
@@ -530,7 +530,7 @@ const styles = StyleSheet.create({
   sportLabel: { fontSize: 13, fontWeight: '600', marginBottom: 6 },
   sportPickers: { flexDirection: 'row', gap: 12 },
   notesInput: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceRaised,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: colors.border,
@@ -538,6 +538,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     minHeight: 70,
     textAlignVertical: 'top',
+    color: colors.text,
   },
   actionsRow: { flexDirection: 'row', gap: 10, marginTop: 8 },
   secondaryBtn: {

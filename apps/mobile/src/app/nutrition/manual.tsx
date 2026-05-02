@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -20,6 +19,7 @@ import {
   suggestMealType,
 } from '../../components/FoodItemEditor';
 import { colors, spacing, radii, typography } from '../../theme';
+import { dialog } from '../../services/dialog';
 
 /**
  * Manual entry — no photo, no AI. The lightweight path for trivial things
@@ -50,11 +50,11 @@ export default function ManualEntryScreen() {
 
   const handleSave = async () => {
     if (items.length === 0) {
-      Alert.alert('No items', 'Add at least one item.');
+      dialog.alert('No items', 'Add at least one item.');
       return;
     }
     if (items.some((it) => !it.name.trim())) {
-      Alert.alert('Missing names', 'Every item needs a name.');
+      dialog.alert('Missing names', 'Every item needs a name.');
       return;
     }
     setSaving(true);
@@ -68,7 +68,7 @@ export default function ManualEntryScreen() {
       });
       router.replace('/');
     } catch (err) {
-      Alert.alert(
+      dialog.alert(
         'Save failed',
         err instanceof Error ? err.message : 'Try again.',
       );

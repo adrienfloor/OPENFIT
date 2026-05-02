@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { apiClient } from '../../services/api';
 import { useAuthStore } from '../../stores/auth.store';
@@ -11,6 +11,7 @@ import {
 } from '@openfit/fitness-core';
 import { calculateAge, formatDuration } from '../../utils';
 import { colors, spacing, radii, typography } from '../../theme';
+import { dialog } from '../../services/dialog';
 
 type SessionState = 'idle' | 'running' | 'paused' | 'finished';
 
@@ -187,9 +188,9 @@ export default function JiuJitsuScreen() {
     try {
       await apiClient.post('/workouts/logs', payload);
       const calText = caloriesBurned ? ` · ${Math.round(caloriesBurned)} kcal` : '';
-      Alert.alert('Session saved', `${formatDuration(elapsed)}${calText}`);
+      dialog.alert('Session saved', `${formatDuration(elapsed)}${calText}`);
     } catch {
-      Alert.alert('Saved locally', 'Will sync when back online.');
+      dialog.alert('Saved locally', 'Will sync when back online.');
     }
 
     setState('idle');
@@ -200,7 +201,7 @@ export default function JiuJitsuScreen() {
   };
 
   const handleDiscard = () => {
-    Alert.alert('Discard session?', 'This cannot be undone.', [
+    dialog.alert('Discard session?', 'This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Discard',

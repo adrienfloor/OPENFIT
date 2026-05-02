@@ -82,6 +82,54 @@ function endOfDay(date: Date): Date {
 }
 
 /**
+ * Group records by `metadata.dataOrigin.packageName`. Health Connect can hold
+ * multiple writers for the same record type (Zepp + Samsung Health + phone
+ * pedometer), and `aggregateRecord` would sum them across non-overlapping
+ * windows — inflating totals when each source writes at a different cadence.
+ * Picking the source with the most records returns the wearable's stream
+ * (worn all day → high record count) over a one-shot writer.
+ */
+type WithOrigin = { metadata?: { dataOrigin?: string } };
+
+function sumDominantSource<T extends WithOrigin>(
+  records: T[],
+  getKcal: (r: T) => number,
+): number {
+  if (records.length === 0) return 0;
+  const bySource = new Map<string, { count: number; sum: number }>();
+  for (const r of records) {
+    const key = r.metadata?.dataOrigin ?? 'unknown';
+    const cur = bySource.get(key) ?? { count: 0, sum: 0 };
+    cur.count += 1;
+    cur.sum += getKcal(r);
+    bySource.set(key, cur);
+  }
+  // Most records wins; tiebreak by larger sum.
+  let best: { count: number; sum: number } | null = null;
+  for (const v of bySource.values()) {
+    if (!best || v.count > best.count || (v.count === best.count && v.sum > best.sum)) {
+      best = v;
+    }
+  }
+  return best?.sum ?? 0;
+}
+
+function bySourceSummary<T extends WithOrigin>(
+  records: T[],
+  getKcal: (r: T) => number,
+): Record<string, { count: number; sum: number }> {
+  const out: Record<string, { count: number; sum: number }> = {};
+  for (const r of records) {
+    const key = r.metadata?.dataOrigin ?? 'unknown';
+    const cur = out[key] ?? { count: 0, sum: 0 };
+    cur.count += 1;
+    cur.sum += getKcal(r);
+    out[key] = cur;
+  }
+  return out;
+}
+
+/**
  * Initialize Health Connect and check SDK availability.
  * Must be called once on app start.
  * Returns false if Health Connect is not installed — in that case,
@@ -165,11 +213,17 @@ export async function getDailyStats(
     // across data sources (e.g. phone pedometer + Zepp both writing Steps)
     // using its priority rules; readRecords would return raw per-source
     // records and summing them double-counts overlapping windows.
+    //
+    // Calorie records are pulled raw because HC's aggregate sums across
+    // every writer for non-overlapping windows. With Samsung Health and Zepp
+    // both writing TotalCaloriesBurned at different cadences, the sum
+    // inflates the day total. We instead pick the single dominant source
+    // (most records written that day = the wearable that's worn all day).
     const [
       sleep,
       stepsAgg,
-      activeCalAgg,
-      totalCalAgg,
+      activeCalRaw,
+      totalCalRaw,
       restingHRAgg,
       spo2,
       regularity,
@@ -179,14 +233,12 @@ export async function getDailyStats(
       aggregateRecord({ recordType: 'Steps', timeRangeFilter }).catch(
         () => null,
       ),
-      aggregateRecord({
-        recordType: 'ActiveCaloriesBurned',
-        timeRangeFilter,
-      }).catch(() => null),
-      aggregateRecord({
-        recordType: 'TotalCaloriesBurned',
-        timeRangeFilter,
-      }).catch(() => null),
+      readRecords('ActiveCaloriesBurned', { timeRangeFilter }).catch(
+        () => ({ records: [] }),
+      ),
+      readRecords('TotalCaloriesBurned', { timeRangeFilter }).catch(
+        () => ({ records: [] }),
+      ),
       aggregateRecord({
         recordType: 'RestingHeartRate',
         timeRangeFilter,
@@ -224,8 +276,23 @@ export async function getDailyStats(
     }).catch(() => ({ records: [] }));
 
     const totalSteps = stepsAgg?.COUNT_TOTAL ?? 0;
-    const totalTotalCal = totalCalAgg?.ENERGY_TOTAL.inKilocalories ?? 0;
-    const rawActiveCal = activeCalAgg?.ACTIVE_CALORIES_TOTAL.inKilocalories ?? 0;
+    const totalTotalCal = sumDominantSource(
+      totalCalRaw.records,
+      (r) => r.energy.inKilocalories,
+    );
+    const rawActiveCal = sumDominantSource(
+      activeCalRaw.records,
+      (r) => r.energy.inKilocalories,
+    );
+    if (__DEV__) {
+      console.log('[HC] calories breakdown', {
+        date: dayStart.toISOString().slice(0, 10),
+        total: bySourceSummary(totalCalRaw.records, (r) => r.energy.inKilocalories),
+        active: bySourceSummary(activeCalRaw.records, (r) => r.energy.inKilocalories),
+        chosenTotal: totalTotalCal,
+        chosenActive: rawActiveCal,
+      });
+    }
 
     // Zepp's "Consommation d'activité" = TotalCaloriesBurned − BMR.
     // Zepp does not write BasalMetabolicRate records to Health Connect, so we

@@ -32,7 +32,7 @@ const TONE_FG: Record<NonNullable<Props['status']>['tone'], string> = {
 };
 
 /**
- * Compact row used in the "Métriques de base" stack on Home → Overview.
+ * Compact row used in the "Base metrics" stack on Home → Overview.
  * Layout matches Zepp's compact stat rows: icon | label | value | tone
  * pill, with a chevron when tappable.
  */

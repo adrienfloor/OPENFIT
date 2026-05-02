@@ -27,8 +27,8 @@ interface Props {
 }
 
 /**
- * Larger Overview block — used for Santé cardiaque / Pas / Calories /
- * PAI / Poids cards. The shape mirrors Zepp's stat cards: title row at
+ * Larger Overview block — used for Heart health / Steps / Calories /
+ * PAI / Weight cards. The shape mirrors Zepp's stat cards: title row at
  * the top, big number, sub-line, optional progress bar, optional custom
  * footer for inline charts.
  */

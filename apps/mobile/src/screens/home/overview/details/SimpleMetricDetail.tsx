@@ -26,8 +26,8 @@ interface Props {
 /**
  * One-size-fits-most detail modal for metrics whose deep-dive is
  * "current value + 7-day chart + plain-language explanation". Used
- * by Charge d'effort, Statut de l'entraînement, VO₂ Max, Durée
- * Sommeil, Variabilité de FC, PAI, and the 7-day deep-dives that
+ * by Effort load, Training status, VO₂ Max, Sleep duration, Heart
+ * rate variability, PAI, and the 7-day deep-dives that
  * Slice 4–6 will reuse for BioCharge / Sleep / Effort sub-tabs.
  */
 export function SimpleMetricDetail({

@@ -38,11 +38,11 @@ const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
  *   • Tri-ring header (Sleep / BioCharge / Effort) — non-tappable; the
  *     deep dives live in the sibling sub-tabs.
  *   • AI insight card — taps to expand reasoning bottom sheet.
- *   • Métriques de base: 5 compact rows (Charge d'effort, Statut de
- *     l'entraînement, VO₂ Max, Durée Sommeil, Variabilité de FC).
- *     Each opens its own DetailModal.
+ *   • Base metrics: 5 compact rows (Effort load, Training status,
+ *     VO₂ Max, Sleep duration, Heart rate variability). Each opens
+ *     its own DetailModal.
  *   • Nutrition card — existing component, untouched.
- *   • Large MetricCards: Santé cardiaque, Pas, Calories, PAI, Poids.
+ *   • Large MetricCards: Heart health, Steps, Calories, PAI, Weight.
  *     Each opens its own DetailModal.
  *
  * Mocks where data isn't live yet (VO₂ Max, training-status numbers,
@@ -137,17 +137,17 @@ export function HomeOverview() {
       {/* AI insight */}
       <AIInsightCard />
 
-      {/* Métriques de base */}
-      <Text style={styles.sectionLabel}>Métriques de base</Text>
+      {/* Base metrics */}
+      <Text style={styles.sectionLabel}>Base metrics</Text>
       <MetricRow
-        label="Charge d'effort"
+        label="Effort load"
         value={`${fatigue.current}`}
         status={{ text: 'BALANCED', tone: 'good' }}
         icon={<MetricGlyph color={colors.warning}>⌃</MetricGlyph>}
         onPress={() => setDetail('fatigueLoad')}
       />
       <MetricRow
-        label="Statut de l'entraînement"
+        label="Training status"
         value={`${trainingStatus.current}`}
         status={{ text: trainingStatus.label.toUpperCase(), tone: 'neutral' }}
         icon={<MetricGlyph color={colors.sleep}>↻</MetricGlyph>}
@@ -161,13 +161,13 @@ export function HomeOverview() {
         onPress={() => setDetail('vo2max')}
       />
       <MetricRow
-        label="Durée Sommeil"
+        label="Sleep duration"
         value={sleepHours}
         icon={<MetricGlyph color={colors.sleep}>☾</MetricGlyph>}
         onPress={() => setDetail('sleepDuration')}
       />
       <MetricRow
-        label="Variabilité de FC"
+        label="Heart rate variability"
         value={hrv}
         status={{ text: 'OPTIMAL', tone: 'good' }}
         icon={<MetricGlyph color={colors.danger}>~</MetricGlyph>}
@@ -182,7 +182,7 @@ export function HomeOverview() {
       <Text style={styles.sectionLabel}>Today</Text>
 
       <MetricCard
-        title="Santé cardiaque"
+        title="Heart health"
         icon="♥"
         value={today?.heartRateResting != null ? `${today.heartRateResting}` : '--'}
         unit="bpm"
@@ -191,7 +191,7 @@ export function HomeOverview() {
       />
 
       <MetricCard
-        title="Pas"
+        title="Steps"
         icon="👟"
         value={today?.steps?.toLocaleString() ?? '--'}
         subtitle={
@@ -230,7 +230,7 @@ export function HomeOverview() {
       />
 
       <MetricCard
-        title="Poids"
+        title="Weight"
         icon="⚖"
         value={weight.current.toFixed(1)}
         unit="kg"
@@ -245,7 +245,7 @@ export function HomeOverview() {
         visible={detail === 'fatigueLoad'}
         onClose={close}
         eyebrow="Effort"
-        title="Charge d'effort"
+        title="Effort load"
         value={`${fatigue.current}`}
         status={fatigue.status.toUpperCase()}
         trend={fatigue.trend7Days.map((p) => p.value)}
@@ -258,7 +258,7 @@ export function HomeOverview() {
         visible={detail === 'trainingStatus'}
         onClose={close}
         eyebrow="Effort"
-        title="Statut de l'entraînement"
+        title="Training status"
         value={`${trainingStatus.current >= 0 ? '+' : ''}${trainingStatus.current}`}
         status={trainingStatus.label.toUpperCase()}
         trend={trainingStatus.trend7Days.map((p) => p.value)}
@@ -285,7 +285,7 @@ export function HomeOverview() {
         visible={detail === 'sleepDuration'}
         onClose={close}
         eyebrow="Sleep"
-        title="Durée Sommeil"
+        title="Sleep duration"
         value={sleepHours}
         trend={[440, 510, 480, 520, 460, 530, today?.sleepDurationMinutes ?? 480].map(
           (m) => Math.round(m / 6) / 10,
@@ -299,7 +299,7 @@ export function HomeOverview() {
         visible={detail === 'hrv'}
         onClose={close}
         eyebrow="Recovery"
-        title="Variabilité de FC"
+        title="Heart rate variability"
         value={today?.hrvRmssd != null ? `${Math.round(today.hrvRmssd)}` : '--'}
         unit="ms"
         status="OPTIMAL"

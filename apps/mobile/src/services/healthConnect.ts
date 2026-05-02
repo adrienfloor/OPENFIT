@@ -91,20 +91,26 @@ function endOfDay(date: Date): Date {
 type WithOrigin = { metadata?: { dataOrigin?: string } };
 
 /**
- * Identify the package writing the most records. Wearables write Steps every
- * few minutes all day, so that source dominates by record count and is the
- * one Zepp's display should agree with.
+ * Identify the package writing the largest total value (e.g. most steps,
+ * not most step records). The phone pedometer writes many tiny Step
+ * records during walks while a wearable like Zepp writes fewer but
+ * larger chunks — by record count the phone wins, by total value the
+ * wearable wins. Total-value matches what HC's aggregate dedup picks
+ * via priority rules.
  */
-function dominantSource<T extends WithOrigin>(records: T[]): string | null {
+function dominantSource<T extends WithOrigin>(
+  records: T[],
+  getValue: (r: T) => number,
+): string | null {
   if (records.length === 0) return null;
-  const counts = new Map<string, number>();
+  const sums = new Map<string, number>();
   for (const r of records) {
     const key = r.metadata?.dataOrigin ?? 'unknown';
-    counts.set(key, (counts.get(key) ?? 0) + 1);
+    sums.set(key, (sums.get(key) ?? 0) + getValue(r));
   }
-  let best: { key: string; count: number } | null = null;
-  for (const [key, count] of counts.entries()) {
-    if (!best || count > best.count) best = { key, count };
+  let best: { key: string; sum: number } | null = null;
+  for (const [key, sum] of sums.entries()) {
+    if (!best || sum > best.sum) best = { key, sum };
   }
   return best?.key ?? null;
 }
@@ -282,7 +288,7 @@ export async function getDailyStats(
     // displayed total; Samsung Health (or any other writer) runs a
     // different model. We use the wearable package as a filter on
     // calories so the day total comes from one consistent source.
-    const wearablePackage = dominantSource(stepsRaw.records);
+    const wearablePackage = dominantSource(stepsRaw.records, (r) => r.count);
 
     // HRV is a sleep / wake-transition metric — its value comes from the
     // autonomic state at rest. Averaging over the calendar day would mix in
@@ -320,14 +326,14 @@ export async function getDailyStats(
         (r) => (r.metadata?.dataOrigin ?? 'unknown') === wearablePackage,
       )
         ? wearablePackage
-        : dominantSource(totalCalRaw.records);
+        : dominantSource(totalCalRaw.records, (r) => r.energy.inKilocalories);
     const activeCalPackage =
       wearablePackage !== null &&
       activeCalRaw.records.some(
         (r) => (r.metadata?.dataOrigin ?? 'unknown') === wearablePackage,
       )
         ? wearablePackage
-        : dominantSource(activeCalRaw.records);
+        : dominantSource(activeCalRaw.records, (r) => r.energy.inKilocalories);
     const totalTotalCal = sumBySource(
       totalCalRaw.records,
       (r) => r.energy.inKilocalories,

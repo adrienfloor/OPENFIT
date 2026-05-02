@@ -483,6 +483,80 @@ export function useMockSleepInsight(): AIInsight {
   };
 }
 
+export interface FitnessLevel {
+  current: number;
+  /** Trend in cyan in the screenshots — typically rises with consistent training. */
+  trend7Days: TrendPoint[];
+}
+
+export function useMockFitnessLevel(): FitnessLevel {
+  return {
+    current: 70,
+    trend7Days: sevenDayTrend([59, 66, 76, 79, 77, 69, 70]),
+  };
+}
+
+export interface DailyActivity {
+  kind: 'daily' | 'workout';
+  label: string;
+  /** Effort minutes earned. */
+  earnedMinutes: number;
+  startTime?: Date;
+  endTime?: Date;
+  /** Optional workout-log id so the row can drill into its detail. */
+  workoutLogId?: string;
+}
+
+export function useMockTodayActivities(input: {
+  earnedMinutes: number | null;
+}): DailyActivity[] {
+  // Split today's earned minutes between background daily activity and the
+  // logged cross-training session shown in BioCharge mocks.
+  const total = input.earnedMinutes ?? 92;
+  const dailyShare = Math.max(0, Math.min(20, Math.round(total * 0.15)));
+  const workoutShare = Math.max(0, total - dailyShare);
+
+  const today = new Date();
+  const start = new Date(today);
+  start.setHours(13, 8, 0, 0);
+  const end = new Date(today);
+  end.setHours(13, 44, 0, 0);
+
+  return [
+    {
+      kind: 'daily',
+      label: 'Daily activity',
+      earnedMinutes: dailyShare,
+    },
+    {
+      kind: 'workout',
+      label: 'Cross-training',
+      earnedMinutes: workoutShare,
+      startTime: start,
+      endTime: end,
+    },
+  ];
+}
+
+export function useMockEffortInsight(): AIInsight {
+  return {
+    window: 'afternoon',
+    headline: 'Target hit — fitness trend is climbing.',
+    body:
+      'Today’s session pushed earned effort minutes past the personalised ' +
+      'target with sustained time in zone 4. Your 7-day fitness curve is ' +
+      'still rising while fatigue dropped over the weekend — a productive ' +
+      'spot. Keep one easy day in the next 48 h to bank the gain.',
+    inputs: [
+      'Effort 100% (92/32 min)',
+      'Workout cost: 78 effort min',
+      '7d fitness +2 vs week prior',
+      'Training status −4 (balanced)',
+    ],
+    generatedAt: new Date(),
+  };
+}
+
 export function useMockBioChargeInsight(): AIInsight {
   return {
     window: 'afternoon',

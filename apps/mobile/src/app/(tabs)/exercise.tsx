@@ -50,7 +50,7 @@ function typeColor(type: WorkoutType): string {
   return '#3b82f6';
 }
 
-export default function WorkoutPickerScreen() {
+export default function ExerciseScreen() {
   const router = useRouter();
   const [recent, setRecent] = useState<RecentLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,8 +82,18 @@ export default function WorkoutPickerScreen() {
       style={styles.container}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchRecent} />}
     >
-      <Text style={styles.title}>Workout</Text>
-      <Text style={styles.subtitle}>Pick a session type to start</Text>
+      <View style={styles.titleRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.title}>Exercise</Text>
+          <Text style={styles.subtitle}>Pick a session type to start</Text>
+        </View>
+        <TouchableOpacity
+          onPress={() => router.push('/(tabs)/history')}
+          style={styles.historyBtn}
+        >
+          <Text style={styles.historyBtnText}>History →</Text>
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.pickerGrid}>
         <TouchableOpacity
@@ -153,8 +163,16 @@ export default function WorkoutPickerScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb', paddingHorizontal: 16, paddingTop: 56 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   title: { fontSize: 28, fontWeight: 'bold', marginBottom: 4 },
-  subtitle: { fontSize: 14, color: '#6b7280', marginBottom: 20 },
+  subtitle: { fontSize: 14, color: '#6b7280' },
+  historyBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#f3f4f6',
+  },
+  historyBtnText: { fontSize: 13, color: '#374151', fontWeight: '600' },
   pickerGrid: { gap: 12 },
   pickerCard: { borderRadius: 16, padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16 },
   pickerEmoji: { fontSize: 40 },

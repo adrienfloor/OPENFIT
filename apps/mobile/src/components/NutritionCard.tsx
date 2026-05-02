@@ -137,22 +137,26 @@ export function NutritionCard() {
             </View>
           )}
 
-          {/* Thumbnail strip of today's meal photos — tap to open detail. */}
-          {logs.some((l) => l.photoUrl) && (
-            <View style={styles.thumbsRow}>
-              {logs
-                .filter((l) => l.photoUrl)
-                .slice(0, 6)
-                .map((l) => (
-                  <TouchableOpacity
-                    key={l.id}
-                    onPress={() => router.push(`/nutrition/log/${l.id}`)}
-                  >
-                    <AuthedImage path={l.photoUrl} style={styles.thumb} />
-                  </TouchableOpacity>
-                ))}
-            </View>
-          )}
+          {/* Thumbnail strip of today's meals — photo if present,
+              otherwise a labelled placeholder using the first item name. */}
+          <View style={styles.thumbsRow}>
+            {logs.slice(0, 6).map((l) => (
+              <TouchableOpacity
+                key={l.id}
+                onPress={() => router.push(`/nutrition/log/${l.id}`)}
+              >
+                {l.photoUrl ? (
+                  <AuthedImage path={l.photoUrl} style={styles.thumb} />
+                ) : (
+                  <View style={[styles.thumb, styles.thumbFallback]}>
+                    <Text style={styles.thumbFallbackText} numberOfLines={2}>
+                      {fallbackLabel(l.items[0]?.name)}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
         </>
       )}
 
@@ -170,6 +174,12 @@ interface MacroBarProps {
   value: number;
   target: number | null;
   color: string;
+}
+
+function fallbackLabel(name: string | undefined): string {
+  if (!name || !name.trim()) return 'Meal';
+  const trimmed = name.trim();
+  return trimmed.length > 16 ? trimmed.slice(0, 15).trimEnd() + '…' : trimmed;
 }
 
 function MacroBar({ label, value, target, color }: MacroBarProps) {
@@ -247,6 +257,21 @@ const styles = StyleSheet.create({
   },
   thumbsRow: { flexDirection: 'row', gap: 6, marginTop: 12, flexWrap: 'wrap' },
   thumb: { width: 56, height: 56, borderRadius: 8, backgroundColor: '#f3f4f6' },
+  thumbFallback: {
+    backgroundColor: '#ecfdf5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  thumbFallbackText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#15803d',
+    textAlign: 'center',
+    lineHeight: 12,
+  },
   balancePill: {
     flexDirection: 'row',
     alignItems: 'baseline',

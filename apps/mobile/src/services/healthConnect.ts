@@ -83,63 +83,11 @@ function endOfDay(date: Date): Date {
 
 /**
  * Health Connect can hold multiple writers for the same record type (Zepp +
- * Samsung Health + phone pedometer). `aggregateRecord` sums across writers for
- * non-overlapping windows — inflating totals when each source writes at a
- * different cadence. We pick a single canonical package (the wearable's
- * Steps stream) and read other metrics through that filter.
+ * Samsung Health + phone pedometer). For most metrics we trust HC's
+ * aggregate dedup. For diagnostics we sometimes want to see who wrote
+ * what — `bySourceSummary` groups raw records by package.
  */
 type WithOrigin = { metadata?: { dataOrigin?: string } };
-
-/**
- * Identify the package writing the largest total value (e.g. most steps,
- * not most step records). The phone pedometer writes many tiny Step
- * records during walks while a wearable like Zepp writes fewer but
- * larger chunks — by record count the phone wins, by total value the
- * wearable wins. Total-value matches what HC's aggregate dedup picks
- * via priority rules.
- */
-function dominantSource<T extends WithOrigin>(
-  records: T[],
-  getValue: (r: T) => number,
-): string | null {
-  if (records.length === 0) return null;
-  const sums = new Map<string, number>();
-  for (const r of records) {
-    const key = r.metadata?.dataOrigin ?? 'unknown';
-    sums.set(key, (sums.get(key) ?? 0) + getValue(r));
-  }
-  let best: { key: string; sum: number } | null = null;
-  for (const [key, sum] of sums.entries()) {
-    if (!best || sum > best.sum) best = { key, sum };
-  }
-  return best?.key ?? null;
-}
-
-/**
- * Sum a numeric field over records originating from `pkg`. If `pkg` is null
- * (no records to identify a wearable) sum the largest single source — better
- * than zero, and matches the Phase 2.1 behaviour for users with only one
- * writer.
- */
-function sumBySource<T extends WithOrigin>(
-  records: T[],
-  getValue: (r: T) => number,
-  pkg: string | null,
-): number {
-  if (records.length === 0) return 0;
-  if (pkg !== null) {
-    return records
-      .filter((r) => (r.metadata?.dataOrigin ?? 'unknown') === pkg)
-      .reduce((sum, r) => sum + getValue(r), 0);
-  }
-  // Fallback: pick the source with the largest sum (single writer case).
-  const bySource = new Map<string, number>();
-  for (const r of records) {
-    const key = r.metadata?.dataOrigin ?? 'unknown';
-    bySource.set(key, (bySource.get(key) ?? 0) + getValue(r));
-  }
-  return Math.max(0, ...bySource.values());
-}
 
 function bySourceSummary<T extends WithOrigin>(
   records: T[],
@@ -241,20 +189,20 @@ export async function getDailyStats(
     // using its priority rules; readRecords would return raw per-source
     // records and summing them double-counts overlapping windows.
     //
-    // Calorie records are pulled raw because HC's aggregate sums across
-    // every writer for non-overlapping windows. With Samsung Health and Zepp
-    // both writing TotalCaloriesBurned at different cadences, the sum
-    // inflates the day total. We additionally read Steps records to
-    // discover which package owns the user's wearable stream (whichever
-    // package wrote the most Steps records is the wearable worn all day),
-    // then filter calorie sums to that single package — locks calorie
-    // numbers onto the same source HC's aggregate already favours for
-    // steps.
+    // For TotalCaloriesBurned we use HC's aggregate (not raw per-source
+    // sums) because HC synthesises a meaningful total even when individual
+    // writers leave gaps — Zepp on Helio Strap, for example, writes only
+    // ~70 kcal of TotalCaloriesBurned for a full day while the in-app
+    // display shows 1100+. HC's aggregate fills those gaps from Active +
+    // BMR records across sources. Raw reads still happen so we can log
+    // which package contributed what for diagnosis.
     const [
       sleep,
       stepsAgg,
       stepsRaw,
+      activeCalAgg,
       activeCalRaw,
+      totalCalAgg,
       totalCalRaw,
       restingHRAgg,
       spo2,
@@ -266,9 +214,17 @@ export async function getDailyStats(
         () => null,
       ),
       readRecords('Steps', { timeRangeFilter }).catch(() => ({ records: [] })),
+      aggregateRecord({
+        recordType: 'ActiveCaloriesBurned',
+        timeRangeFilter,
+      }).catch(() => null),
       readRecords('ActiveCaloriesBurned', { timeRangeFilter }).catch(
         () => ({ records: [] }),
       ),
+      aggregateRecord({
+        recordType: 'TotalCaloriesBurned',
+        timeRangeFilter,
+      }).catch(() => null),
       readRecords('TotalCaloriesBurned', { timeRangeFilter }).catch(
         () => ({ records: [] }),
       ),
@@ -282,13 +238,6 @@ export async function getDailyStats(
       getSleepRegularity(current).catch(() => null),
       getDayHRSamples(current).catch(() => [] as EffortHRSample[]),
     ]);
-
-    // Whichever package wrote the most Steps records today owns this
-    // user's wearable stream. Zepp's TotalCaloriesBurned matches their
-    // displayed total; Samsung Health (or any other writer) runs a
-    // different model. We use the wearable package as a filter on
-    // calories so the day total comes from one consistent source.
-    const wearablePackage = dominantSource(stepsRaw.records, (r) => r.count);
 
     // HRV is a sleep / wake-transition metric — its value comes from the
     // autonomic state at rest. Averaging over the calendar day would mix in
@@ -316,45 +265,22 @@ export async function getDailyStats(
     }).catch(() => ({ records: [] }));
 
     const totalSteps = stepsAgg?.COUNT_TOTAL ?? 0;
-    // Prefer the wearable's stream, but if the wearable doesn't write
-    // calorie records (Zepp on some devices is Steps-only), fall back to
-    // whichever single package wrote the most calorie records — better
-    // than showing nothing.
-    const totalCalPackage =
-      wearablePackage !== null &&
-      totalCalRaw.records.some(
-        (r) => (r.metadata?.dataOrigin ?? 'unknown') === wearablePackage,
-      )
-        ? wearablePackage
-        : dominantSource(totalCalRaw.records, (r) => r.energy.inKilocalories);
-    const activeCalPackage =
-      wearablePackage !== null &&
-      activeCalRaw.records.some(
-        (r) => (r.metadata?.dataOrigin ?? 'unknown') === wearablePackage,
-      )
-        ? wearablePackage
-        : dominantSource(activeCalRaw.records, (r) => r.energy.inKilocalories);
-    const totalTotalCal = sumBySource(
-      totalCalRaw.records,
-      (r) => r.energy.inKilocalories,
-      totalCalPackage,
-    );
-    const rawActiveCal = sumBySource(
-      activeCalRaw.records,
-      (r) => r.energy.inKilocalories,
-      activeCalPackage,
-    );
+    const totalTotalCal = totalCalAgg?.ENERGY_TOTAL.inKilocalories ?? 0;
+    const rawActiveCal = activeCalAgg?.ACTIVE_CALORIES_TOTAL.inKilocalories ?? 0;
     if (__DEV__) {
       console.log('[HC] calories breakdown', {
         date: dayStart.toISOString().slice(0, 10),
-        wearablePackage,
-        totalCalPackage,
-        activeCalPackage,
-        steps: bySourceSummary(stepsRaw.records, (r) => r.count),
-        total: bySourceSummary(totalCalRaw.records, (r) => r.energy.inKilocalories),
-        active: bySourceSummary(activeCalRaw.records, (r) => r.energy.inKilocalories),
-        chosenTotal: totalTotalCal,
-        chosenActive: rawActiveCal,
+        aggregateTotal: totalTotalCal,
+        aggregateActive: rawActiveCal,
+        rawTotalBySource: bySourceSummary(
+          totalCalRaw.records,
+          (r) => r.energy.inKilocalories,
+        ),
+        rawActiveBySource: bySourceSummary(
+          activeCalRaw.records,
+          (r) => r.energy.inKilocalories,
+        ),
+        rawStepsBySource: bySourceSummary(stepsRaw.records, (r) => r.count),
       });
     }
 

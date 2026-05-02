@@ -150,6 +150,131 @@ export function useMockPAI(): PAI {
   };
 }
 
+export interface IntradayPoint {
+  /** Minutes since local midnight. */
+  minute: number;
+  value: number;
+}
+
+export interface DailyEvent {
+  kind: 'sleep' | 'workout';
+  label: string;
+  /** Positive = added BioCharge, negative = consumed it. */
+  delta: number;
+  startTime: Date;
+  endTime: Date;
+}
+
+export interface BioChargeDashboard {
+  /** Latest score, 0-100. Real version reads from today.recoveryScore. */
+  current: number;
+  lastUpdated: Date;
+  /** BioCharge at wake — typically the day's peak. */
+  wakeScore: number;
+  /** Sleep contribution in BioCharge points. */
+  sleepContribution: number;
+  intraday: IntradayPoint[];
+  events: DailyEvent[];
+  /** Last 7 days. Index 0 = oldest, last = today. */
+  wakeTrend7Days: TrendPoint[];
+  hrvTrend7Days: TrendPoint[];
+  rhrTrend7Days: TrendPoint[];
+}
+
+export function useMockBioCharge(latestScore: number | null): BioChargeDashboard {
+  const score = latestScore ?? 58;
+  const wake = Math.min(100, score + 20);
+
+  // Intraday curve: starts climbing during sleep (00:00–08:00), plateaus
+  // until early afternoon, dips after a midday workout, then drifts down
+  // toward evening. Sample every 30 min.
+  const intraday: IntradayPoint[] = [];
+  for (let m = 0; m <= 24 * 60; m += 30) {
+    const h = m / 60;
+    let value: number;
+    if (h <= 8) {
+      // Sleep window — climbs from 65 to ~95.
+      value = 65 + (h / 8) * 30;
+    } else if (h <= 12) {
+      // Morning plateau, gentle drift.
+      value = 95 - (h - 8) * 0.5;
+    } else if (h <= 14) {
+      // Workout drop.
+      value = 93 - (h - 12) * 18;
+    } else {
+      // Afternoon decay.
+      value = Math.max(score, 57 + (16 - h) * 0.4);
+    }
+    intraday.push({ minute: m, value: Math.round(value) });
+  }
+
+  // 7-day mock series anchored on today's value.
+  const wakeTrend7Days = sevenDayTrend([92, 87, 85, 82, 81, 77, wake]);
+  const hrvTrend7Days = sevenDayTrend([67, 67, 69, 67, 71, 65, 71]);
+  const rhrTrend7Days = sevenDayTrend([43, 46, 47, 47, 47, 47, 42]);
+
+  // Today's events. Sleep contributed +35 BioCharge, mid-day cross-training
+  // session burned −12.
+  const today = new Date();
+  const sleepStart = new Date(today);
+  sleepStart.setDate(sleepStart.getDate() - 1);
+  sleepStart.setHours(22, 19, 0, 0);
+  const sleepEnd = new Date(today);
+  sleepEnd.setHours(8, 11, 0, 0);
+  const workoutStart = new Date(today);
+  workoutStart.setHours(13, 8, 0, 0);
+  const workoutEnd = new Date(today);
+  workoutEnd.setHours(13, 44, 0, 0);
+
+  const events: DailyEvent[] = [
+    {
+      kind: 'sleep',
+      label: 'Sleep',
+      delta: 35,
+      startTime: sleepStart,
+      endTime: sleepEnd,
+    },
+    {
+      kind: 'workout',
+      label: 'Cross-training',
+      delta: -12,
+      startTime: workoutStart,
+      endTime: workoutEnd,
+    },
+  ];
+
+  return {
+    current: score,
+    lastUpdated: new Date(),
+    wakeScore: wake,
+    sleepContribution: 35,
+    intraday,
+    events,
+    wakeTrend7Days,
+    hrvTrend7Days,
+    rhrTrend7Days,
+  };
+}
+
+export function useMockBioChargeInsight(): AIInsight {
+  return {
+    window: 'afternoon',
+    headline: 'BioCharge holding steady — push or rest both work.',
+    body:
+      'Your BioCharge dropped 12 points during the cross-training block but recovered ' +
+      'most of the buffer afterward. With ~6 hours of awake time left and HRV near ' +
+      'baseline, a moderate evening session would only cost another ~10 points. ' +
+      'Skip the session if tomorrow is a heavy training day.',
+    inputs: [
+      'Wake BioCharge 92',
+      'Workout cost −12',
+      'Current 58',
+      'HRV 71 ms (baseline 67)',
+    ],
+    generatedAt: new Date(),
+  };
+}
+
 export function useMockWeight(): WeightTrend {
   // 30-day downward trend with daily noise.
   const start = 80.5;

@@ -7,8 +7,13 @@ import {
   Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useMockAIInsight } from '../mocks';
+import { useMockAIInsight, type AIInsight } from '../mocks';
 import { colors, spacing, radii, typography } from '../theme';
+
+interface CardProps {
+  /** Override the default Overview-flavored insight with a focus-specific one. */
+  insight?: AIInsight;
+}
 
 /**
  * AI insight card for Home → Overview.
@@ -21,8 +26,9 @@ import { colors, spacing, radii, typography } from '../theme';
  * Currently fed by a mock hook. Slice 9 swaps the source to
  * `/insights/today?focus=overview`.
  */
-export function AIInsightCard() {
-  const insight = useMockAIInsight();
+export function AIInsightCard({ insight: override }: CardProps = {}) {
+  const fallback = useMockAIInsight();
+  const insight = override ?? fallback;
   const [expanded, setExpanded] = useState(false);
   const insets = useSafeAreaInsets();
 

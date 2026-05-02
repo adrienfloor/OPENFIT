@@ -7,6 +7,8 @@ interface AuthState {
   user: UserProfile | null;
   isAuthenticated: boolean;
   setAuth: (tokens: AuthTokens, user: UserProfile) => Promise<void>;
+  /** Replace just the cached user profile (e.g. after a PATCH /auth/me). */
+  setUser: (user: UserProfile) => void;
   clearAuth: () => Promise<void>;
 }
 
@@ -20,6 +22,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     await saveRefreshToken(tokens.refreshToken);
     set({ accessToken: tokens.accessToken, user, isAuthenticated: true });
   },
+
+  setUser: (user) => set({ user }),
 
   clearAuth: async () => {
     setAccessToken(null);

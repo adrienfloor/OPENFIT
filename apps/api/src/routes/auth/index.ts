@@ -1,7 +1,17 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { AuthService } from '../../services/auth.service.js';
-import { RegisterInputSchema, LoginInputSchema, RefreshInputSchema } from '@openfit/types';
-import type { RegisterInput, LoginInput, RefreshInput } from '@openfit/types';
+import {
+  RegisterInputSchema,
+  LoginInputSchema,
+  RefreshInputSchema,
+  UpdateUserInputSchema,
+} from '@openfit/types';
+import type {
+  RegisterInput,
+  LoginInput,
+  RefreshInput,
+  UpdateUserInput,
+} from '@openfit/types';
 
 export const authRoutes: FastifyPluginAsync = async (fastify) => {
   const authService = new AuthService(fastify.prisma, (payload) =>
@@ -130,6 +140,34 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     async (request, reply) => {
       try {
         const profile = await authService.getProfile(request.user.sub);
+        return reply.status(200).send(profile);
+      } catch (err) {
+        if (err instanceof Error && 'statusCode' in err) {
+          const authErr = err as { statusCode: number; message: string };
+          return reply.status(authErr.statusCode).send({ error: authErr.message });
+        }
+        throw err;
+      }
+    },
+  );
+
+  // PATCH /auth/me — update name, DOB, weight, height, sex.
+  // Email and password updates require dedicated flows (not in this endpoint).
+  fastify.patch<{ Body: UpdateUserInput }>(
+    '/me',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const parsed = UpdateUserInputSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply
+          .status(400)
+          .send({ error: 'Validation error', details: parsed.error.flatten() });
+      }
+      try {
+        const profile = await authService.updateProfile(
+          request.user.sub,
+          parsed.data,
+        );
         return reply.status(200).send(profile);
       } catch (err) {
         if (err instanceof Error && 'statusCode' in err) {

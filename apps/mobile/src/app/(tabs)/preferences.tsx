@@ -1,72 +1,155 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../hooks/useAuth';
+import { dialog } from '../../services/dialog';
 import { colors, spacing, radii, typography } from '../../theme';
 import { useScreenTopPadding } from '../../theme/useScreenPadding';
 
 /**
- * Preferences tab — Slice 1 placeholder.
+ * Preferences tab — Slice 8.
  *
- * - Hosts the user identity block (lifted from the old Today header).
- * - Logout moved here so Home stays focused on the daily-stats Overview.
- * - Slice 8 will fill in: Profile editor (weight/height/sex/DOB), unit
- *   prefs, notifications, nutrition targets shortcut, coach profile
- *   shortcut.
+ * Sections:
+ *   • Profile card with the user's name + email and a tap → real
+ *     profile editor at /preferences/profile (PATCH /auth/me).
+ *   • Body stats summary (DOB / weight / height / sex) read straight
+ *     from the cached UserProfile so users see their values without
+ *     opening the editor.
+ *   • Shortcuts: nutrition targets (real), coaching profile (real).
+ *   • Settings stubs: units, notifications, theme — all "Soon".
+ *   • Logout button.
  */
 export default function PreferencesScreen() {
   const router = useRouter();
   const { user, logout } = useAuth();
   const topPadding = useScreenTopPadding();
 
+  const dob = user ? new Date(user.dateOfBirth) : null;
+  const dobLabel = dob
+    ? dob.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+    : '—';
+  const ageYears = dob
+    ? Math.floor((Date.now() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+    : null;
+
+  const onComingSoon = (feature: string) => () =>
+    dialog.alert(`${feature} — Coming soon`, 'This will land in a future slice.');
+
+  const onLogout = () =>
+    dialog.alert('Log out?', 'You can sign back in with the same email.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Log out', style: 'destructive', onPress: logout },
+    ]);
+
   return (
     <ScrollView style={[styles.container, { paddingTop: topPadding }]}>
       <Text style={styles.title}>Preferences</Text>
 
-      <View style={styles.profileCard}>
-        <Text style={styles.name}>{user?.name ?? 'athlete'}</Text>
-        <Text style={styles.email}>{user?.email ?? ''}</Text>
+      {/* Profile card */}
+      <TouchableOpacity
+        style={styles.profileCard}
+        activeOpacity={0.85}
+        onPress={() => router.push('/preferences/profile')}
+      >
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>
+            {user?.name?.[0]?.toUpperCase() ?? '?'}
+          </Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.name}>{user?.name ?? 'athlete'}</Text>
+          <Text style={styles.email}>{user?.email ?? ''}</Text>
+        </View>
+        <Text style={styles.chevron}>›</Text>
+      </TouchableOpacity>
+
+      {/* Body stats */}
+      <Text style={styles.sectionLabel}>Body</Text>
+      <View style={styles.statsCard}>
+        <StatRow
+          label="Date of birth"
+          value={ageYears != null ? `${dobLabel} · ${ageYears}y` : dobLabel}
+        />
+        <Divider />
+        <StatRow label="Weight" value={user ? `${user.weightKg} kg` : '—'} />
+        <Divider />
+        <StatRow label="Height" value={user ? `${user.heightCm} cm` : '—'} />
+        <Divider />
+        <StatRow
+          label="Sex"
+          value={user ? (user.sex === 'male' ? 'Male' : 'Female') : '—'}
+        />
       </View>
 
-      <Text style={styles.sectionLabel}>Profile</Text>
-      <PlaceholderRow label="Edit profile (weight, height, sex, DOB)" />
-
+      {/* Shortcuts */}
       <Text style={styles.sectionLabel}>Shortcuts</Text>
-      <TouchableOpacity
-        style={styles.row}
+      <ShortcutRow
+        label="Nutrition targets"
+        sub="Daily calories + macro split"
         onPress={() => router.push('/nutrition/targets')}
-      >
-        <Text style={styles.rowText}>Nutrition targets</Text>
-        <Text style={styles.chevron}>›</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={styles.row}
+      />
+      <ShortcutRow
+        label="Coaching profile"
+        sub="Goal, equipment, sessions/week"
         onPress={() => router.push('/(tabs)/coach')}
-      >
-        <Text style={styles.rowText}>Coaching profile</Text>
-        <Text style={styles.chevron}>›</Text>
-      </TouchableOpacity>
+      />
 
+      {/* Settings */}
       <Text style={styles.sectionLabel}>Settings</Text>
-      <PlaceholderRow label="Units" />
-      <PlaceholderRow label="Notifications" />
+      <ShortcutRow label="Units" sub="Metric · imperial" comingSoon onPress={onComingSoon('Units')} />
+      <ShortcutRow
+        label="Notifications"
+        sub="Quiet hours, reminders"
+        comingSoon
+        onPress={onComingSoon('Notifications')}
+      />
 
-      <View style={{ height: 24 }} />
+      <View style={{ height: spacing.xxl }} />
 
-      <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
+      <TouchableOpacity onPress={onLogout} style={styles.logoutBtn}>
         <Text style={styles.logoutText}>Log out</Text>
       </TouchableOpacity>
 
-      <View style={{ height: 40 }} />
+      <Text style={styles.versionText}>OpenFit · Phase 2.5</Text>
+      <View style={{ height: spacing.huge }} />
     </ScrollView>
   );
 }
 
-function PlaceholderRow({ label }: { label: string }) {
+interface StatRowProps {
+  label: string;
+  value: string;
+}
+
+function StatRow({ label, value }: StatRowProps) {
   return (
-    <View style={[styles.row, styles.rowDisabled]}>
-      <Text style={styles.rowText}>{label}</Text>
-      <Text style={styles.soon}>Soon</Text>
+    <View style={styles.statRow}>
+      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={styles.statValue}>{value}</Text>
     </View>
+  );
+}
+
+function Divider() {
+  return <View style={styles.divider} />;
+}
+
+interface ShortcutRowProps {
+  label: string;
+  sub?: string;
+  comingSoon?: boolean;
+  onPress: () => void;
+}
+
+function ShortcutRow({ label, sub, comingSoon, onPress }: ShortcutRowProps) {
+  return (
+    <TouchableOpacity style={styles.shortcutRow} onPress={onPress} activeOpacity={0.85}>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.shortcutLabel}>{label}</Text>
+        {sub ? <Text style={styles.shortcutSub}>{sub}</Text> : null}
+      </View>
+      {comingSoon ? <Text style={styles.soon}>Soon</Text> : null}
+      <Text style={styles.chevron}>›</Text>
+    </TouchableOpacity>
   );
 }
 
@@ -79,10 +162,26 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
   profileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
-    padding: spacing.lg,
-    marginBottom: spacing.xl,
+    paddingVertical: spacing.md + 2,
+    paddingHorizontal: spacing.lg,
+  },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    fontSize: typography.size.xl,
+    fontWeight: typography.weight.bold,
+    color: colors.bg,
   },
   name: {
     fontSize: typography.size.lg,
@@ -90,42 +189,87 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: 2,
   },
-  email: { fontSize: typography.size.sm, color: colors.textSecondary },
+  email: { fontSize: typography.size.xs + 1, color: colors.textSecondary },
+  chevron: { fontSize: typography.size.xl, color: colors.textMuted },
   sectionLabel: {
     fontSize: typography.size.xs,
-    color: colors.textSecondary,
+    color: colors.textMuted,
     fontWeight: typography.weight.semibold,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginTop: spacing.lg,
+    marginTop: spacing.xl,
     marginBottom: spacing.sm,
   },
-  row: {
+  statsCard: {
     backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    padding: spacing.md + 2,
-    marginBottom: spacing.xs + 2,
+    borderRadius: radii.lg,
+    paddingHorizontal: spacing.lg,
+  },
+  statRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    paddingVertical: spacing.md,
   },
-  rowDisabled: { opacity: 0.6 },
-  rowText: { fontSize: typography.size.sm, color: colors.text },
-  chevron: { fontSize: typography.size.lg, color: colors.textMuted },
+  statLabel: {
+    flex: 1,
+    fontSize: typography.size.sm + 1,
+    color: colors.textSecondary,
+    fontWeight: typography.weight.semibold,
+  },
+  statValue: {
+    fontSize: typography.size.md,
+    color: colors.text,
+    fontWeight: typography.weight.bold,
+  },
+  divider: { height: 1, backgroundColor: colors.borderSubtle },
+  shortcutRow: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  shortcutLabel: {
+    fontSize: typography.size.sm + 1,
+    color: colors.text,
+    fontWeight: typography.weight.semibold,
+  },
+  shortcutSub: {
+    fontSize: typography.size.xs + 1,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
   soon: {
-    fontSize: typography.size.xs,
+    fontSize: typography.size.xs - 1,
     color: colors.textMuted,
-    fontWeight: typography.weight.medium,
+    fontWeight: typography.weight.bold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    backgroundColor: colors.surfaceRaised,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radii.sm,
   },
   logoutBtn: {
     paddingVertical: spacing.md + 2,
     borderRadius: radii.md,
-    backgroundColor: colors.surface,
+    backgroundColor: 'rgba(239, 68, 68, 0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.35)',
     alignItems: 'center',
   },
   logoutText: {
-    fontSize: typography.size.sm,
+    fontSize: typography.size.md,
     color: colors.danger,
-    fontWeight: typography.weight.semibold,
+    fontWeight: typography.weight.bold,
+  },
+  versionText: {
+    fontSize: typography.size.xs,
+    color: colors.textMuted,
+    textAlign: 'center',
+    marginTop: spacing.lg,
   },
 });

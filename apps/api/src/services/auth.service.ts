@@ -1,7 +1,14 @@
 import bcrypt from 'bcrypt';
 import crypto from 'node:crypto';
-import type { PrismaClient } from '@prisma/client';
-import type { RegisterInput, LoginInput, AuthTokens, JWTPayload, UserProfile } from '@openfit/types';
+import { Prisma, type PrismaClient } from '@prisma/client';
+import type {
+  RegisterInput,
+  LoginInput,
+  AuthTokens,
+  JWTPayload,
+  UserProfile,
+  UpdateUserInput,
+} from '@openfit/types';
 
 const BCRYPT_ROUNDS = 12;
 const REFRESH_TOKEN_BYTES = 48; // 384-bit token before hashing
@@ -120,6 +127,37 @@ export class AuthService {
     }
 
     return this.toUserProfile(user);
+  }
+
+  async updateProfile(
+    userId: string,
+    input: UpdateUserInput,
+  ): Promise<UserProfile> {
+    // Drop keys with `undefined` values — exactOptionalPropertyTypes
+    // makes Prisma reject `name: undefined`. Only forward the keys the
+    // client actually sent.
+    const data: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(input)) {
+      if (value !== undefined) data[key] = value;
+    }
+    if (Object.keys(data).length === 0) {
+      return this.getProfile(userId);
+    }
+    try {
+      const user = await this.prisma.user.update({
+        where: { id: userId },
+        data,
+      });
+      return this.toUserProfile(user);
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2025'
+      ) {
+        throw new AuthError('User not found', 404);
+      }
+      throw err;
+    }
   }
 
   private async issueTokens(

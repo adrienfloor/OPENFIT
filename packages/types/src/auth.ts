@@ -39,6 +39,21 @@ export const RefreshInputSchema = z.object({
   refreshToken: z.string(),
 });
 
+/**
+ * Partial update for the authenticated user. Email is intentionally
+ * excluded — changing the login identity needs its own dedicated flow.
+ * `password` is also excluded (would need current-password verification).
+ */
+export const UpdateUserInputSchema = z
+  .object({
+    name: z.string().min(1).max(100).trim().optional(),
+    dateOfBirth: z.coerce.date().optional(),
+    weightKg: z.number().positive().max(500).optional(),
+    heightCm: z.number().positive().max(300).optional(),
+    sex: SexSchema.optional(),
+  })
+  .strict();
+
 export const UserProfileSchema = z.object({
   id: z.string(),
   email: z.string().email(),
@@ -58,3 +73,4 @@ export type AuthTokens = z.infer<typeof AuthTokensSchema>;
 export type JWTPayload = z.infer<typeof JWTPayloadSchema>;
 export type RefreshInput = z.infer<typeof RefreshInputSchema>;
 export type UserProfile = z.infer<typeof UserProfileSchema>;
+export type UpdateUserInput = z.infer<typeof UpdateUserInputSchema>;

@@ -1,67 +1,48 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
   RefreshControl,
 } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
-import type { WorkoutType } from '@openfit/types';
+import { useFocusEffect } from 'expo-router';
 import { apiClient } from '../../services/api';
-import { colors, spacing, radii, typography } from '../../theme';
+import { WorkoutTypePicker } from '../../screens/exercise/WorkoutTypePicker';
+import { WeeklySummaryCard } from '../../screens/exercise/WeeklySummaryCard';
+import {
+  HistoryList,
+  type HistoryWorkout,
+} from '../../screens/exercise/HistoryList';
+import { WorkoutHistoryDetail } from '../../screens/exercise/WorkoutHistoryDetail';
+import { colors, spacing, typography } from '../../theme';
 import { useScreenTopPadding } from '../../theme/useScreenPadding';
 
-interface RecentLog {
-  id: string;
-  type: WorkoutType;
-  startedAt: string;
-  completedAt: string | null;
-  durationSeconds: number | null;
-  caloriesBurned: number | null;
-  distanceMeters: number | null;
-  session: { name: string } | null;
-  exerciseLogs: { completedSets: unknown[] }[];
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  });
-}
-
-function formatDuration(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
-}
-
-function typeLabel(type: WorkoutType): string {
-  if (type === 'strength') return 'Strength';
-  if (type === 'jiu_jitsu') return 'Jiu-Jitsu';
-  return 'Run';
-}
-
-function typeColor(type: WorkoutType): string {
-  if (type === 'strength') return colors.strength;
-  if (type === 'jiu_jitsu') return colors.jiuJitsu;
-  return colors.run;
-}
-
+/**
+ * Phase 2.5 Slice 7 — Exercise tab.
+ *
+ * Three sections, top to bottom:
+ *   1. Workout-type picker (3 cards). Each card surfaces this week's
+ *      session count and routes to the type's start flow.
+ *   2. Weekly summary card (sessions / time / kcal / km).
+ *   3. History list (filter chips + chronological cards). Tap a row →
+ *      WorkoutHistoryDetail modal which lazy-loads the full log
+ *      (map for runs, sets table for strength, HR summary).
+ *
+ * The standalone /(tabs)/history route remains href:null (hidden) since
+ * Slice 1; the legacy file is unused but kept until we delete it in a
+ * separate cleanup commit.
+ */
 export default function ExerciseScreen() {
-  const router = useRouter();
-  const [recent, setRecent] = useState<RecentLog[]>([]);
+  const [workouts, setWorkouts] = useState<HistoryWorkout[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const topPadding = useScreenTopPadding();
 
-  const fetchRecent = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     try {
-      const res = await apiClient.get<RecentLog[]>('/workouts/logs');
-      setRecent(res.data.slice(0, 5));
+      const res = await apiClient.get<HistoryWorkout[]>('/workouts/logs');
+      setWorkouts(res.data);
     } catch {
       // empty state
     } finally {
@@ -70,174 +51,126 @@ export default function ExerciseScreen() {
   }, []);
 
   useEffect(() => {
-    fetchRecent();
-  }, [fetchRecent]);
+    fetchData();
+  }, [fetchData]);
 
-  // Refresh when user navigates back from a child screen.
+  // Refresh whenever the user navigates back from a finished workout.
   useFocusEffect(
     useCallback(() => {
-      fetchRecent();
-    }, [fetchRecent]),
+      fetchData();
+    }, [fetchData]),
   );
+
+  const summary = useMemo(() => computeWeeklySummary(workouts), [workouts]);
 
   return (
     <ScrollView
       style={[styles.container, { paddingTop: topPadding }]}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={fetchRecent} tintColor={colors.text} />
+        <RefreshControl refreshing={loading} onRefresh={fetchData} tintColor={colors.text} />
       }
     >
-      <View style={styles.titleRow}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.title}>Exercise</Text>
-          <Text style={styles.subtitle}>Pick a session type to start</Text>
-        </View>
-        <TouchableOpacity
-          onPress={() => router.push('/(tabs)/history')}
-          style={styles.historyBtn}
-        >
-          <Text style={styles.historyBtnText}>History →</Text>
-        </TouchableOpacity>
-      </View>
+      <Text style={styles.title}>Exercise</Text>
+      <Text style={styles.subtitle}>Pick a session, see your week, browse history.</Text>
 
-      <View style={styles.pickerGrid}>
-        <TouchableOpacity
-          style={[styles.pickerCard, { backgroundColor: colors.strength }]}
-          onPress={() => router.push('/workout/strength')}
-        >
-          <Text style={styles.pickerEmoji}>🏋️</Text>
-          <Text style={styles.pickerLabel}>Strength</Text>
-          <Text style={styles.pickerSub}>Programs & sets</Text>
-        </TouchableOpacity>
+      {/* 1. Workout-type picker */}
+      <WorkoutTypePicker weeklyCounts={summary.byType} />
 
-        <TouchableOpacity
-          style={[styles.pickerCard, { backgroundColor: colors.run }]}
-          onPress={() => router.push('/workout/run')}
-        >
-          <Text style={styles.pickerEmoji}>🏃</Text>
-          <Text style={styles.pickerLabel}>Run</Text>
-          <Text style={styles.pickerSub}>GPS tracked</Text>
-        </TouchableOpacity>
+      {/* 2. Weekly summary */}
+      <Text style={styles.sectionLabel}>Summary</Text>
+      <WeeklySummaryCard
+        totalSessions={summary.totalSessions}
+        totalDurationSeconds={summary.totalDuration}
+        totalCalories={summary.totalCalories}
+        totalDistanceMeters={summary.totalDistance}
+      />
 
-        <TouchableOpacity
-          style={[styles.pickerCard, { backgroundColor: colors.jiuJitsu }]}
-          onPress={() => router.push('/workout/jiujitsu')}
-        >
-          <Text style={styles.pickerEmoji}>🥋</Text>
-          <Text style={styles.pickerLabel}>Jiu-Jitsu</Text>
-          <Text style={styles.pickerSub}>Timer + HR</Text>
-        </TouchableOpacity>
-      </View>
+      {/* 3. History */}
+      <Text style={styles.sectionLabel}>History</Text>
+      <HistoryList
+        workouts={workouts}
+        onSelect={(w) => setActiveId(w.id)}
+      />
 
-      {recent.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent</Text>
-          {recent.map((log) => {
-            const label = typeLabel(log.type);
-            const color = typeColor(log.type);
-            const meta =
-              log.type === 'strength'
-                ? `${log.exerciseLogs.reduce((n, el) => n + el.completedSets.length, 0)} sets`
-                : log.type === 'run' && log.distanceMeters
-                  ? `${(log.distanceMeters / 1000).toFixed(2)} km`
-                  : log.durationSeconds
-                    ? formatDuration(log.durationSeconds)
-                    : '—';
-            return (
-              <View key={log.id} style={styles.recentCard}>
-                <View style={[styles.recentDot, { backgroundColor: color }]} />
-                <View style={styles.recentMain}>
-                  <Text style={styles.recentName}>
-                    {log.session?.name ?? label}
-                  </Text>
-                  <Text style={styles.recentDate}>{formatDate(log.startedAt)} · {meta}</Text>
-                </View>
-                {log.caloriesBurned != null && (
-                  <Text style={styles.recentCal}>{Math.round(log.caloriesBurned)} kcal</Text>
-                )}
-              </View>
-            );
-          })}
-        </View>
-      )}
+      <View style={{ height: spacing.huge }} />
 
-      <View style={{ height: 40 }} />
+      <WorkoutHistoryDetail
+        visible={activeId !== null}
+        onClose={() => setActiveId(null)}
+        workoutId={activeId}
+      />
     </ScrollView>
   );
 }
 
+interface WeeklySummary {
+  totalSessions: number;
+  totalDuration: number;
+  totalCalories: number;
+  totalDistance: number;
+  byType: { strength: number; run: number; jiuJitsu: number };
+}
+
+function computeWeeklySummary(workouts: HistoryWorkout[]): WeeklySummary {
+  // Local week — Monday 00:00 to next Monday.
+  const start = new Date();
+  const day = (start.getDay() + 6) % 7; // Mon=0
+  start.setDate(start.getDate() - day);
+  start.setHours(0, 0, 0, 0);
+
+  let totalDuration = 0;
+  let totalCalories = 0;
+  let totalDistance = 0;
+  let strength = 0;
+  let run = 0;
+  let jiuJitsu = 0;
+  let totalSessions = 0;
+
+  for (const w of workouts) {
+    const startedAt = new Date(w.startedAt);
+    if (startedAt < start) continue;
+    totalSessions += 1;
+    totalDuration += w.durationSeconds ?? 0;
+    totalCalories += w.caloriesBurned ?? 0;
+    totalDistance += w.distanceMeters ?? 0;
+    if (w.type === 'strength') strength += 1;
+    else if (w.type === 'run') run += 1;
+    else if (w.type === 'jiu_jitsu') jiuJitsu += 1;
+  }
+
+  return {
+    totalSessions,
+    totalDuration,
+    totalCalories,
+    totalDistance,
+    byType: { strength, run, jiuJitsu },
+  };
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: spacing.lg },
-  titleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xl },
+  container: {
+    flex: 1,
+    backgroundColor: colors.bg,
+    paddingHorizontal: spacing.lg,
+  },
   title: {
     fontSize: typography.size.xxl,
     fontWeight: typography.weight.bold,
     color: colors.text,
     marginBottom: spacing.xs,
   },
-  subtitle: { fontSize: typography.size.sm, color: colors.textSecondary },
-  historyBtn: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.md,
-    backgroundColor: colors.surface,
-  },
-  historyBtnText: {
+  subtitle: {
     fontSize: typography.size.sm,
-    color: colors.text,
-    fontWeight: typography.weight.semibold,
-  },
-  pickerGrid: { gap: spacing.md },
-  pickerCard: {
-    borderRadius: radii.xl,
-    padding: spacing.xl,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.lg,
-  },
-  pickerEmoji: { fontSize: 40 },
-  pickerLabel: {
-    color: '#fff',
-    fontSize: typography.size.lg,
-    fontWeight: typography.weight.bold,
-    flex: 1,
-  },
-  pickerSub: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: typography.size.xs,
-    fontWeight: typography.weight.medium,
-  },
-  section: { marginTop: spacing.xxxl },
-  sectionTitle: {
-    fontSize: typography.size.md,
-    fontWeight: typography.weight.semibold,
-    marginBottom: spacing.md,
     color: colors.textSecondary,
+    marginBottom: spacing.xl,
   },
-  recentCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    padding: spacing.md + 2,
-    marginBottom: spacing.xs + 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  recentDot: { width: 10, height: 10, borderRadius: 5 },
-  recentMain: { flex: 1 },
-  recentName: {
-    fontSize: typography.size.sm,
-    fontWeight: typography.weight.medium,
-    color: colors.text,
-  },
-  recentDate: {
+  sectionLabel: {
     fontSize: typography.size.xs,
     color: colors.textMuted,
-    marginTop: 2,
-  },
-  recentCal: {
-    fontSize: typography.size.sm,
-    color: colors.textSecondary,
-    fontWeight: typography.weight.medium,
+    fontWeight: typography.weight.semibold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginTop: spacing.xl,
+    marginBottom: spacing.sm,
   },
 });

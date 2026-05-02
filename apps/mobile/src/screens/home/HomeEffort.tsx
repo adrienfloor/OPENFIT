@@ -1,9 +1,10 @@
 import { View, Text, StyleSheet } from 'react-native';
+import { colors, spacing, typography } from '../../theme';
 
 /**
- * Home → Effort sub-tab. Slice 1 placeholder — Slice 6 fills it with the
- * effort ring, today's activities list, and the 7-day fatigue/fitness/
- * training-status charts.
+ * Home → Effort sub-tab. Slice 2 dark conversion — Slice 6 fills it with
+ * the effort ring, today's activities list, and the 7-day fatigue/
+ * fitness/training-status charts.
  */
 export function HomeEffort() {
   return (
@@ -17,7 +18,17 @@ export function HomeEffort() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb', paddingHorizontal: 16, paddingTop: 24 },
-  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 12 },
-  placeholder: { fontSize: 14, color: '#6b7280' },
+  container: {
+    flex: 1,
+    backgroundColor: colors.bg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xxl,
+  },
+  title: {
+    fontSize: typography.size.xxl,
+    fontWeight: typography.weight.bold,
+    color: colors.text,
+    marginBottom: spacing.md,
+  },
+  placeholder: { fontSize: typography.size.sm, color: colors.textSecondary },
 });

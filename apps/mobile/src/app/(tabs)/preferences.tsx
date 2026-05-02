@@ -1,6 +1,8 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../hooks/useAuth';
+import { colors, spacing, radii, typography } from '../../theme';
+import { useScreenTopPadding } from '../../theme/useScreenPadding';
 
 /**
  * Preferences tab — Slice 1 placeholder.
@@ -14,9 +16,10 @@ import { useAuth } from '../../hooks/useAuth';
 export default function PreferencesScreen() {
   const router = useRouter();
   const { user, logout } = useAuth();
+  const topPadding = useScreenTopPadding();
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={[styles.container, { paddingTop: topPadding }]}>
       <Text style={styles.title}>Preferences</Text>
 
       <View style={styles.profileCard}>
@@ -68,43 +71,61 @@ function PlaceholderRow({ label }: { label: string }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb', paddingHorizontal: 16, paddingTop: 56 },
-  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 20 },
-  profileCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
+  container: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: spacing.lg },
+  title: {
+    fontSize: typography.size.xxl,
+    fontWeight: typography.weight.bold,
+    color: colors.text,
+    marginBottom: spacing.xl,
   },
-  name: { fontSize: 18, fontWeight: '700', marginBottom: 2 },
-  email: { fontSize: 13, color: '#6b7280' },
+  profileCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+  name: {
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.bold,
+    color: colors.text,
+    marginBottom: 2,
+  },
+  email: { fontSize: typography.size.sm, color: colors.textSecondary },
   sectionLabel: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontWeight: '600',
+    fontSize: typography.size.xs,
+    color: colors.textSecondary,
+    fontWeight: typography.weight.semibold,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
   },
   row: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 6,
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    padding: spacing.md + 2,
+    marginBottom: spacing.xs + 2,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   rowDisabled: { opacity: 0.6 },
-  rowText: { fontSize: 14, color: '#111827' },
-  chevron: { fontSize: 18, color: '#9ca3af' },
-  soon: { fontSize: 11, color: '#9ca3af', fontWeight: '500' },
+  rowText: { fontSize: typography.size.sm, color: colors.text },
+  chevron: { fontSize: typography.size.lg, color: colors.textMuted },
+  soon: {
+    fontSize: typography.size.xs,
+    color: colors.textMuted,
+    fontWeight: typography.weight.medium,
+  },
   logoutBtn: {
-    paddingVertical: 14,
-    borderRadius: 10,
-    backgroundColor: '#f3f4f6',
+    paddingVertical: spacing.md + 2,
+    borderRadius: radii.md,
+    backgroundColor: colors.surface,
     alignItems: 'center',
   },
-  logoutText: { fontSize: 14, color: '#6b7280', fontWeight: '600' },
+  logoutText: {
+    fontSize: typography.size.sm,
+    color: colors.danger,
+    fontWeight: typography.weight.semibold,
+  },
 });

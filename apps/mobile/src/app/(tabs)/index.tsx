@@ -4,6 +4,8 @@ import { HomeOverview } from '../../screens/home/HomeOverview';
 import { HomeBioCharge } from '../../screens/home/HomeBioCharge';
 import { HomeSleep } from '../../screens/home/HomeSleep';
 import { HomeEffort } from '../../screens/home/HomeEffort';
+import { colors, spacing, radii, typography } from '../../theme';
+import { useScreenTopPadding } from '../../theme/useScreenPadding';
 
 const SUB_TABS = ['Overview', 'BioCharge', 'Sleep', 'Effort'] as const;
 type HomeSubTab = (typeof SUB_TABS)[number];
@@ -15,10 +17,11 @@ type HomeSubTab = (typeof SUB_TABS)[number];
  */
 export default function HomeScreen() {
   const [active, setActive] = useState<HomeSubTab>('Overview');
+  const topPadding = useScreenTopPadding();
 
   return (
     <View style={styles.root}>
-      <View style={styles.tabBarWrap}>
+      <View style={[styles.tabBarWrap, { paddingTop: topPadding }]}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -52,23 +55,26 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f9fafb' },
+  root: { flex: 1, backgroundColor: colors.bg },
   tabBarWrap: {
-    paddingTop: 56,
-    paddingBottom: 8,
-    backgroundColor: '#f9fafb',
-    borderBottomColor: '#e5e7eb',
+    paddingBottom: spacing.sm,
+    backgroundColor: colors.bg,
+    borderBottomColor: colors.borderSubtle,
     borderBottomWidth: 1,
   },
-  tabBar: { paddingHorizontal: 12, gap: 8 },
+  tabBar: { paddingHorizontal: spacing.md, gap: spacing.sm },
   pill: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: '#f3f4f6',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surface,
   },
-  pillActive: { backgroundColor: '#111827' },
-  pillText: { fontSize: 13, fontWeight: '600', color: '#6b7280' },
-  pillTextActive: { color: '#fff' },
+  pillActive: { backgroundColor: colors.text },
+  pillText: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.semibold,
+    color: colors.textSecondary,
+  },
+  pillTextActive: { color: colors.bg },
   body: { flex: 1 },
 });

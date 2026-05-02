@@ -26,6 +26,8 @@ import {
   computeCaloriesFromHRSamples,
   ageYearsFromDob,
 } from '@openfit/fitness-core';
+import { colors, spacing, radii, typography } from '../../theme';
+import { useScreenTopPadding } from '../../theme/useScreenPadding';
 
 interface Exercise {
   id: string;
@@ -123,6 +125,7 @@ export default function WorkoutScreen() {
   const user = useAuthStore((s) => s.user);
   const hrSamplesRef = useRef<() => Array<{ timestamp: Date; bpm: number; zone: string }>>(() => []);
   const restTimer = useRestTimer();
+  const topPadding = useScreenTopPadding();
 
   const [programs, setPrograms] = useState<Program[]>([]);
   const [exercises, setExercises] = useState<Exercise[]>([]);
@@ -310,7 +313,7 @@ export default function WorkoutScreen() {
     const hasPlan = plannedExercises.length > 0;
 
     return (
-      <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
+      <ScrollView style={[styles.container, { paddingTop: topPadding }]} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <TouchableOpacity onPress={handleCancel}>
             <Text style={styles.cancelText}>Cancel</Text>
@@ -415,8 +418,10 @@ export default function WorkoutScreen() {
   // Program selection / start view
   return (
     <ScrollView
-      style={styles.container}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchData} />}
+      style={[styles.container, { paddingTop: topPadding }]}
+      refreshControl={
+        <RefreshControl refreshing={loading} onRefresh={fetchData} tintColor={colors.text} />
+      }
     >
       <View style={styles.titleRow}>
         <TouchableOpacity onPress={() => router.back()}>
@@ -1000,15 +1005,15 @@ function FreeWorkoutInput({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb', paddingHorizontal: 16, paddingTop: 56 },
+  container: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: 16 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  backText: { fontSize: 16, color: '#22c55e', fontWeight: '500', width: 50 },
+  backText: { fontSize: 16, color: colors.accent, fontWeight: '500', width: 50 },
   title: { fontSize: 24, fontWeight: 'bold' },
-  elapsed: { fontSize: 18, fontWeight: '600', color: '#22c55e' },
-  cancelText: { fontSize: 15, color: '#ef4444', fontWeight: '500' },
+  elapsed: { fontSize: 18, fontWeight: '600', color: colors.accent },
+  cancelText: { fontSize: 15, color: colors.danger, fontWeight: '500' },
   hrCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -1016,18 +1021,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     borderLeftWidth: 4,
-    borderLeftColor: '#ef4444',
+    borderLeftColor: colors.danger,
   },
   hrCardLeft: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
-  hrBpm: { fontSize: 36, fontWeight: 'bold', color: '#ef4444' },
-  hrUnit: { fontSize: 14, color: '#9ca3af' },
+  hrBpm: { fontSize: 36, fontWeight: 'bold', color: colors.danger },
+  hrUnit: { fontSize: 14, color: colors.textMuted },
   hrCardRight: { alignItems: 'flex-end' },
-  hrZone: { fontSize: 13, fontWeight: '600', color: '#ef4444', marginBottom: 2 },
-  hrState: { fontSize: 11, color: '#9ca3af' },
+  hrZone: { fontSize: 13, fontWeight: '600', color: colors.danger, marginBottom: 2 },
+  hrState: { fontSize: 11, color: colors.textMuted },
   section: { marginTop: 24 },
-  sectionTitle: { fontSize: 16, fontWeight: '600', marginBottom: 12, color: '#374151' },
+  sectionTitle: { fontSize: 16, fontWeight: '600', marginBottom: 12, color: colors.text },
   startFreeBtn: {
-    backgroundColor: '#22c55e',
+    backgroundColor: colors.accent,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
@@ -1035,17 +1040,17 @@ const styles = StyleSheet.create({
   },
   startFreeBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   programCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 8,
   },
   programName: { fontSize: 16, fontWeight: '600' },
-  programMeta: { fontSize: 12, color: '#6b7280', marginTop: 4 },
+  programMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 4 },
   weekSection: { marginLeft: 12, marginBottom: 8 },
-  weekLabel: { fontSize: 13, fontWeight: '600', color: '#6b7280', marginBottom: 6 },
+  weekLabel: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginBottom: 6 },
   sessionCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 10,
     padding: 14,
     marginBottom: 6,
@@ -1053,26 +1058,26 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     borderLeftWidth: 3,
-    borderLeftColor: '#22c55e',
+    borderLeftColor: colors.accent,
   },
   sessionName: { fontSize: 14, fontWeight: '500' },
-  sessionMeta: { fontSize: 12, color: '#22c55e' },
-  emptyText: { fontSize: 14, color: '#9ca3af', textAlign: 'center', marginTop: 40, paddingHorizontal: 24 },
+  sessionMeta: { fontSize: 12, color: colors.accent },
+  emptyText: { fontSize: 14, color: colors.textMuted, textAlign: 'center', marginTop: 40, paddingHorizontal: 24 },
   exercisePicker: { marginBottom: 16 },
   exerciseChip: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 8,
     marginRight: 8,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: colors.border,
   },
-  exerciseChipActive: { backgroundColor: '#22c55e', borderColor: '#22c55e' },
-  exerciseChipText: { fontSize: 13, color: '#374151' },
+  exerciseChipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  exerciseChipText: { fontSize: 13, color: colors.text },
   exerciseChipTextActive: { color: '#fff' },
   setInput: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -1080,9 +1085,9 @@ const styles = StyleSheet.create({
   currentExName: { fontSize: 15, fontWeight: '600', marginBottom: 12 },
   inputRow: { flexDirection: 'row', gap: 10 },
   inputGroup: { flex: 1 },
-  inputLabel: { fontSize: 11, color: '#6b7280', marginBottom: 4 },
+  inputLabel: { fontSize: 11, color: colors.textSecondary, marginBottom: 4 },
   input: {
-    backgroundColor: '#f3f4f6',
+    backgroundColor: colors.surfaceMuted,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -1090,7 +1095,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   logSetBtn: {
-    backgroundColor: '#22c55e',
+    backgroundColor: colors.accent,
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
@@ -1099,22 +1104,22 @@ const styles = StyleSheet.create({
   logSetBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
   loggedSection: { marginBottom: 16 },
   loggedExercise: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 10,
     padding: 14,
     marginBottom: 8,
   },
   loggedExName: { fontSize: 14, fontWeight: '600', marginBottom: 6 },
-  loggedSet: { fontSize: 13, color: '#6b7280', marginBottom: 2 },
+  loggedSet: { fontSize: 13, color: colors.textSecondary, marginBottom: 2 },
   finishBtn: {
-    backgroundColor: '#ef4444',
+    backgroundColor: colors.danger,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
   },
   finishBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   recentCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 10,
     padding: 14,
     marginBottom: 6,
@@ -1123,13 +1128,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   recentName: { fontSize: 14, fontWeight: '500' },
-  recentDate: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
-  recentSets: { fontSize: 13, color: '#6b7280' },
+  recentDate: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  recentSets: { fontSize: 13, color: colors.textSecondary },
 
   // ── Active session header additions ─────────────────────────────────────
-  sessionTitle: { fontSize: 14, fontWeight: '600', color: '#374151' },
+  sessionTitle: { fontSize: 14, fontWeight: '600', color: colors.text },
   progressPill: {
-    backgroundColor: '#22c55e',
+    backgroundColor: colors.accent,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 14,
@@ -1138,88 +1143,88 @@ const styles = StyleSheet.create({
 
   // ── Rest timer ──────────────────────────────────────────────────────────
   restCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     borderLeftWidth: 4,
-    borderLeftColor: '#f97316',
+    borderLeftColor: colors.effort,
   },
-  restCardFinished: { borderLeftColor: '#22c55e' },
+  restCardFinished: { borderLeftColor: colors.accent },
   restHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  restLabel: { fontSize: 13, fontWeight: '600', color: '#f97316', textTransform: 'uppercase' },
-  restSkip: { fontSize: 13, color: '#6b7280', fontWeight: '500' },
-  restTime: { fontSize: 44, fontWeight: '700', color: '#f97316', marginVertical: 8 },
-  restTimeFinished: { color: '#22c55e' },
+  restLabel: { fontSize: 13, fontWeight: '600', color: colors.effort, textTransform: 'uppercase' },
+  restSkip: { fontSize: 13, color: colors.textSecondary, fontWeight: '500' },
+  restTime: { fontSize: 44, fontWeight: '700', color: colors.effort, marginVertical: 8 },
+  restTimeFinished: { color: colors.accent },
   restProgress: {
     height: 4,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: colors.surfaceMuted,
     borderRadius: 2,
     overflow: 'hidden',
     marginBottom: 12,
   },
-  restProgressFill: { height: '100%', backgroundColor: '#f97316' },
+  restProgressFill: { height: '100%', backgroundColor: colors.effort },
   restAdjustRow: { flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
   restAdjustBtn: {
     flex: 1,
-    backgroundColor: '#fef3c7',
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
     borderRadius: 8,
     paddingVertical: 8,
     alignItems: 'center',
   },
-  restAdjustText: { fontSize: 13, fontWeight: '600', color: '#b45309' },
+  restAdjustText: { fontSize: 13, fontWeight: '600', color: colors.warning },
 
   // ── Planned exercise card ───────────────────────────────────────────────
   exCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 14,
     marginBottom: 10,
     borderLeftWidth: 3,
-    borderLeftColor: '#e5e7eb',
+    borderLeftColor: colors.border,
   },
-  exCardFocused: { borderLeftColor: '#22c55e' },
-  exCardDone: { opacity: 0.55, borderLeftColor: '#22c55e' },
+  exCardFocused: { borderLeftColor: colors.accent },
+  exCardDone: { opacity: 0.55, borderLeftColor: colors.accent },
   exHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   exName: { fontSize: 15, fontWeight: '600', flex: 1, paddingRight: 8 },
-  exNameDone: { textDecorationLine: 'line-through', color: '#6b7280' },
+  exNameDone: { textDecorationLine: 'line-through', color: colors.textSecondary },
   exProgress: {
-    backgroundColor: '#f3f4f6',
+    backgroundColor: colors.surfaceMuted,
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: 10,
   },
-  exProgressDone: { backgroundColor: '#dcfce7' },
-  exProgressText: { fontSize: 11, fontWeight: '700', color: '#6b7280' },
-  exProgressTextDone: { color: '#15803d' },
+  exProgressDone: { backgroundColor: 'rgba(34, 197, 94, 0.15)' },
+  exProgressText: { fontSize: 11, fontWeight: '700', color: colors.textSecondary },
+  exProgressTextDone: { color: colors.accent },
 
   // ── Set rows ────────────────────────────────────────────────────────────
   setRowPending: { paddingVertical: 6, paddingLeft: 4 },
-  setRowPendingText: { fontSize: 13, color: '#9ca3af' },
+  setRowPendingText: { fontSize: 13, color: colors.textMuted },
   setRowDone: { paddingVertical: 6, paddingLeft: 4, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  setRowDoneCheck: { color: '#22c55e', fontSize: 14, fontWeight: '700' },
-  setRowDoneText: { fontSize: 13, color: '#374151' },
+  setRowDoneCheck: { color: colors.accent, fontSize: 14, fontWeight: '700' },
+  setRowDoneText: { fontSize: 13, color: colors.text },
   setRowCurrent: {
     backgroundColor: '#f0fdf4',
     borderRadius: 8,
     padding: 10,
     marginVertical: 4,
   },
-  setRowLabel: { fontSize: 12, fontWeight: '700', color: '#15803d', marginBottom: 6, textTransform: 'uppercase' },
+  setRowLabel: { fontSize: 12, fontWeight: '700', color: colors.accent, marginBottom: 6, textTransform: 'uppercase' },
   setInputRow: { flexDirection: 'row', gap: 8, marginBottom: 4 },
   setInputGroup: { flex: 1 },
-  setInputLabel: { fontSize: 10, color: '#6b7280', marginBottom: 2 },
+  setInputLabel: { fontSize: 10, color: colors.textSecondary, marginBottom: 2 },
   setInputField: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 6,
     paddingHorizontal: 10,
     paddingVertical: 8,
     fontSize: 15,
     fontWeight: '600',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: colors.border,
   },
-  setHint: { fontSize: 11, color: '#6b7280', marginTop: 4, marginBottom: 8 },
+  setHint: { fontSize: 11, color: colors.textSecondary, marginTop: 4, marginBottom: 8 },
 
   // ── Swap button + modal ─────────────────────────────────────────────────
   swapBtn: {
@@ -1232,7 +1237,7 @@ const styles = StyleSheet.create({
   swapBtnText: { fontSize: 11, fontWeight: '700', color: '#2563eb', textTransform: 'uppercase' },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalSheet: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingHorizontal: 16,
@@ -1243,40 +1248,40 @@ const styles = StyleSheet.create({
   modalHandle: {
     width: 40,
     height: 4,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: colors.border,
     borderRadius: 2,
     alignSelf: 'center',
     marginBottom: 14,
   },
   modalTitle: { fontSize: 18, fontWeight: '700' },
-  modalSubtitle: { fontSize: 13, color: '#6b7280', marginTop: 4, marginBottom: 12 },
+  modalSubtitle: { fontSize: 13, color: colors.textSecondary, marginTop: 4, marginBottom: 12 },
   modalList: { maxHeight: 480 },
   modalRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    borderBottomColor: colors.surfaceMuted,
   },
   modalRowName: { fontSize: 15, fontWeight: '500' },
-  modalRowMeta: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
-  modalRowChevron: { fontSize: 22, color: '#9ca3af' },
+  modalRowMeta: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  modalRowChevron: { fontSize: 22, color: colors.textMuted },
   modalSectionHeader: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#22c55e',
+    color: colors.accent,
     textTransform: 'uppercase',
     paddingTop: 14,
     paddingBottom: 4,
     letterSpacing: 0.5,
   },
-  modalEmpty: { fontSize: 14, color: '#9ca3af', textAlign: 'center', paddingVertical: 24 },
+  modalEmpty: { fontSize: 14, color: colors.textMuted, textAlign: 'center', paddingVertical: 24 },
   modalCancel: {
     marginTop: 12,
     paddingVertical: 12,
     alignItems: 'center',
     borderRadius: 10,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: colors.surfaceMuted,
   },
-  modalCancelText: { fontSize: 15, fontWeight: '600', color: '#374151' },
+  modalCancelText: { fontSize: 15, fontWeight: '600', color: colors.text },
 });

@@ -10,6 +10,8 @@ import {
 import { useRouter, useFocusEffect } from 'expo-router';
 import type { WorkoutType } from '@openfit/types';
 import { apiClient } from '../../services/api';
+import { colors, spacing, radii, typography } from '../../theme';
+import { useScreenTopPadding } from '../../theme/useScreenPadding';
 
 interface RecentLog {
   id: string;
@@ -45,15 +47,16 @@ function typeLabel(type: WorkoutType): string {
 }
 
 function typeColor(type: WorkoutType): string {
-  if (type === 'strength') return '#22c55e';
-  if (type === 'jiu_jitsu') return '#a855f7';
-  return '#3b82f6';
+  if (type === 'strength') return colors.strength;
+  if (type === 'jiu_jitsu') return colors.jiuJitsu;
+  return colors.run;
 }
 
 export default function ExerciseScreen() {
   const router = useRouter();
   const [recent, setRecent] = useState<RecentLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const topPadding = useScreenTopPadding();
 
   const fetchRecent = useCallback(async () => {
     try {
@@ -79,8 +82,10 @@ export default function ExerciseScreen() {
 
   return (
     <ScrollView
-      style={styles.container}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchRecent} />}
+      style={[styles.container, { paddingTop: topPadding }]}
+      refreshControl={
+        <RefreshControl refreshing={loading} onRefresh={fetchRecent} tintColor={colors.text} />
+      }
     >
       <View style={styles.titleRow}>
         <View style={{ flex: 1 }}>
@@ -97,7 +102,7 @@ export default function ExerciseScreen() {
 
       <View style={styles.pickerGrid}>
         <TouchableOpacity
-          style={[styles.pickerCard, { backgroundColor: '#22c55e' }]}
+          style={[styles.pickerCard, { backgroundColor: colors.strength }]}
           onPress={() => router.push('/workout/strength')}
         >
           <Text style={styles.pickerEmoji}>🏋️</Text>
@@ -106,7 +111,7 @@ export default function ExerciseScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.pickerCard, { backgroundColor: '#3b82f6' }]}
+          style={[styles.pickerCard, { backgroundColor: colors.run }]}
           onPress={() => router.push('/workout/run')}
         >
           <Text style={styles.pickerEmoji}>🏃</Text>
@@ -115,7 +120,7 @@ export default function ExerciseScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.pickerCard, { backgroundColor: '#a855f7' }]}
+          style={[styles.pickerCard, { backgroundColor: colors.jiuJitsu }]}
           onPress={() => router.push('/workout/jiujitsu')}
         >
           <Text style={styles.pickerEmoji}>🥋</Text>
@@ -162,36 +167,77 @@ export default function ExerciseScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb', paddingHorizontal: 16, paddingTop: 56 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
-  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 4 },
-  subtitle: { fontSize: 14, color: '#6b7280' },
-  historyBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#f3f4f6',
+  container: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: spacing.lg },
+  titleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xl },
+  title: {
+    fontSize: typography.size.xxl,
+    fontWeight: typography.weight.bold,
+    color: colors.text,
+    marginBottom: spacing.xs,
   },
-  historyBtnText: { fontSize: 13, color: '#374151', fontWeight: '600' },
-  pickerGrid: { gap: 12 },
-  pickerCard: { borderRadius: 16, padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16 },
-  pickerEmoji: { fontSize: 40 },
-  pickerLabel: { color: '#fff', fontSize: 20, fontWeight: '700', flex: 1 },
-  pickerSub: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '500' },
-  section: { marginTop: 32 },
-  sectionTitle: { fontSize: 16, fontWeight: '600', marginBottom: 12, color: '#374151' },
-  recentCard: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 6,
+  subtitle: { fontSize: typography.size.sm, color: colors.textSecondary },
+  historyBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.md,
+    backgroundColor: colors.surface,
+  },
+  historyBtnText: {
+    fontSize: typography.size.sm,
+    color: colors.text,
+    fontWeight: typography.weight.semibold,
+  },
+  pickerGrid: { gap: spacing.md },
+  pickerCard: {
+    borderRadius: radii.xl,
+    padding: spacing.xl,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: spacing.lg,
+  },
+  pickerEmoji: { fontSize: 40 },
+  pickerLabel: {
+    color: '#fff',
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.bold,
+    flex: 1,
+  },
+  pickerSub: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.medium,
+  },
+  section: { marginTop: spacing.xxxl },
+  sectionTitle: {
+    fontSize: typography.size.md,
+    fontWeight: typography.weight.semibold,
+    marginBottom: spacing.md,
+    color: colors.textSecondary,
+  },
+  recentCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    padding: spacing.md + 2,
+    marginBottom: spacing.xs + 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
   },
   recentDot: { width: 10, height: 10, borderRadius: 5 },
   recentMain: { flex: 1 },
-  recentName: { fontSize: 14, fontWeight: '500' },
-  recentDate: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
-  recentCal: { fontSize: 13, color: '#6b7280', fontWeight: '500' },
+  recentName: {
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.medium,
+    color: colors.text,
+  },
+  recentDate: {
+    fontSize: typography.size.xs,
+    color: colors.textMuted,
+    marginTop: 2,
+  },
+  recentCal: {
+    fontSize: typography.size.sm,
+    color: colors.textSecondary,
+    fontWeight: typography.weight.medium,
+  },
 });

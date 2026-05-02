@@ -21,6 +21,7 @@ import {
   blankFoodItem,
   suggestMealType,
 } from '../../components/FoodItemEditor';
+import { colors, spacing, radii, typography } from '../../theme';
 
 /**
  * Review the AI's analysis before logging it. The user can:
@@ -181,7 +182,7 @@ export default function ConfirmScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: colors.bg,
     paddingHorizontal: 16,
   },
   titleRow: {
@@ -191,34 +192,34 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   title: { fontSize: 20, fontWeight: '700' },
-  cancel: { fontSize: 15, color: '#ef4444', fontWeight: '500', minWidth: 60 },
+  cancel: { fontSize: 15, color: colors.danger, fontWeight: '500', minWidth: 60 },
   save: {
     fontSize: 15,
-    color: '#22c55e',
+    color: colors.accent,
     fontWeight: '700',
     minWidth: 60,
     textAlign: 'right',
   },
   placeholder: {
     fontSize: 14,
-    color: '#9ca3af',
+    color: colors.textMuted,
     textAlign: 'center',
     marginTop: 64,
     marginBottom: 16,
   },
   cancelBtn: {
-    backgroundColor: '#f3f4f6',
+    backgroundColor: colors.surfaceMuted,
     paddingVertical: 12,
     borderRadius: 10,
     alignItems: 'center',
     marginHorizontal: 24,
   },
-  cancelBtnText: { color: '#374151', fontWeight: '600' },
+  cancelBtnText: { color: colors.text, fontWeight: '600' },
   photo: {
     width: '100%',
     aspectRatio: 16 / 9,
     borderRadius: 12,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: colors.border,
     marginBottom: 12,
   },
   noteCard: {
@@ -227,36 +228,36 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 12,
     borderLeftWidth: 3,
-    borderLeftColor: '#f59e0b',
+    borderLeftColor: colors.warning,
   },
-  noteText: { fontSize: 12, color: '#92400e' },
+  noteText: { fontSize: 12, color: colors.warning },
   totalsCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     alignItems: 'center',
   },
-  totalsKcal: { fontSize: 28, fontWeight: '700', color: '#111827' },
-  totalsMacros: { fontSize: 13, color: '#6b7280', marginTop: 4 },
+  totalsKcal: { fontSize: 28, fontWeight: '700', color: colors.text },
+  totalsMacros: { fontSize: 13, color: colors.textSecondary, marginTop: 4 },
   sectionLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#374151',
+    color: colors.text,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 8,
   },
   addBtn: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
     marginTop: 4,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: colors.border,
     borderStyle: 'dashed',
   },
-  addBtnText: { color: '#22c55e', fontSize: 14, fontWeight: '600' },
+  addBtnText: { color: colors.accent, fontSize: 14, fontWeight: '600' },
 });

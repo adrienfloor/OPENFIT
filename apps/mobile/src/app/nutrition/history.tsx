@@ -13,6 +13,7 @@ import type { FoodLog } from '@openfit/types';
 import { sumDayTotals } from '@openfit/fitness-core';
 import { listFoodLogs } from '../../services/nutrition';
 import { AuthedImage } from '../../components/AuthedImage';
+import { colors, spacing, radii, typography } from '../../theme';
 
 /**
  * Past-day browse — groups all FoodLogs by day, newest day first. Tap a
@@ -187,7 +188,7 @@ function capitalize(s: string): string {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb', paddingHorizontal: 16 },
+  container: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: 16 },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -195,10 +196,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   title: { fontSize: 20, fontWeight: '700' },
-  back: { fontSize: 15, color: '#22c55e', fontWeight: '500', minWidth: 60 },
+  back: { fontSize: 15, color: colors.accent, fontWeight: '500', minWidth: 60 },
   empty: {
     fontSize: 14,
-    color: '#9ca3af',
+    color: colors.textMuted,
     textAlign: 'center',
     marginTop: 64,
   },
@@ -209,10 +210,10 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
     marginBottom: 8,
   },
-  dayLabel: { fontSize: 13, fontWeight: '700', color: '#374151' },
-  dayMeta: { fontSize: 12, color: '#6b7280' },
+  dayLabel: { fontSize: 13, fontWeight: '700', color: colors.text },
+  dayMeta: { fontSize: 12, color: colors.textSecondary },
   mealRow: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 10,
     marginBottom: 6,
@@ -224,12 +225,12 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 8,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: colors.surfaceMuted,
   },
   mealThumbPlaceholder: { justifyContent: 'center', alignItems: 'center' },
   mealThumbEmoji: { fontSize: 24 },
   mealMeta: { flex: 1, gap: 2 },
-  mealName: { fontSize: 14, fontWeight: '600', color: '#111827' },
-  mealLine: { fontSize: 12, color: '#6b7280' },
-  mealTime: { fontSize: 11, color: '#9ca3af' },
+  mealName: { fontSize: 14, fontWeight: '600', color: colors.text },
+  mealLine: { fontSize: 12, color: colors.textSecondary },
+  mealTime: { fontSize: 11, color: colors.textMuted },
 });

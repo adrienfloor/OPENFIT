@@ -1,4 +1,5 @@
 import { Tabs } from 'expo-router';
+import { colors } from '../../theme';
 
 /**
  * Phase 2.5 tab structure: Home / Exercise / Coach / Preferences.
@@ -9,8 +10,13 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#22c55e',
-        tabBarInactiveTintColor: '#6b7280',
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: colors.textMuted,
+        tabBarStyle: {
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
+        },
+        sceneStyle: { backgroundColor: colors.bg },
         headerShown: false,
       }}
     >

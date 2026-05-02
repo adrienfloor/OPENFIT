@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
+import { View } from 'react-native';
 import { useAuthStore } from '../stores/auth.store';
 import { getRefreshToken, setAccessToken } from '../services/api';
 import { apiClient } from '../services/api';
+import { colors } from '../theme';
 
 export default function RootLayout() {
   const router = useRouter();
@@ -65,11 +68,19 @@ export default function RootLayout() {
     }
   }, [isAuthenticated, segments, isReady, router]);
 
-  if (!isReady) return null;
+  if (!isReady) {
+    return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
+  }
 
   return (
     <SafeAreaProvider>
-      <Stack screenOptions={{ headerShown: false }}>
+      <StatusBar style="light" />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.bg },
+        }}
+      >
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
       </Stack>

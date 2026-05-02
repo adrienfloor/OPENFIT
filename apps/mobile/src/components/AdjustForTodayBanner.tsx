@@ -14,6 +14,7 @@ import {
   useWorkoutStore,
   type PlannedExerciseSpec,
 } from '../stores/workout.store';
+import { colors, spacing, radii, typography } from '../theme';
 
 /**
  * Banner shown above the planned-exercise list when:
@@ -186,15 +187,15 @@ function mergeAdjustedPlan(
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 14,
     marginBottom: 16,
     borderLeftWidth: 4,
-    borderLeftColor: '#3b82f6',
+    borderLeftColor: colors.run,
   },
   cardApplied: {
-    borderLeftColor: '#22c55e',
+    borderLeftColor: colors.accent,
     backgroundColor: '#f0fdf4',
   },
   row: {
@@ -212,34 +213,34 @@ const styles = StyleSheet.create({
   },
   caption: {
     fontSize: 12,
-    color: '#6b7280',
+    color: colors.textSecondary,
     lineHeight: 16,
   },
   adjustBtn: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: colors.run,
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 10,
     minWidth: 72,
     alignItems: 'center',
   },
-  adjustBtnDisabled: { backgroundColor: '#9ca3af' },
+  adjustBtnDisabled: { backgroundColor: colors.textMuted },
   adjustBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   appliedLabel: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#15803d',
+    color: colors.accent,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 4,
   },
   appliedReason: { fontSize: 13, color: '#166534', lineHeight: 18 },
-  appliedMeta: { fontSize: 11, color: '#15803d', marginTop: 4, fontWeight: '600' },
+  appliedMeta: { fontSize: 11, color: colors.accent, marginTop: 4, fontWeight: '600' },
   revertBtn: {
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
-    backgroundColor: '#dcfce7',
+    backgroundColor: 'rgba(34, 197, 94, 0.15)',
   },
-  revertBtnText: { color: '#15803d', fontSize: 12, fontWeight: '700' },
+  revertBtnText: { color: colors.accent, fontSize: 12, fontWeight: '700' },
 });

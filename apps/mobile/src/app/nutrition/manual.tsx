@@ -19,6 +19,7 @@ import {
   blankFoodItem,
   suggestMealType,
 } from '../../components/FoodItemEditor';
+import { colors, spacing, radii, typography } from '../../theme';
 
 /**
  * Manual entry — no photo, no AI. The lightweight path for trivial things
@@ -129,7 +130,7 @@ export default function ManualEntryScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb', paddingHorizontal: 16 },
+  container: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: 16 },
   titleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -137,47 +138,47 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   title: { fontSize: 20, fontWeight: '700' },
-  cancel: { fontSize: 15, color: '#ef4444', fontWeight: '500', minWidth: 60 },
+  cancel: { fontSize: 15, color: colors.danger, fontWeight: '500', minWidth: 60 },
   save: {
     fontSize: 15,
-    color: '#22c55e',
+    color: colors.accent,
     fontWeight: '700',
     minWidth: 60,
     textAlign: 'right',
   },
   intro: {
     fontSize: 13,
-    color: '#6b7280',
+    color: colors.textSecondary,
     lineHeight: 18,
     marginBottom: 16,
   },
   totalsCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     alignItems: 'center',
   },
-  totalsKcal: { fontSize: 28, fontWeight: '700', color: '#111827' },
-  totalsMacros: { fontSize: 13, color: '#6b7280', marginTop: 4 },
+  totalsKcal: { fontSize: 28, fontWeight: '700', color: colors.text },
+  totalsMacros: { fontSize: 13, color: colors.textSecondary, marginTop: 4 },
   sectionLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#374151',
+    color: colors.text,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 8,
   },
   addBtn: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
     marginTop: 4,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: colors.border,
     borderStyle: 'dashed',
   },
-  addBtnText: { color: '#22c55e', fontSize: 14, fontWeight: '600' },
+  addBtnText: { color: colors.accent, fontSize: 14, fontWeight: '600' },
 });

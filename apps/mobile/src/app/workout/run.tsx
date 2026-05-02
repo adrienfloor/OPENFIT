@@ -24,6 +24,8 @@ import {
   resetRunData,
   setOnUpdateCallback,
 } from '../../services/runTracker';
+import { colors, spacing, radii, typography } from '../../theme';
+import { useScreenTopPadding } from '../../theme/useScreenPadding';
 
 type RunState = 'idle' | 'running' | 'paused' | 'finished';
 
@@ -93,6 +95,7 @@ export default function RunScreen() {
   const [distance, setDistance] = useState(0);
   const [pointCount, setPointCount] = useState(0);
   const [currentSpeed, setCurrentSpeed] = useState(0);
+  const topPadding = useScreenTopPadding();
 
   const startTimeRef = useRef<Date | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -296,7 +299,10 @@ export default function RunScreen() {
 
   // Active / Paused / Finished
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.content, { paddingTop: topPadding }]}
+    >
       {/* Timer */}
       <Text style={styles.timer}>{formatDuration(elapsed)}</Text>
 
@@ -380,53 +386,53 @@ export default function RunScreen() {
 }
 
 const styles = StyleSheet.create({
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg },
   backBtn: { position: 'absolute', top: 56, left: 16 },
-  backText: { fontSize: 16, color: '#22c55e', fontWeight: '500' },
-  container: { flex: 1, backgroundColor: '#f9fafb' },
-  content: { paddingHorizontal: 16, paddingTop: 56, paddingBottom: 40 },
+  backText: { fontSize: 16, color: colors.accent, fontWeight: '500' },
+  container: { flex: 1, backgroundColor: colors.bg },
+  content: { paddingHorizontal: 16, paddingBottom: 40 },
   title: { fontSize: 24, fontWeight: 'bold', marginBottom: 8 },
-  subtitle: { fontSize: 14, color: '#6b7280', marginBottom: 4 },
-  subtitleSmall: { fontSize: 12, color: '#9ca3af', marginBottom: 32 },
-  timer: { fontSize: 52, fontWeight: 'bold', textAlign: 'center', color: '#111827' },
-  distanceBig: { fontSize: 36, fontWeight: '700', textAlign: 'center', color: '#22c55e', marginBottom: 24 },
-  paceRow: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16, alignItems: 'center' },
+  subtitle: { fontSize: 14, color: colors.textSecondary, marginBottom: 4 },
+  subtitleSmall: { fontSize: 12, color: colors.textMuted, marginBottom: 32 },
+  timer: { fontSize: 52, fontWeight: 'bold', textAlign: 'center', color: colors.text },
+  distanceBig: { fontSize: 36, fontWeight: '700', textAlign: 'center', color: colors.accent, marginBottom: 24 },
+  paceRow: { flexDirection: 'row', backgroundColor: colors.surface, borderRadius: 12, padding: 16, marginBottom: 16, alignItems: 'center' },
   paceBox: { flex: 1, alignItems: 'center' },
-  paceDivider: { width: 1, height: 40, backgroundColor: '#e5e7eb' },
-  paceLabel: { fontSize: 11, color: '#9ca3af', marginBottom: 4 },
-  paceValue: { fontSize: 28, fontWeight: '700', color: '#111827' },
-  paceUnit: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
-  hrSection: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16, borderLeftWidth: 4, borderLeftColor: '#ef4444' },
+  paceDivider: { width: 1, height: 40, backgroundColor: colors.border },
+  paceLabel: { fontSize: 11, color: colors.textMuted, marginBottom: 4 },
+  paceValue: { fontSize: 28, fontWeight: '700', color: colors.text },
+  paceUnit: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
+  hrSection: { backgroundColor: colors.surface, borderRadius: 12, padding: 16, marginBottom: 16, borderLeftWidth: 4, borderLeftColor: colors.danger },
   hrRow: { flexDirection: 'row', justifyContent: 'space-between' },
   hrStatBox: { flex: 1, alignItems: 'center' },
-  hrStatLabel: { fontSize: 11, color: '#9ca3af', marginBottom: 4 },
-  hrStatValue: { fontSize: 28, fontWeight: '700', color: '#ef4444' },
-  hrStatUnit: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
+  hrStatLabel: { fontSize: 11, color: colors.textMuted, marginBottom: 4 },
+  hrStatValue: { fontSize: 28, fontWeight: '700', color: colors.danger },
+  hrStatUnit: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
   hrZoneText: { fontSize: 18, fontWeight: '700', marginTop: 8 },
-  hrZoneHigh: { color: '#ef4444' },
-  hrZoneMid: { color: '#f59e0b' },
-  hrZoneLow: { color: '#22c55e' },
-  hrConnectionStatus: { textAlign: 'center', fontSize: 11, color: '#9ca3af', marginTop: 8 },
-  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16 },
+  hrZoneHigh: { color: colors.danger },
+  hrZoneMid: { color: colors.warning },
+  hrZoneLow: { color: colors.accent },
+  hrConnectionStatus: { textAlign: 'center', fontSize: 11, color: colors.textMuted, marginTop: 8 },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: colors.surface, borderRadius: 12, padding: 16, marginBottom: 16 },
   summaryItem: { flex: 1, alignItems: 'center' },
-  summaryLabel: { fontSize: 11, color: '#9ca3af', marginBottom: 4 },
+  summaryLabel: { fontSize: 11, color: colors.textMuted, marginBottom: 4 },
   summaryValue: { fontSize: 16, fontWeight: '600' },
   controls: { flexDirection: 'row', gap: 12 },
   startBtn: {
-    backgroundColor: '#22c55e',
+    backgroundColor: colors.accent,
     borderRadius: 40,
     paddingVertical: 20,
     paddingHorizontal: 48,
   },
   startBtnText: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  pauseBtn: { flex: 1, backgroundColor: '#f59e0b', borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
+  pauseBtn: { flex: 1, backgroundColor: colors.warning, borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
   pauseBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  resumeBtn: { flex: 1, backgroundColor: '#22c55e', borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
+  resumeBtn: { flex: 1, backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
   resumeBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  stopBtn: { flex: 1, backgroundColor: '#ef4444', borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
+  stopBtn: { flex: 1, backgroundColor: colors.danger, borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
   stopBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  saveBtn: { flex: 1, backgroundColor: '#22c55e', borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
+  saveBtn: { flex: 1, backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  discardBtn: { flex: 1, backgroundColor: '#e5e7eb', borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
-  discardBtnText: { color: '#374151', fontSize: 16, fontWeight: '600' },
+  discardBtn: { flex: 1, backgroundColor: colors.border, borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
+  discardBtnText: { color: colors.text, fontSize: 16, fontWeight: '600' },
 });

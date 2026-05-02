@@ -19,6 +19,7 @@ import {
 } from '@openfit/fitness-core';
 import { getMacroTargets, setMacroTargets } from '../../services/nutrition';
 import { useAuth } from '../../hooks/useAuth';
+import { colors, spacing, radii, typography } from '../../theme';
 
 /**
  * Daily macro targets editor. Reachable from the Today nutrition card via a
@@ -220,7 +221,7 @@ function Field({ label, unit, value, onChange, bigNumber }: FieldProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: colors.bg,
     paddingHorizontal: 16,
   },
   titleRow: {
@@ -230,17 +231,17 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   title: { fontSize: 20, fontWeight: '700' },
-  back: { fontSize: 15, color: '#22c55e', fontWeight: '500', minWidth: 60 },
+  back: { fontSize: 15, color: colors.accent, fontWeight: '500', minWidth: 60 },
   save: {
     fontSize: 15,
-    color: '#22c55e',
+    color: colors.accent,
     fontWeight: '700',
     minWidth: 60,
     textAlign: 'right',
   },
   intro: {
     fontSize: 13,
-    color: '#6b7280',
+    color: colors.textSecondary,
     lineHeight: 18,
     marginBottom: 16,
   },
@@ -255,14 +256,14 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#374151',
+    color: colors.text,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginTop: 16,
     marginBottom: 8,
   },
   fieldCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -271,24 +272,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  fieldLabel: { fontSize: 14, color: '#374151', fontWeight: '500' },
+  fieldLabel: { fontSize: 14, color: colors.text, fontWeight: '500' },
   fieldInputRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
   fieldInput: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
+    color: colors.text,
     minWidth: 70,
     textAlign: 'right',
   },
   fieldInputBig: { fontSize: 24 },
-  fieldUnit: { fontSize: 13, color: '#9ca3af' },
+  fieldUnit: { fontSize: 13, color: colors.textMuted },
   driftCard: {
     backgroundColor: '#fffbeb',
     borderRadius: 8,
     padding: 12,
     marginTop: 16,
     borderLeftWidth: 3,
-    borderLeftColor: '#f59e0b',
+    borderLeftColor: colors.warning,
   },
-  driftText: { fontSize: 12, color: '#92400e', lineHeight: 16 },
+  driftText: { fontSize: 12, color: colors.warning, lineHeight: 16 },
 });

@@ -14,6 +14,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { analyzeFoodPhoto } from '../../services/nutrition';
 import { useNutritionStore } from '../../stores/nutrition.store';
+import { colors, spacing, radii, typography } from '../../theme';
 
 /**
  * Capture flow:
@@ -156,7 +157,7 @@ export default function CaptureScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: colors.bg,
     paddingHorizontal: 16,
   },
   titleRow: {
@@ -165,20 +166,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 24,
   },
-  back: { fontSize: 16, color: '#22c55e', fontWeight: '500', width: 50 },
+  back: { fontSize: 16, color: colors.accent, fontWeight: '500', width: 50 },
   title: { fontSize: 20, fontWeight: '700' },
   preview: {
     width: '100%',
     aspectRatio: 1,
     borderRadius: 16,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: colors.border,
     marginBottom: 24,
   },
   placeholder: {
     width: '100%',
     aspectRatio: 1,
     borderRadius: 16,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
@@ -187,22 +188,22 @@ const styles = StyleSheet.create({
   placeholderEmoji: { fontSize: 64, marginBottom: 12 },
   placeholderText: {
     fontSize: 13,
-    color: '#6b7280',
+    color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 19,
   },
   busy: { alignItems: 'center', marginTop: 16 },
-  busyText: { marginTop: 12, color: '#22c55e', fontWeight: '600' },
+  busyText: { marginTop: 12, color: colors.accent, fontWeight: '600' },
   btn: {
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
     marginBottom: 12,
   },
-  btnPrimary: { backgroundColor: '#22c55e' },
+  btnPrimary: { backgroundColor: colors.accent },
   btnPrimaryText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  btnSecondary: { backgroundColor: '#fff' },
-  btnSecondaryText: { color: '#374151', fontSize: 15, fontWeight: '600' },
+  btnSecondary: { backgroundColor: colors.surface },
+  btnSecondaryText: { color: colors.text, fontSize: 15, fontWeight: '600' },
   manualLink: { paddingVertical: 12, alignItems: 'center' },
-  manualLinkText: { color: '#22c55e', fontSize: 13, fontWeight: '600' },
+  manualLinkText: { color: colors.accent, fontSize: 13, fontWeight: '600' },
 });

@@ -25,6 +25,8 @@ import {
   saveCoachingProfile,
   generateProgram,
 } from '../../services/coach';
+import { colors, spacing, radii, typography } from '../../theme';
+import { useScreenTopPadding } from '../../theme/useScreenPadding';
 
 const GOALS: { value: TrainingGoal; label: string }[] = [
   { value: 'aesthetics', label: 'Aesthetics' },
@@ -61,10 +63,10 @@ const EMPHASIS: CoachingEmphasis[] = [
 ];
 
 const PHASE_COLORS: Record<MesocyclePhase, string> = {
-  accumulation: '#3b82f6',
-  intensification: '#f97316',
-  deload: '#22c55e',
-  peak: '#a855f7',
+  accumulation: colors.run,
+  intensification: colors.effort,
+  deload: colors.accent,
+  peak: colors.jiuJitsu,
 };
 
 const DEFAULT_PROFILE: CoachingProfile = {
@@ -83,6 +85,7 @@ export default function CoachScreen() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [generated, setGenerated] = useState<GeneratedProgram | null>(null);
+  const topPadding = useScreenTopPadding();
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -135,16 +138,18 @@ export default function CoachScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.container, styles.center]}>
-        <ActivityIndicator color="#22c55e" />
+      <View style={[styles.container, styles.center, { paddingTop: topPadding }]}>
+        <ActivityIndicator color={colors.accent} />
       </View>
     );
   }
 
   return (
     <ScrollView
-      style={styles.container}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} />}
+      style={[styles.container, { paddingTop: topPadding }]}
+      refreshControl={
+        <RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.text} />
+      }
     >
       <Text style={styles.title}>Coach</Text>
       <Text style={styles.subtitle}>
@@ -489,46 +494,46 @@ function prettify(s: string): string {
 // ──────────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb', paddingHorizontal: 16, paddingTop: 56 },
+  container: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: 16 },
   center: { justifyContent: 'center', alignItems: 'center' },
   title: { fontSize: 28, fontWeight: 'bold', marginBottom: 4 },
-  subtitle: { fontSize: 14, color: '#6b7280', marginBottom: 24 },
+  subtitle: { fontSize: 14, color: colors.textSecondary, marginBottom: 24 },
   section: { marginBottom: 20 },
-  sectionTitle: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 10 },
+  sectionTitle: { fontSize: 14, fontWeight: '600', color: colors.text, marginBottom: 10 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: colors.border,
   },
-  chipActive: { backgroundColor: '#22c55e', borderColor: '#22c55e' },
-  chipText: { fontSize: 13, color: '#374151', fontWeight: '500' },
+  chipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  chipText: { fontSize: 13, color: colors.text, fontWeight: '500' },
   chipTextActive: { color: '#fff' },
   row: { flexDirection: 'row', gap: 12 },
   numberPicker: { flex: 1 },
-  numberLabel: { fontSize: 11, color: '#6b7280', marginBottom: 4 },
+  numberLabel: { fontSize: 11, color: colors.textSecondary, marginBottom: 4 },
   numberRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: colors.border,
   },
   numberBtn: { paddingHorizontal: 14, paddingVertical: 10 },
-  numberBtnText: { fontSize: 18, fontWeight: '600', color: '#22c55e' },
+  numberBtnText: { fontSize: 18, fontWeight: '600', color: colors.accent },
   numberValue: { flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '600' },
   sportRow: { marginBottom: 12 },
   sportLabel: { fontSize: 13, fontWeight: '600', marginBottom: 6 },
   sportPickers: { flexDirection: 'row', gap: 12 },
   notesInput: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: colors.border,
     padding: 12,
     fontSize: 14,
     minHeight: 70,
@@ -537,57 +542,57 @@ const styles = StyleSheet.create({
   actionsRow: { flexDirection: 'row', gap: 10, marginTop: 8 },
   secondaryBtn: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#22c55e',
+    borderColor: colors.accent,
   },
-  secondaryBtnText: { color: '#22c55e', fontSize: 15, fontWeight: '600' },
+  secondaryBtnText: { color: colors.accent, fontSize: 15, fontWeight: '600' },
   primaryBtn: {
     flex: 1.5,
-    backgroundColor: '#22c55e',
+    backgroundColor: colors.accent,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
   },
   primaryBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  hint: { fontSize: 12, color: '#9ca3af', textAlign: 'center', marginTop: 12 },
+  hint: { fontSize: 12, color: colors.textMuted, textAlign: 'center', marginTop: 12 },
   preview: {
     marginTop: 24,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 16,
   },
   previewName: { fontSize: 18, fontWeight: '700' },
-  previewMeta: { fontSize: 12, color: '#6b7280', marginTop: 4 },
-  previewOverview: { fontSize: 13, color: '#374151', marginTop: 10, lineHeight: 18 },
+  previewMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 4 },
+  previewOverview: { fontSize: 13, color: colors.text, marginTop: 10, lineHeight: 18 },
   weekCard: {
     marginTop: 16,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
+    borderTopColor: colors.surfaceMuted,
   },
   weekHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   weekNum: { fontSize: 15, fontWeight: '700' },
   phaseBadge: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
   phaseBadgeText: { fontSize: 10, color: '#fff', fontWeight: '700', textTransform: 'uppercase' },
-  weekSummary: { fontSize: 12, color: '#6b7280', marginTop: 4, marginBottom: 8 },
+  weekSummary: { fontSize: 12, color: colors.textSecondary, marginTop: 4, marginBottom: 8 },
   sessionCard: {
-    backgroundColor: '#f9fafb',
+    backgroundColor: colors.bg,
     borderRadius: 8,
     padding: 10,
     marginBottom: 8,
   },
   sessionName: { fontSize: 14, fontWeight: '600' },
-  sessionFocus: { fontSize: 11, color: '#6b7280', marginTop: 2, marginBottom: 6 },
+  sessionFocus: { fontSize: 11, color: colors.textSecondary, marginTop: 2, marginBottom: 6 },
   exerciseRow: {
     paddingVertical: 6,
     borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
+    borderTopColor: colors.surfaceMuted,
   },
   exerciseName: { fontSize: 13, fontWeight: '500' },
-  exerciseSets: { fontSize: 12, color: '#374151', marginTop: 2 },
-  exerciseRationale: { fontSize: 11, color: '#9ca3af', marginTop: 2, fontStyle: 'italic' },
+  exerciseSets: { fontSize: 12, color: colors.text, marginTop: 2 },
+  exerciseRationale: { fontSize: 11, color: colors.textMuted, marginTop: 2, fontStyle: 'italic' },
 });

@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
+import { colors, typography } from '../theme';
 
 interface Props {
   /** 0–100; null renders an empty ring + em-dash. */
@@ -56,7 +57,7 @@ export function ScoreRing({
             cx={size / 2}
             cy={size / 2}
             r={radius}
-            stroke="#e5e7eb"
+            stroke={colors.border}
             strokeWidth={strokeWidth}
             fill="transparent"
           />
@@ -78,7 +79,7 @@ export function ScoreRing({
         </Svg>
         <View style={StyleSheet.absoluteFill as unknown as object} pointerEvents="none">
           <View style={styles.center}>
-            <Text style={[styles.value, { color: score !== null ? '#111827' : '#9ca3af' }]}>
+            <Text style={[styles.value, { color: score !== null ? colors.text : colors.textMuted }]}>
               {score !== null ? Math.round(score) : '—'}
             </Text>
             {score !== null && (
@@ -118,8 +119,19 @@ function tierFor(score: number, variant: 'quality' | 'battery'): string {
 const styles = StyleSheet.create({
   wrap: { alignItems: 'center' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  value: { fontSize: 24, fontWeight: '700', lineHeight: 28 },
-  tier: { fontSize: 9, color: '#6b7280', fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase' },
-  label: { marginTop: 8, fontSize: 13, color: '#374151', fontWeight: '500' },
-  caption: { marginTop: 2, fontSize: 10, color: '#9ca3af' },
+  value: { fontSize: 24, fontWeight: typography.weight.bold, lineHeight: 28 },
+  tier: {
+    fontSize: 9,
+    color: colors.textSecondary,
+    fontWeight: typography.weight.semibold,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  label: {
+    marginTop: 8,
+    fontSize: typography.size.sm,
+    color: colors.text,
+    fontWeight: typography.weight.medium,
+  },
+  caption: { marginTop: 2, fontSize: 10, color: colors.textMuted },
 });

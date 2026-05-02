@@ -1,5 +1,6 @@
 import { View, StyleSheet } from 'react-native';
 import { ScoreRing } from './ScoreRing';
+import { colors, spacing, radii } from '../theme';
 
 interface Props {
   sleepScore: number | null;
@@ -45,17 +46,17 @@ export function TodayScoresHeader({
 
   return (
     <View style={styles.container}>
-      <ScoreRing score={sleepScore} label="Sleep" color="#38bdf8" />
+      <ScoreRing score={sleepScore} label="Sleep" color={colors.sleep} />
       <ScoreRing
         score={effortScore}
         label="Effort"
-        color="#f97316"
+        color={colors.effort}
         caption={effortCaption}
       />
       <ScoreRing
         score={readinessScore}
         label="BioCharge"
-        color="#10b981"
+        color={colors.bioCharge}
         caption={readinessCaption}
         tierOverride={readinessCalibrating ? 'CAL.' : undefined}
         variant="battery"
@@ -69,10 +70,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'flex-start',
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    paddingVertical: 20,
-    paddingHorizontal: 12,
-    marginBottom: 16,
+    backgroundColor: colors.surface,
+    borderRadius: radii.xl,
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.lg,
   },
 });

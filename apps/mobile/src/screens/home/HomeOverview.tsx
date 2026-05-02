@@ -3,13 +3,14 @@ import { useDailyStats } from '../../hooks/useDailyStats';
 import { useAuth } from '../../hooks/useAuth';
 import { TodayScoresHeader } from '../../components/TodayScoresHeader';
 import { NutritionCard } from '../../components/NutritionCard';
+import { colors, spacing, radii, typography } from '../../theme';
 
 /**
  * Home → Overview sub-tab.
  *
- * Slice 1: lifted from the old standalone Today screen unchanged. Slice 3
- * will redesign this with the new card system + tappable drill-ins for
- * each row.
+ * Slice 1: lifted from the old standalone Today screen.
+ * Slice 2: switched to the dark token palette.
+ * Slice 3 will rebuild the cards into the final design.
  */
 export function HomeOverview() {
   const { user } = useAuth();
@@ -24,7 +25,12 @@ export function HomeOverview() {
   ];
 
   return (
-    <ScrollView style={styles.container} refreshControl={<RefreshControl refreshing={loading} onRefresh={refetch} />}>
+    <ScrollView
+      style={styles.container}
+      refreshControl={
+        <RefreshControl refreshing={loading} onRefresh={refetch} tintColor={colors.text} />
+      }
+    >
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>Hello, {user?.name ?? 'athlete'}</Text>
@@ -66,23 +72,64 @@ export function HomeOverview() {
 
       <NutritionCard />
 
-      <View style={{ height: 32 }} />
+      <View style={{ height: spacing.xxxl }} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb', paddingHorizontal: 16, paddingTop: 8 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 },
-  greeting: { fontSize: 24, fontWeight: 'bold', marginBottom: 4 },
-  date: { fontSize: 14, color: '#6b7280' },
-  banner: { backgroundColor: '#fef3c7', borderRadius: 12, padding: 14, marginBottom: 16 },
-  bannerText: { fontSize: 13, color: '#92400e' },
-  connectBtn: { backgroundColor: '#22c55e', borderRadius: 12, padding: 16, alignItems: 'center', marginBottom: 16 },
-  connectBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  connectBtnSub: { color: '#dcfce7', fontSize: 12, marginTop: 4 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  card: { width: '47%', backgroundColor: '#fff', borderRadius: 12, padding: 16 },
-  cardLabel: { fontSize: 12, color: '#6b7280', marginBottom: 6 },
-  cardValue: { fontSize: 22, fontWeight: '600' },
+  container: {
+    flex: 1,
+    backgroundColor: colors.bg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: spacing.xxl,
+  },
+  greeting: {
+    fontSize: typography.size.xxl,
+    fontWeight: typography.weight.bold,
+    color: colors.text,
+    marginBottom: spacing.xs,
+  },
+  date: { fontSize: typography.size.sm, color: colors.textSecondary },
+  banner: {
+    backgroundColor: colors.surfaceRaised,
+    borderRadius: radii.lg,
+    padding: spacing.md + 2,
+    marginBottom: spacing.lg,
+    borderColor: colors.warning,
+    borderWidth: 1,
+  },
+  bannerText: { fontSize: typography.size.sm, color: colors.warning },
+  connectBtn: {
+    backgroundColor: colors.accent,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  connectBtnText: { color: colors.bg, fontSize: typography.size.md, fontWeight: typography.weight.semibold },
+  connectBtnSub: { color: colors.bg, opacity: 0.7, fontSize: typography.size.xs, marginTop: spacing.xs },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
+  card: {
+    width: '47%',
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+  },
+  cardLabel: {
+    fontSize: typography.size.xs,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs + 2,
+  },
+  cardValue: {
+    fontSize: typography.size.xl,
+    fontWeight: typography.weight.semibold,
+    color: colors.text,
+  },
 });

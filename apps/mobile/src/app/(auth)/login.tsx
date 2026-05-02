@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'reac
 import { router } from 'expo-router';
 import { useAuth } from '../../hooks/useAuth';
 import { LoginInputSchema } from '@openfit/types';
+import { colors, spacing, radii, typography } from '../../theme';
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -58,15 +59,15 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', paddingHorizontal: 24, backgroundColor: '#fff' },
+  container: { flex: 1, justifyContent: 'center', paddingHorizontal: 24, backgroundColor: colors.surface },
   title: { fontSize: 32, fontWeight: 'bold', color: '#16a34a', marginBottom: 4, textAlign: 'center' },
-  subtitle: { fontSize: 16, color: '#6b7280', marginBottom: 32, textAlign: 'center' },
-  input: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12, fontSize: 16, marginBottom: 12 },
-  passwordContainer: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#d1d5db', borderRadius: 10, marginBottom: 12 },
+  subtitle: { fontSize: 16, color: colors.textSecondary, marginBottom: 32, textAlign: 'center' },
+  input: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12, fontSize: 16, marginBottom: 12 },
+  passwordContainer: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 10, marginBottom: 12 },
   passwordInput: { flex: 1, paddingHorizontal: 16, paddingVertical: 12, fontSize: 16 },
   eyeBtn: { paddingHorizontal: 14, paddingVertical: 12 },
   eyeText: { fontSize: 18 },
-  button: { backgroundColor: '#22c55e', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginBottom: 16 },
+  button: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginBottom: 16 },
   buttonDisabled: { opacity: 0.5 },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   link: { textAlign: 'center', color: '#16a34a', fontSize: 14 },

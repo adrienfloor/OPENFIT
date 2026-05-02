@@ -6,6 +6,7 @@ import {
   TextInput,
 } from 'react-native';
 import type { FoodItem, MealType } from '@openfit/types';
+import { colors, spacing, radii, typography } from '../theme';
 
 /**
  * Shared editor row used by Confirm, Log Detail, and Manual Entry screens.
@@ -158,16 +159,16 @@ const styles = StyleSheet.create({
   mealChip: {
     paddingHorizontal: 14,
     paddingVertical: 8,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: colors.border,
   },
-  mealChipActive: { backgroundColor: '#22c55e', borderColor: '#22c55e' },
-  mealChipText: { fontSize: 13, color: '#374151', fontWeight: '500' },
+  mealChipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  mealChipText: { fontSize: 13, color: colors.text, fontWeight: '500' },
   mealChipTextActive: { color: '#fff', fontWeight: '700' },
   itemCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 12,
     marginBottom: 8,
@@ -182,19 +183,19 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     fontWeight: '600',
-    color: '#111827',
+    color: colors.text,
     paddingVertical: 4,
   },
-  removeBtn: { fontSize: 16, color: '#ef4444', paddingHorizontal: 6 },
+  removeBtn: { fontSize: 16, color: colors.danger, paddingHorizontal: 6 },
   itemFieldsRow: { flexDirection: 'row', gap: 8, marginBottom: 6 },
   field: { flex: 1 },
-  fieldLabel: { fontSize: 10, color: '#6b7280', marginBottom: 2 },
+  fieldLabel: { fontSize: 10, color: colors.textSecondary, marginBottom: 2 },
   fieldInput: {
-    backgroundColor: '#f3f4f6',
+    backgroundColor: colors.surfaceMuted,
     borderRadius: 6,
     paddingHorizontal: 10,
     paddingVertical: 8,
     fontSize: 14,
   },
-  lowConfidence: { fontSize: 11, color: '#b45309', marginTop: 4 },
+  lowConfidence: { fontSize: 11, color: colors.warning, marginTop: 4 },
 });

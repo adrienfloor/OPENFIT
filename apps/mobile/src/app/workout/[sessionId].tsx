@@ -12,6 +12,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { apiClient } from '../../services/api';
 import { useWorkoutStore } from '../../stores/workout.store';
 import { formatDuration } from '../../utils';
+import { colors, spacing, radii, typography } from '../../theme';
+import { useScreenTopPadding } from '../../theme/useScreenPadding';
 
 interface PlannedSet {
   setIndex: number;
@@ -37,6 +39,7 @@ export default function ActiveWorkoutScreen() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
   const router = useRouter();
   const { isActive, startedAt, activeExercises, addSet, finishWorkout } = useWorkoutStore();
+  const topPadding = useScreenTopPadding();
 
   const [session, setSession] = useState<SessionDetail | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -152,7 +155,7 @@ export default function ActiveWorkoutScreen() {
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={[styles.container, { paddingTop: topPadding }]}>
       <View style={styles.header}>
         <Text style={styles.title}>{session?.name ?? 'Workout'}</Text>
         <Text style={styles.elapsed}>{formatDuration(elapsed)}</Text>
@@ -251,42 +254,42 @@ export default function ActiveWorkoutScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb', paddingHorizontal: 16, paddingTop: 56 },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb' },
+  container: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: 16 },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   title: { fontSize: 22, fontWeight: 'bold' },
-  elapsed: { fontSize: 18, fontWeight: '600', color: '#22c55e' },
-  link: { color: '#22c55e', fontSize: 14, marginTop: 12 },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16 },
+  elapsed: { fontSize: 18, fontWeight: '600', color: colors.accent },
+  link: { color: colors.accent, fontSize: 14, marginTop: 12 },
+  card: { backgroundColor: colors.surface, borderRadius: 12, padding: 16, marginBottom: 16 },
   exerciseHeader: { marginBottom: 12 },
   exerciseName: { fontSize: 17, fontWeight: '600' },
-  exerciseMeta: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
-  plannedRef: { backgroundColor: '#f3f4f6', borderRadius: 8, padding: 10, marginBottom: 12 },
-  plannedLabel: { fontSize: 11, fontWeight: '600', color: '#6b7280', marginBottom: 4 },
-  plannedSet: { fontSize: 13, color: '#374151' },
+  exerciseMeta: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  plannedRef: { backgroundColor: colors.surfaceMuted, borderRadius: 8, padding: 10, marginBottom: 12 },
+  plannedLabel: { fontSize: 11, fontWeight: '600', color: colors.textSecondary, marginBottom: 4 },
+  plannedSet: { fontSize: 13, color: colors.text },
   inputRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
   inputGroup: { flex: 1 },
-  inputLabel: { fontSize: 11, color: '#6b7280', marginBottom: 4 },
+  inputLabel: { fontSize: 11, color: colors.textSecondary, marginBottom: 4 },
   input: {
-    backgroundColor: '#f3f4f6',
+    backgroundColor: colors.surfaceMuted,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 16,
     fontWeight: '500',
   },
-  logBtn: { backgroundColor: '#22c55e', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  logBtn: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
   logBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
   navRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  navBtn: { backgroundColor: '#e5e7eb', borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8 },
+  navBtn: { backgroundColor: colors.border, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8 },
   navBtnDisabled: { opacity: 0.4 },
-  navBtnText: { fontSize: 13, fontWeight: '500', color: '#374151' },
-  navLabel: { fontSize: 13, color: '#6b7280' },
+  navBtnText: { fontSize: 13, fontWeight: '500', color: colors.text },
+  navLabel: { fontSize: 13, color: colors.textSecondary },
   section: { marginBottom: 16 },
-  sectionTitle: { fontSize: 15, fontWeight: '600', color: '#374151', marginBottom: 10 },
-  loggedCard: { backgroundColor: '#fff', borderRadius: 10, padding: 12, marginBottom: 6 },
+  sectionTitle: { fontSize: 15, fontWeight: '600', color: colors.text, marginBottom: 10 },
+  loggedCard: { backgroundColor: colors.surface, borderRadius: 10, padding: 12, marginBottom: 6 },
   loggedName: { fontSize: 14, fontWeight: '600', marginBottom: 4 },
-  loggedSet: { fontSize: 13, color: '#6b7280' },
-  finishBtn: { backgroundColor: '#ef4444', borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
+  loggedSet: { fontSize: 13, color: colors.textSecondary },
+  finishBtn: { backgroundColor: colors.danger, borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
   finishBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });

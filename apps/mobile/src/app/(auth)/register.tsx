@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView 
 import { router } from 'expo-router';
 import { useAuth } from '../../hooks/useAuth';
 import { RegisterInputSchema } from '@openfit/types';
+import { colors, spacing, radii, typography } from '../../theme';
 
 export default function RegisterScreen() {
   const { register } = useAuth();
@@ -91,20 +92,20 @@ export default function RegisterScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40, backgroundColor: '#fff' },
+  container: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40, backgroundColor: colors.surface },
   title: { fontSize: 28, fontWeight: 'bold', marginBottom: 24, textAlign: 'center' },
-  input: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12, fontSize: 16, marginBottom: 12 },
-  passwordContainer: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#d1d5db', borderRadius: 10, marginBottom: 12 },
+  input: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12, fontSize: 16, marginBottom: 12 },
+  passwordContainer: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 10, marginBottom: 12 },
   passwordInput: { flex: 1, paddingHorizontal: 16, paddingVertical: 12, fontSize: 16 },
   eyeBtn: { paddingHorizontal: 14, paddingVertical: 12 },
   eyeText: { fontSize: 18 },
-  button: { backgroundColor: '#22c55e', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginBottom: 16, marginTop: 8 },
+  button: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginBottom: 16, marginTop: 8 },
   buttonDisabled: { opacity: 0.5 },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   link: { textAlign: 'center', color: '#16a34a', fontSize: 14 },
   sexRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
-  sexBtn: { flex: 1, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
-  sexBtnActive: { backgroundColor: '#22c55e', borderColor: '#22c55e' },
-  sexBtnText: { fontSize: 16, color: '#374151', fontWeight: '500' },
+  sexBtn: { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  sexBtnActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  sexBtnText: { fontSize: 16, color: colors.text, fontWeight: '500' },
   sexBtnTextActive: { color: '#fff' },
 });

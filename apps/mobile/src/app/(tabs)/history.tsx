@@ -11,6 +11,8 @@ import MapLibreGL, { setConnected } from '@maplibre/maplibre-react-native';
 import type { WorkoutType } from '@openfit/types';
 import { apiClient } from '../../services/api';
 import { formatDuration } from '../../utils';
+import { colors, spacing, radii, typography } from '../../theme';
+import { useScreenTopPadding } from '../../theme/useScreenPadding';
 
 interface GPSPoint {
   lat: number;
@@ -66,9 +68,9 @@ function typeLabel(type: WorkoutType): string {
 }
 
 function typeColor(type: WorkoutType): string {
-  if (type === 'strength') return '#22c55e';
-  if (type === 'jiu_jitsu') return '#a855f7';
-  return '#3b82f6';
+  if (type === 'strength') return colors.accent;
+  if (type === 'jiu_jitsu') return colors.jiuJitsu;
+  return colors.run;
 }
 
 // OpenFreeMap — free OSM tiles, no API key.
@@ -142,11 +144,11 @@ function RunMap({ gpsPoints }: { gpsPoints: GPSPoint[] }) {
         <MapLibreGL.ShapeSource id="route" shape={routeGeoJSON}>
           <MapLibreGL.LineLayer
             id="routeLineGlow"
-            style={{ lineColor: '#3b82f6', lineWidth: 8, lineOpacity: 0.3, lineCap: 'round', lineJoin: 'round' }}
+            style={{ lineColor: colors.run, lineWidth: 8, lineOpacity: 0.3, lineCap: 'round', lineJoin: 'round' }}
           />
           <MapLibreGL.LineLayer
             id="routeLine"
-            style={{ lineColor: '#3b82f6', lineWidth: 4, lineCap: 'round', lineJoin: 'round' }}
+            style={{ lineColor: colors.run, lineWidth: 4, lineCap: 'round', lineJoin: 'round' }}
           />
         </MapLibreGL.ShapeSource>
         <MapLibreGL.ShapeSource
@@ -155,7 +157,7 @@ function RunMap({ gpsPoints }: { gpsPoints: GPSPoint[] }) {
         >
           <MapLibreGL.CircleLayer
             id="startCircle"
-            style={{ circleRadius: 7, circleColor: '#22c55e', circleStrokeWidth: 3, circleStrokeColor: '#ffffff' }}
+            style={{ circleRadius: 7, circleColor: colors.accent, circleStrokeWidth: 3, circleStrokeColor: '#ffffff' }}
           />
         </MapLibreGL.ShapeSource>
         <MapLibreGL.ShapeSource
@@ -164,7 +166,7 @@ function RunMap({ gpsPoints }: { gpsPoints: GPSPoint[] }) {
         >
           <MapLibreGL.CircleLayer
             id="endCircle"
-            style={{ circleRadius: 7, circleColor: '#ef4444', circleStrokeWidth: 3, circleStrokeColor: '#ffffff' }}
+            style={{ circleRadius: 7, circleColor: colors.danger, circleStrokeWidth: 3, circleStrokeColor: '#ffffff' }}
           />
         </MapLibreGL.ShapeSource>
       </MapLibreGL.MapView>
@@ -188,6 +190,7 @@ export default function HistoryScreen() {
   const [logs, setLogs] = useState<WorkoutLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const topPadding = useScreenTopPadding();
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -215,7 +218,7 @@ export default function HistoryScreen() {
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { paddingTop: topPadding }]}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchData} />}
     >
       <Text style={styles.title}>History</Text>
@@ -375,43 +378,43 @@ export default function HistoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb', paddingHorizontal: 16, paddingTop: 56 },
+  container: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: 16 },
   title: { fontSize: 24, fontWeight: 'bold', marginBottom: 16 },
   filterRow: { flexDirection: 'row', marginBottom: 16, maxHeight: 44 },
   filterChip: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 8,
     marginRight: 8,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: colors.border,
   },
-  filterChipActive: { backgroundColor: '#22c55e', borderColor: '#22c55e' },
-  filterChipText: { fontSize: 13, color: '#374151', fontWeight: '500' },
+  filterChipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  filterChipText: { fontSize: 13, color: colors.text, fontWeight: '500' },
   filterChipTextActive: { color: '#fff' },
-  emptyText: { fontSize: 14, color: '#9ca3af', textAlign: 'center', marginTop: 40 },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 10 },
+  emptyText: { fontSize: 14, color: colors.textMuted, textAlign: 'center', marginTop: 40 },
+  card: { backgroundColor: colors.surface, borderRadius: 12, padding: 16, marginBottom: 10 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   cardLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
   typeBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   typeBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   cardTitle: { fontSize: 15, fontWeight: '600' },
-  cardDate: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
+  cardDate: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
   cardRight: { alignItems: 'flex-end' },
-  cardStat: { fontSize: 14, fontWeight: '500', color: '#374151' },
-  cardStatSub: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
-  calBar: { fontSize: 12, color: '#6b7280', marginTop: 8, fontWeight: '500' },
-  expandedContent: { marginTop: 12, borderTopWidth: 1, borderTopColor: '#f3f4f6', paddingTop: 12 },
+  cardStat: { fontSize: 14, fontWeight: '500', color: colors.text },
+  cardStatSub: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  calBar: { fontSize: 12, color: colors.textSecondary, marginTop: 8, fontWeight: '500' },
+  expandedContent: { marginTop: 12, borderTopWidth: 1, borderTopColor: colors.surfaceMuted, paddingTop: 12 },
   exerciseRow: { marginBottom: 8 },
   exerciseName: { fontSize: 14, fontWeight: '500', marginBottom: 2 },
-  setText: { fontSize: 13, color: '#6b7280', marginLeft: 8 },
+  setText: { fontSize: 13, color: colors.textSecondary, marginLeft: 8 },
   mapContainer: { height: 250, borderRadius: 12, overflow: 'hidden', marginBottom: 12 },
   map: { flex: 1 },
-  mapPlaceholder: { height: 100, borderRadius: 10, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-  mapPlaceholderText: { fontSize: 13, color: '#9ca3af' },
+  mapPlaceholder: { height: 100, borderRadius: 10, backgroundColor: colors.surfaceMuted, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+  mapPlaceholderText: { fontSize: 13, color: colors.textMuted },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between' },
   detailItem: { flex: 1, alignItems: 'center' },
-  detailLabel: { fontSize: 11, color: '#9ca3af', marginBottom: 2 },
+  detailLabel: { fontSize: 11, color: colors.textMuted, marginBottom: 2 },
   detailValue: { fontSize: 14, fontWeight: '500' },
 });

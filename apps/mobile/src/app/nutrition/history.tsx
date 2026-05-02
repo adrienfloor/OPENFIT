@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   RefreshControl,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { FoodLog } from '@openfit/types';
 import { sumDayTotals } from '@openfit/fitness-core';
@@ -47,6 +47,14 @@ export default function HistoryScreen() {
       cancelled = true;
     };
   }, [trigger]);
+
+  // Refetch on focus so deletes/edits made on the log detail screen are
+  // reflected when the user navigates back here.
+  useFocusEffect(
+    useCallback(() => {
+      setTrigger((t) => t + 1);
+    }, []),
+  );
 
   const days = groupByDay(logs);
 

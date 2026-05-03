@@ -90,7 +90,7 @@ function HeartRateLive({
   );
 }
 
-export default function JiuJitsuScreen() {
+export default function FreeWorkoutScreen() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const [state, setState] = useState<SessionState>('idle');
@@ -171,7 +171,7 @@ export default function JiuJitsuScreen() {
         : null;
 
     const payload = {
-      type: 'jiu_jitsu' as const,
+      type: 'free' as const,
       startedAt: startTimeRef.current.toISOString(),
       completedAt: new Date().toISOString(),
       durationSeconds: elapsed,
@@ -223,8 +223,8 @@ export default function JiuJitsuScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Text style={styles.backText}>‹ Back</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Jiu-Jitsu</Text>
-        <Text style={styles.subtitle}>HR-tracked timed session</Text>
+        <Text style={styles.title}>Free</Text>
+        <Text style={styles.subtitle}>HR-tracked timed session — anything not strength or run</Text>
         <Text style={styles.subtitleSmall}>Put on your Helio Strap before starting</Text>
         <TouchableOpacity style={styles.startBtn} onPress={handleStart}>
           <Text style={styles.startBtnText}>Start Session</Text>
@@ -307,14 +307,14 @@ const styles = StyleSheet.create({
   title: { fontSize: 36, fontWeight: 'bold', marginBottom: 8, color: colors.text },
   subtitle: { fontSize: 16, color: colors.textSecondary, marginBottom: 4 },
   subtitleSmall: { fontSize: 13, color: colors.textMuted, marginBottom: 48 },
-  startBtn: { backgroundColor: colors.jiuJitsu, paddingHorizontal: 56, paddingVertical: 20, borderRadius: 16 },
+  startBtn: { backgroundColor: colors.free, paddingHorizontal: 56, paddingVertical: 20, borderRadius: 16 },
   startBtnText: { color: '#fff', fontSize: 18, fontWeight: '600' },
-  timer: { fontSize: 72, fontWeight: '200', textAlign: 'center', marginTop: 40, marginBottom: 24, color: '#111' },
+  timer: { fontSize: 72, fontWeight: '200', textAlign: 'center', marginTop: 40, marginBottom: 24, color: colors.text },
   hrSection: { backgroundColor: colors.surface, borderRadius: 16, padding: 20, marginBottom: 32 },
   hrRow: { flexDirection: 'row', justifyContent: 'space-between' },
   hrStatBox: { alignItems: 'center', flex: 1 },
   hrStatLabel: { fontSize: 11, color: colors.textMuted, marginBottom: 4 },
-  hrStatValue: { fontSize: 24, fontWeight: '700', color: '#111' },
+  hrStatValue: { fontSize: 24, fontWeight: '700', color: colors.text },
   hrStatUnit: { fontSize: 10, color: colors.textMuted, marginTop: 2 },
   hrZoneText: { fontSize: 13, fontWeight: '700', marginTop: 8 , color: colors.text },
   hrZoneHigh: { color: colors.danger },
@@ -335,5 +335,5 @@ const styles = StyleSheet.create({
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: colors.surface, borderRadius: 12, padding: 20 },
   summaryItem: { alignItems: 'center', flex: 1 },
   summaryLabel: { fontSize: 12, color: colors.textMuted, marginBottom: 4 },
-  summaryValue: { fontSize: 18, fontWeight: '700' , color: colors.text },
+  summaryValue: { fontSize: 18, fontWeight: '700', color: colors.text },
 });

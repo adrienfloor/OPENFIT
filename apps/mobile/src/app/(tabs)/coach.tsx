@@ -66,7 +66,7 @@ const PHASE_COLORS: Record<MesocyclePhase, string> = {
   accumulation: colors.run,
   intensification: colors.effort,
   deload: colors.accent,
-  peak: colors.jiuJitsu,
+  peak: colors.free,
 };
 
 const DEFAULT_PROFILE: CoachingProfile = {
@@ -228,8 +228,8 @@ export default function CoachScreen() {
       {/* Secondary sports */}
       <Section title="Secondary sports">
         <SecondarySportRow
-          type="jiu_jitsu"
-          label="Jiu-Jitsu"
+          type="free"
+          label="Other (jiu-jitsu, boxing, climbing…)"
           profile={draft}
           setProfile={setDraft}
         />

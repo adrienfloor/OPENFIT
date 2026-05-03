@@ -108,7 +108,7 @@ interface WeeklySummary {
   totalDuration: number;
   totalCalories: number;
   totalDistance: number;
-  byType: { strength: number; run: number; jiuJitsu: number };
+  byType: { strength: number; run: number; free: number };
 }
 
 function computeWeeklySummary(workouts: HistoryWorkout[]): WeeklySummary {
@@ -123,7 +123,7 @@ function computeWeeklySummary(workouts: HistoryWorkout[]): WeeklySummary {
   let totalDistance = 0;
   let strength = 0;
   let run = 0;
-  let jiuJitsu = 0;
+  let free = 0;
   let totalSessions = 0;
 
   for (const w of workouts) {
@@ -135,7 +135,7 @@ function computeWeeklySummary(workouts: HistoryWorkout[]): WeeklySummary {
     totalDistance += w.distanceMeters ?? 0;
     if (w.type === 'strength') strength += 1;
     else if (w.type === 'run') run += 1;
-    else if (w.type === 'jiu_jitsu') jiuJitsu += 1;
+    else if (w.type === 'free') free += 1;
   }
 
   return {
@@ -143,7 +143,7 @@ function computeWeeklySummary(workouts: HistoryWorkout[]): WeeklySummary {
     totalDuration,
     totalCalories,
     totalDistance,
-    byType: { strength, run, jiuJitsu },
+    byType: { strength, run, free },
   };
 }
 

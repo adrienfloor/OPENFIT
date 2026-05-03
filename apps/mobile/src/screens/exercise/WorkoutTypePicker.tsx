@@ -4,7 +4,7 @@ import { colors, spacing, radii, typography } from '../../theme';
 
 interface Props {
   /** Number of sessions logged for each type — surfaced as a small badge. */
-  weeklyCounts: { strength: number; run: number; jiuJitsu: number };
+  weeklyCounts: { strength: number; run: number; free: number };
 }
 
 interface CardConfig {
@@ -13,7 +13,7 @@ interface CardConfig {
   sub: string;
   tone: string;
   borderTone: string;
-  href: '/workout/strength' | '/workout/run' | '/workout/jiujitsu';
+  href: '/workout/strength' | '/workout/run' | '/workout/free';
   count: number;
 }
 
@@ -46,13 +46,13 @@ export function WorkoutTypePicker({ weeklyCounts }: Props) {
       count: weeklyCounts.run,
     },
     {
-      emoji: '🥋',
-      label: 'Jiu-Jitsu',
-      sub: 'Timer · live HR · zones',
+      emoji: '🤸',
+      label: 'Free',
+      sub: 'Timer · live HR · anything else',
       tone: 'rgba(168, 85, 247, 0.12)',
-      borderTone: colors.jiuJitsu,
-      href: '/workout/jiujitsu',
-      count: weeklyCounts.jiuJitsu,
+      borderTone: colors.free,
+      href: '/workout/free',
+      count: weeklyCounts.free,
     },
   ];
 

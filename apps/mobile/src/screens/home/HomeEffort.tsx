@@ -345,7 +345,7 @@ export function HomeEffort() {
 
 function typeNameFor(t: WorkoutType): string {
   if (t === 'strength') return 'Strength';
-  if (t === 'jiu_jitsu') return 'Jiu-Jitsu';
+  if (t === 'free') return 'Free';
   return 'Run';
 }
 

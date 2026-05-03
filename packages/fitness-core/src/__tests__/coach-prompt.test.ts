@@ -15,7 +15,7 @@ const baseInput: CoachPromptInput = {
     availableEquipment: ['barbell', 'dumbbell', 'cable'],
     emphasis: ['back', 'arms'],
     secondarySports: [
-      { type: 'jiu_jitsu', sessionsPerWeek: 2, avgDurationMinutes: 90 },
+      { type: 'free', sessionsPerWeek: 2, avgDurationMinutes: 90 },
       { type: 'run', sessionsPerWeek: 2, avgDurationMinutes: 45 },
     ],
     injuriesNotes: 'mild right shoulder, avoid heavy overhead pressing',
@@ -26,7 +26,7 @@ const baseInput: CoachPromptInput = {
     avgRpeLast30d: 7.4,
     runKmLast30d: 38.5,
     runSessionsLast30d: 8,
-    jiuJitsuSessionsLast30d: 7,
+    freeSessionsLast30d: 7,
     avgWeeklyEffortMinutes: 220,
     avgReadiness7d: 68,
     acwr: 1.15,
@@ -86,13 +86,13 @@ describe('buildCoachPrompt', () => {
     expect(user).toContain('Primary goal: aesthetics');
     expect(user).toContain('Available equipment: barbell, dumbbell, cable');
     expect(user).toContain('Emphasis muscle groups: back, arms');
-    expect(user).toContain('jiu_jitsu 2x/week 90min, run 2x/week 45min');
+    expect(user).toContain('free 2x/week 90min, run 2x/week 45min');
     expect(user).toContain('mild right shoulder');
 
     expect(user).toContain('Strength sessions completed: 12');
     expect(user).toContain('Avg RPE on strength sessions: 7.4');
     expect(user).toContain('Run volume: 38.5km across 8 sessions');
-    expect(user).toContain('Jiu-jitsu sessions: 7');
+    expect(user).toContain('Free (non-strength/run) sessions: 7');
     expect(user).toContain('7-day BioCharge avg: 68');
     expect(user).toContain('ACWR: 1.15 (ok)');
 

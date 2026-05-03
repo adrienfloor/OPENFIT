@@ -35,13 +35,13 @@ function formatTime(d: Date): string {
 
 function typeLabel(t: WorkoutType): string {
   if (t === 'strength') return 'Strength';
-  if (t === 'jiu_jitsu') return 'Jiu-Jitsu';
+  if (t === 'free') return 'Free';
   return 'Run';
 }
 
 function typeColor(t: WorkoutType): string {
   if (t === 'strength') return colors.strength;
-  if (t === 'jiu_jitsu') return colors.jiuJitsu;
+  if (t === 'free') return colors.free;
   return colors.run;
 }
 

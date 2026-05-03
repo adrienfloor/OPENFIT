@@ -21,19 +21,19 @@ const FILTERS: { value: Filter; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'strength', label: 'Strength' },
   { value: 'run', label: 'Run' },
-  { value: 'jiu_jitsu', label: 'Jiu-Jitsu' },
+  { value: 'free', label: 'Free' },
 ];
 
 const TYPE_COLOR: Record<WorkoutType, string> = {
   strength: colors.strength,
   run: colors.run,
-  jiu_jitsu: colors.jiuJitsu,
+  free: colors.free,
 };
 
 const TYPE_LABEL: Record<WorkoutType, string> = {
   strength: 'Strength',
   run: 'Run',
-  jiu_jitsu: 'Jiu-Jitsu',
+  free: 'Free',
 };
 
 function formatDate(d: string | Date): string {
@@ -63,7 +63,7 @@ export function HistoryList({ workouts, onSelect }: Props) {
       all: workouts.length,
       strength: workouts.filter((w) => w.type === 'strength').length,
       run: workouts.filter((w) => w.type === 'run').length,
-      jiu_jitsu: workouts.filter((w) => w.type === 'jiu_jitsu').length,
+      free: workouts.filter((w) => w.type === 'free').length,
     };
   }, [workouts]);
 

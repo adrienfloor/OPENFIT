@@ -33,7 +33,7 @@ export const colors = {
   bioCharge: '#22c55e',
   strength: '#22c55e',
   run: '#3b82f6',
-  jiuJitsu: '#a855f7',
+  free: '#a855f7',
   danger: '#ef4444',
   warning: '#f59e0b',
   info: '#38bdf8',

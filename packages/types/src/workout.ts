@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { HeartRateSampleSchema } from './health';
 
-export const WorkoutTypeSchema = z.enum(['strength', 'jiu_jitsu', 'run']);
+export const WorkoutTypeSchema = z.enum(['strength', 'free', 'run']);
 export type WorkoutType = z.infer<typeof WorkoutTypeSchema>;
 
 export const MuscleGroupSchema = z.enum([
@@ -89,10 +89,11 @@ export const ExerciseLogSchema = z.object({
 });
 
 /**
- * Unified activity log — strength workouts, jiu-jitsu sessions, and runs all
- * live here, distinguished by `type`. Run-specific fields and `gpsTrack` are
- * populated only when `type === 'run'`; `exerciseLogs` is only populated for
- * `type === 'strength'`.
+ * Unified activity log — strength workouts, free HR-tracked sessions, and runs
+ * all live here, distinguished by `type`. Run-specific fields and `gpsTrack`
+ * are populated only when `type === 'run'`; `exerciseLogs` is only populated
+ * for `type === 'strength'`. The `free` bucket holds any timed HR-tracked
+ * session that isn't strength or run (jiu-jitsu, boxing, climbing, etc.).
  */
 export const WorkoutLogSchema = z.object({
   id: z.string(),

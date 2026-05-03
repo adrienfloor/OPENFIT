@@ -82,7 +82,7 @@ export function buildCoachPrompt(input: CoachPromptInput): CoachPrompt {
   lines.push(
     `- Run volume: ${input.recent.runKmLast30d.toFixed(1)}km across ${input.recent.runSessionsLast30d} sessions`,
   );
-  lines.push(`- Jiu-jitsu sessions: ${input.recent.jiuJitsuSessionsLast30d}`);
+  lines.push(`- Free (non-strength/run) sessions: ${input.recent.freeSessionsLast30d}`);
   lines.push(
     `- Weekly avg earned effort minutes: ${formatNullable(input.recent.avgWeeklyEffortMinutes, (n) => Math.round(n).toString())}`,
   );

@@ -248,7 +248,7 @@ describe('CoachService.gatherPromptInput', () => {
     expect(input.recent.strengthSessionsLast30d).toBe(1);
     expect(input.recent.runKmLast30d).toBeCloseTo(12, 1);
     expect(input.recent.runSessionsLast30d).toBe(2);
-    expect(input.recent.jiuJitsuSessionsLast30d).toBe(3);
+    expect(input.recent.freeSessionsLast30d).toBe(3);
     expect(input.recent.avgReadiness7d).toBeCloseTo(67.5, 1);
     expect(input.recent.avgRpeLast30d).toBeCloseTo(7.5, 1);
     expect(input.exerciseLibrary).toHaveLength(1);

@@ -313,7 +313,7 @@ export default function WorkoutScreen() {
     const hasPlan = plannedExercises.length > 0;
 
     return (
-      <ScrollView style={[styles.container, { paddingTop: topPadding }]} keyboardShouldPersistTaps="handled">
+      <View style={[styles.activeRoot, { paddingTop: topPadding }]}>
         <View style={styles.header}>
           <TouchableOpacity onPress={handleCancel}>
             <Text style={styles.cancelText}>Cancel</Text>
@@ -337,6 +337,7 @@ export default function WorkoutScreen() {
           )}
         </View>
 
+        <ScrollView style={styles.activeScroll} keyboardShouldPersistTaps="handled">
         {/* Live heart rate */}
         <HeartRateCard maxHR={maxHR} onSamplesRef={hrSamplesRef} />
 
@@ -411,7 +412,8 @@ export default function WorkoutScreen() {
             setSwapTarget(null);
           }}
         />
-      </ScrollView>
+        </ScrollView>
+      </View>
     );
   }
 
@@ -1006,6 +1008,12 @@ function FreeWorkoutInput({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: 16 },
+  // Active workout splits the screen into a sticky header (always visible
+  // even when the soft keyboard pushes the input fields up) and a scrollable
+  // body. Using ScrollView at the root meant the keyboard scrolled the whole
+  // screen, hiding the Cancel/elapsed/sets header behind the status bar.
+  activeRoot: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: 16 },
+  activeScroll: { flex: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   backText: { fontSize: 16, color: colors.accent, fontWeight: '500', width: 50 },

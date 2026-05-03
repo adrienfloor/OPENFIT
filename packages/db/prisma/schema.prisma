@@ -22,7 +22,7 @@ enum Sex {
 
 enum WorkoutType {
   strength
-  jiu_jitsu
+  free
   run
 }
 

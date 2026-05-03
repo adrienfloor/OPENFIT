@@ -163,7 +163,7 @@ export class CoachService {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setUTCDate(sevenDaysAgo.getUTCDate() - 7);
 
-    const [strengthLogs, runLogs, bjjLogs, recentHealth] = await Promise.all([
+    const [strengthLogs, runLogs, freeLogs, recentHealth] = await Promise.all([
       this.prisma.workoutLog.findMany({
         where: { userId, type: 'strength', startedAt: { gte: since } },
         include: { exerciseLogs: { include: { completedSets: true } } },
@@ -173,7 +173,7 @@ export class CoachService {
         select: { distanceMeters: true },
       }),
       this.prisma.workoutLog.count({
-        where: { userId, type: 'jiu_jitsu', startedAt: { gte: since } },
+        where: { userId, type: 'free', startedAt: { gte: since } },
       }),
       this.prisma.dailyHealth.findMany({
         where: { userId, date: { gte: sevenDaysAgo } },
@@ -208,7 +208,7 @@ export class CoachService {
       avgRpeLast30d: avgRpe,
       runKmLast30d: totalRunMeters / 1000,
       runSessionsLast30d: runLogs.length,
-      jiuJitsuSessionsLast30d: bjjLogs,
+      freeSessionsLast30d: freeLogs,
       avgWeeklyEffortMinutes,
       avgReadiness7d,
       acwr,

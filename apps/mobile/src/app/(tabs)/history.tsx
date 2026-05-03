@@ -63,13 +63,13 @@ function formatPace(secondsPerKm: number): string {
 
 function typeLabel(type: WorkoutType): string {
   if (type === 'strength') return 'Strength';
-  if (type === 'jiu_jitsu') return 'Jiu-Jitsu';
+  if (type === 'free') return 'Free';
   return 'Run';
 }
 
 function typeColor(type: WorkoutType): string {
   if (type === 'strength') return colors.accent;
-  if (type === 'jiu_jitsu') return colors.jiuJitsu;
+  if (type === 'free') return colors.free;
   return colors.run;
 }
 
@@ -213,7 +213,7 @@ export default function HistoryScreen() {
     all: logs.length,
     strength: logs.filter((l) => l.type === 'strength').length,
     run: logs.filter((l) => l.type === 'run').length,
-    jiu_jitsu: logs.filter((l) => l.type === 'jiu_jitsu').length,
+    free: logs.filter((l) => l.type === 'free').length,
   };
 
   return (
@@ -224,7 +224,7 @@ export default function HistoryScreen() {
       <Text style={styles.title}>History</Text>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
-        {(['all', 'strength', 'run', 'jiu_jitsu'] as const).map((f) => (
+        {(['all', 'strength', 'run', 'free'] as const).map((f) => (
           <TouchableOpacity
             key={f}
             style={[styles.filterChip, filter === f && styles.filterChipActive]}
@@ -272,7 +272,7 @@ export default function HistoryScreen() {
               </View>
             );
           }
-          // jiu_jitsu
+          // free
           return (
             <View style={styles.cardRight}>
               <Text style={styles.cardStat}>
@@ -348,7 +348,7 @@ export default function HistoryScreen() {
                   </>
                 )}
 
-                {log.type === 'jiu_jitsu' && hr && (
+                {log.type === 'free' && hr && (
                   <View style={styles.detailRow}>
                     <View style={styles.detailItem}>
                       <Text style={styles.detailLabel}>Duration</Text>

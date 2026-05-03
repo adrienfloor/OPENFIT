@@ -16,7 +16,7 @@ export const TrainingGoalSchema = z.enum([
 
 export const ExperienceLevelSchema = z.enum(['beginner', 'intermediate', 'advanced']);
 
-export const SecondarySportTypeSchema = z.enum(['jiu_jitsu', 'run']);
+export const SecondarySportTypeSchema = z.enum(['free', 'run']);
 
 export const SecondarySportSchema = z.object({
   type: SecondarySportTypeSchema,
@@ -130,7 +130,7 @@ export const CoachRecentActivitySchema = z.object({
   avgRpeLast30d: z.number().min(1).max(10).nullable(),
   runKmLast30d: z.number().nonnegative(),
   runSessionsLast30d: z.number().int().nonnegative(),
-  jiuJitsuSessionsLast30d: z.number().int().nonnegative(),
+  freeSessionsLast30d: z.number().int().nonnegative(),
   avgWeeklyEffortMinutes: z.number().nonnegative().nullable(),
   avgReadiness7d: z.number().min(0).max(100).nullable(),
   /** Acute:Chronic Workload Ratio over the last 28 days. */

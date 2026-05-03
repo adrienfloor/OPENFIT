@@ -49,13 +49,13 @@ interface Props {
 const TYPE_COLOR: Record<WorkoutType, string> = {
   strength: colors.strength,
   run: colors.run,
-  jiu_jitsu: colors.jiuJitsu,
+  free: colors.free,
 };
 
 const TYPE_LABEL: Record<WorkoutType, string> = {
   strength: 'Strength',
   run: 'Run',
-  jiu_jitsu: 'Jiu-Jitsu',
+  free: 'Free',
 };
 
 function formatPace(secondsPerKm: number | null): string {

@@ -25,7 +25,7 @@ import {
 import { SimpleMetricDetail } from './overview/details/SimpleMetricDetail';
 import { DailyActivityDetail } from './effort/DailyActivityDetail';
 import { WorkoutDetail, type TodayWorkout } from './effort/WorkoutDetail';
-import { colors, spacing, radii, typography } from '../../theme';
+import { colors, spacing, radii, typography, themedRefresh } from '../../theme';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
@@ -113,7 +113,7 @@ export function HomeEffort() {
             refetch();
             fetchTodayWorkouts();
           }}
-          tintColor={colors.text}
+          {...themedRefresh}
         />
       }
     >

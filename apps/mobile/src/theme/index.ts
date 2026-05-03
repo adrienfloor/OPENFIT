@@ -82,3 +82,25 @@ export type Theme = typeof theme;
 export function useTheme(): Theme {
   return theme;
 }
+
+/**
+ * Themed props for `RefreshControl`. The defaults render a stark white disc
+ * with a black arc on Android — jarring on the dark theme. Spreading these
+ * props brings the spinner in line with the brand accent and the surface
+ * colour so it disappears into the bg layers when not pulled.
+ *
+ * Usage:
+ *   <RefreshControl refreshing={loading} onRefresh={refetch} {...themedRefresh} />
+ */
+export const themedRefresh: {
+  tintColor: string;
+  colors: string[];
+  progressBackgroundColor: string;
+} = {
+  // iOS: arc colour.
+  tintColor: colors.accent,
+  // Android: array of arc colours (cycles through them).
+  colors: [colors.accent],
+  // Android: bg of the circular indicator disc.
+  progressBackgroundColor: colors.surface,
+};

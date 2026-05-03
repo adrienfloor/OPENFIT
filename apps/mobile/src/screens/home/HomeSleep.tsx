@@ -17,7 +17,7 @@ import { RegularityBars } from '../../components/charts/RegularityBars';
 import { SparkLine } from '../../components/charts/SparkLine';
 import { useMockSleep, useMockSleepInsight } from '../../mocks';
 import { HypnogramDetail } from './sleep/HypnogramDetail';
-import { colors, spacing, radii, typography } from '../../theme';
+import { colors, spacing, radii, typography, themedRefresh } from '../../theme';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
@@ -61,7 +61,7 @@ export function HomeSleep() {
     <ScrollView
       style={styles.container}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={refetch} tintColor={colors.text} />
+        <RefreshControl refreshing={loading} onRefresh={refetch} {...themedRefresh} />
       }
     >
       {/* Hero ring */}

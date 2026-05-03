@@ -6,8 +6,8 @@ import {
   ScrollView,
   TextInput,
   TouchableOpacity,
-  ActivityIndicator,
 } from 'react-native';
+import { Loader } from '../../components/Loader';
 import { useRouter } from 'expo-router';
 import type { Sex, UpdateUserInput } from '@openfit/types';
 import { useAuth } from '../../hooks/useAuth';
@@ -97,7 +97,7 @@ export default function EditProfileScreen() {
         <Text style={styles.title}>Profile</Text>
         <TouchableOpacity onPress={onSave} disabled={!dirty || saving}>
           {saving ? (
-            <ActivityIndicator color={colors.accent} />
+            <Loader size={20} />
           ) : (
             <Text style={[styles.save, !dirty && styles.saveDisabled]}>Save</Text>
           )}

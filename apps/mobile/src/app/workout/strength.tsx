@@ -25,7 +25,7 @@ import {
   computeCaloriesFromHRSamples,
   ageYearsFromDob,
 } from '@openfit/fitness-core';
-import { colors, spacing, radii, typography } from '../../theme';
+import { colors, spacing, radii, typography, themedRefresh } from '../../theme';
 import { useScreenTopPadding } from '../../theme/useScreenPadding';
 import { dialog } from '../../services/dialog';
 
@@ -422,7 +422,7 @@ export default function WorkoutScreen() {
     <ScrollView
       style={[styles.container, { paddingTop: topPadding }]}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={fetchData} tintColor={colors.text} />
+        <RefreshControl refreshing={loading} onRefresh={fetchData} {...themedRefresh} />
       }
     >
       <View style={styles.titleRow}>

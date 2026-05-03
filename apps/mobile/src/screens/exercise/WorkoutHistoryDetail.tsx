@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { Loader } from '../../components/Loader';
 import MapLibreGL, { setConnected } from '@maplibre/maplibre-react-native';
 import type { WorkoutType } from '@openfit/types';
 import { DetailModal } from '../../components/DetailModal';
@@ -135,7 +136,7 @@ export function WorkoutHistoryDetail({ visible, onClose, workoutId }: Props) {
     >
       {loading || !log ? (
         <View style={styles.loadingWrap}>
-          <ActivityIndicator color={colors.accent} />
+          <Loader size={32} />
         </View>
       ) : (
         <>

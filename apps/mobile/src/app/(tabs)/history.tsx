@@ -11,7 +11,7 @@ import MapLibreGL, { setConnected } from '@maplibre/maplibre-react-native';
 import type { WorkoutType } from '@openfit/types';
 import { apiClient } from '../../services/api';
 import { formatDuration } from '../../utils';
-import { colors, spacing, radii, typography } from '../../theme';
+import { colors, spacing, radii, typography, themedRefresh } from '../../theme';
 import { useScreenTopPadding } from '../../theme/useScreenPadding';
 
 interface GPSPoint {
@@ -219,7 +219,7 @@ export default function HistoryScreen() {
   return (
     <ScrollView
       style={[styles.container, { paddingTop: topPadding }]}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchData} />}
+      refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchData} {...themedRefresh} />}
     >
       <Text style={styles.title}>History</Text>
 

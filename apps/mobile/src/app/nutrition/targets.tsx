@@ -6,8 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  ActivityIndicator,
 } from 'react-native';
+import { Loader } from '../../components/Loader';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { MacroTargets } from '@openfit/types';
@@ -133,7 +133,7 @@ export default function TargetsScreen() {
   if (loading) {
     return (
       <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
-        <ActivityIndicator size="large" color="#22c55e" />
+        <Loader size={48} />
       </View>
     );
   }
@@ -151,7 +151,7 @@ export default function TargetsScreen() {
         <Text style={styles.title}>Macro targets</Text>
         <TouchableOpacity onPress={handleSave} disabled={saving}>
           {saving ? (
-            <ActivityIndicator color="#22c55e" />
+            <Loader size={20} />
           ) : (
             <Text style={styles.save}>Save</Text>
           )}

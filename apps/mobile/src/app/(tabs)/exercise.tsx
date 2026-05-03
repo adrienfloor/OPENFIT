@@ -15,7 +15,7 @@ import {
   type HistoryWorkout,
 } from '../../screens/exercise/HistoryList';
 import { WorkoutHistoryDetail } from '../../screens/exercise/WorkoutHistoryDetail';
-import { colors, spacing, typography } from '../../theme';
+import { colors, spacing, typography, themedRefresh } from '../../theme';
 import { useScreenTopPadding } from '../../theme/useScreenPadding';
 
 /**
@@ -67,7 +67,7 @@ export default function ExerciseScreen() {
     <ScrollView
       style={[styles.container, { paddingTop: topPadding }]}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={fetchData} tintColor={colors.text} />
+        <RefreshControl refreshing={loading} onRefresh={fetchData} {...themedRefresh} />
       }
     >
       <Text style={styles.title}>Exercise</Text>

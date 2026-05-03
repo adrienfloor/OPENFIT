@@ -13,7 +13,7 @@ import type { FoodLog } from '@openfit/types';
 import { sumDayTotals } from '@openfit/fitness-core';
 import { listFoodLogs } from '../../services/nutrition';
 import { AuthedImage } from '../../components/AuthedImage';
-import { colors, spacing, radii, typography } from '../../theme';
+import { colors, spacing, radii, typography, themedRefresh } from '../../theme';
 
 /**
  * Past-day browse — groups all FoodLogs by day, newest day first. Tap a
@@ -67,6 +67,7 @@ export default function HistoryScreen() {
         <RefreshControl
           refreshing={loading}
           onRefresh={() => setTrigger((t) => t + 1)}
+          {...themedRefresh}
         />
       }
     >

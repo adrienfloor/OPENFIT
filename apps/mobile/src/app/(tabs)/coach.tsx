@@ -9,6 +9,9 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+// ActivityIndicator is still used inline on the green Generate-program
+// button (white spinner on a coloured CTA reads better than the brand-ring
+// Loader in that context); Loader is used for the full-screen loading view.
 import type {
   CoachingProfile,
   CoachingEmphasis,
@@ -24,9 +27,10 @@ import {
   saveCoachingProfile,
   generateProgram,
 } from '../../services/coach';
-import { colors, spacing, radii, typography } from '../../theme';
+import { colors, spacing, radii, typography, themedRefresh } from '../../theme';
 import { useScreenTopPadding } from '../../theme/useScreenPadding';
 import { dialog } from '../../services/dialog';
+import { Loader } from '../../components/Loader';
 
 const GOALS: { value: TrainingGoal; label: string }[] = [
   { value: 'aesthetics', label: 'Aesthetics' },
@@ -139,7 +143,7 @@ export default function CoachScreen() {
   if (loading) {
     return (
       <View style={[styles.container, styles.center, { paddingTop: topPadding }]}>
-        <ActivityIndicator color={colors.accent} />
+        <Loader size={40} />
       </View>
     );
   }
@@ -148,7 +152,7 @@ export default function CoachScreen() {
     <ScrollView
       style={[styles.container, { paddingTop: topPadding }]}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.text} />
+        <RefreshControl refreshing={loading} onRefresh={refresh} {...themedRefresh} />
       }
     >
       <Text style={styles.title}>Coach</Text>

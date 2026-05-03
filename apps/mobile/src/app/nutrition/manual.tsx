@@ -5,8 +5,8 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
 } from 'react-native';
+import { Loader } from '../../components/Loader';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { FoodItem, MealType } from '@openfit/types';
@@ -90,7 +90,7 @@ export default function ManualEntryScreen() {
         <Text style={styles.title}>Quick add</Text>
         <TouchableOpacity onPress={handleSave} disabled={saving}>
           {saving ? (
-            <ActivityIndicator color="#22c55e" />
+            <Loader size={20} />
           ) : (
             <Text style={styles.save}>Save</Text>
           )}

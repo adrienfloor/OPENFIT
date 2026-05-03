@@ -17,7 +17,7 @@ import {
 import { SparkBars } from '../../components/charts/SparkBars';
 import { SparkLine } from '../../components/charts/SparkLine';
 import { useMockBioCharge, useMockBioChargeInsight } from '../../mocks';
-import { colors, spacing, radii, typography } from '../../theme';
+import { colors, spacing, radii, typography, themedRefresh } from '../../theme';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
@@ -67,7 +67,7 @@ export function HomeBioCharge() {
     <ScrollView
       style={styles.container}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={refetch} tintColor={colors.text} />
+        <RefreshControl refreshing={loading} onRefresh={refetch} {...themedRefresh} />
       }
     >
       {/* Hero ring */}

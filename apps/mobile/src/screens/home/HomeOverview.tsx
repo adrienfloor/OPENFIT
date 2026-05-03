@@ -26,7 +26,7 @@ import { StepsDetail } from './overview/details/StepsDetail';
 import { CaloriesDetail } from './overview/details/CaloriesDetail';
 import { WeightDetail } from './overview/details/WeightDetail';
 import { SimpleMetricDetail } from './overview/details/SimpleMetricDetail';
-import { colors, spacing, radii, typography } from '../../theme';
+import { colors, spacing, radii, typography, themedRefresh } from '../../theme';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
@@ -91,21 +91,9 @@ export function HomeOverview() {
     <ScrollView
       style={styles.container}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={refetch} tintColor={colors.text} />
+        <RefreshControl refreshing={loading} onRefresh={refetch} {...themedRefresh} />
       }
     >
-      {/* Greeting */}
-      <View style={styles.header}>
-        <Text style={styles.greeting}>Hello, {user?.name ?? 'athlete'}</Text>
-        <Text style={styles.date}>
-          {new Date().toLocaleDateString('en-US', {
-            weekday: 'long',
-            month: 'long',
-            day: 'numeric',
-          })}
-        </Text>
-      </View>
-
       {/* Health Connect onboarding */}
       {healthConnectAvailable === false ? (
         <View style={styles.banner}>
@@ -372,19 +360,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.xl,
-  },
-  greeting: {
-    fontSize: typography.size.xxl,
-    fontWeight: typography.weight.bold,
-    color: colors.text,
-    marginBottom: spacing.xs,
-  },
-  date: { fontSize: typography.size.sm, color: colors.textSecondary },
   banner: {
     backgroundColor: colors.surfaceRaised,
     borderRadius: radii.lg,

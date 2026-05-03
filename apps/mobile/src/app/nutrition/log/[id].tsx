@@ -5,8 +5,8 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
 } from 'react-native';
+import { Loader } from '../../../components/Loader';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { FoodItem, FoodLog, MealType } from '@openfit/types';
@@ -140,7 +140,7 @@ export default function LogDetailScreen() {
   if (loading || !log) {
     return (
       <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
-        <ActivityIndicator size="large" color="#22c55e" />
+        <Loader size={48} />
       </View>
     );
   }
@@ -158,7 +158,7 @@ export default function LogDetailScreen() {
         <Text style={styles.title}>Meal</Text>
         <TouchableOpacity onPress={handleSave} disabled={saving || !dirty}>
           {saving ? (
-            <ActivityIndicator color="#22c55e" />
+            <Loader size={20} />
           ) : (
             <Text style={[styles.save, !dirty && styles.saveDisabled]}>Save</Text>
           )}

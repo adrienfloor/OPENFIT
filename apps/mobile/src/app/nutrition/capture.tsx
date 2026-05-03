@@ -4,9 +4,9 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ActivityIndicator,
   Image,
 } from 'react-native';
+import { Loader } from '../../components/Loader';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -123,7 +123,7 @@ export default function CaptureScreen() {
 
       {busy ? (
         <View style={styles.busy}>
-          <ActivityIndicator size="large" color="#22c55e" />
+          <Loader size={48} />
           <Text style={styles.busyText}>Analyzing your meal…</Text>
         </View>
       ) : (

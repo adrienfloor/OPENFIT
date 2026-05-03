@@ -205,6 +205,14 @@ model WorkoutLog {
   bestPaceSecondsPerKm Float?
   elevationGainMeters  Float?
 
+  // VO₂max estimate from this workout (Uth–Sørensen). Set only when the
+  // session passes the qualifying gate (≥10min, avgHR ≥ 0.7·HRmax) — for
+  // sustained runs and hard free sessions. Lifting and short jogs leave
+  // these null. The Fitness Age service picks the best of the last 28
+  // days of estimates.
+  vo2maxEstimate    Float?
+  vo2maxComputedAt  DateTime?
+
   user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   session          Session?          @relation(fields: [sessionId], references: [id], onDelete: SetNull)
   heartRateSamples HeartRateSample[]

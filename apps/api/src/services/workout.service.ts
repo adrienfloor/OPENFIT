@@ -6,6 +6,12 @@ import type {
   UpdateWorkoutLogInput,
   WorkoutType,
 } from '@openfit/types';
+import {
+  ageYearsFromDob,
+  calculateMaxHR,
+  estimateVo2maxFromWorkout,
+  qualifiesForVo2maxEstimate,
+} from '@openfit/fitness-core';
 
 export class WorkoutError extends Error {
   constructor(
@@ -331,6 +337,12 @@ export class WorkoutService {
       }
     }
 
+    // VO₂max estimate — Uth–Sørensen, gated to sustained high-HR sessions.
+    // Strength logs and short jogs get null; runs/free sessions over the
+    // bar get a stored value that the Fitness Age service later picks
+    // the best of from a 28-day window.
+    const vo2 = await this.deriveVo2maxEstimate(userId, input);
+
     const data: Parameters<typeof this.prisma.workoutLog.create>[0]['data'] = {
       userId,
       type: input.type,
@@ -343,6 +355,8 @@ export class WorkoutService {
       avgPaceSecondsPerKm: input.avgPaceSecondsPerKm ?? null,
       bestPaceSecondsPerKm: input.bestPaceSecondsPerKm ?? null,
       elevationGainMeters: input.elevationGainMeters ?? null,
+      vo2maxEstimate: vo2,
+      vo2maxComputedAt: vo2 != null ? new Date() : null,
       exerciseLogs: {
         create: input.exerciseLogs.map((el) => ({
           exerciseId: el.exerciseId,
@@ -442,5 +456,41 @@ export class WorkoutService {
     }
 
     await this.prisma.workoutLog.delete({ where: { id: logId } });
+  }
+
+  // Pure-ish helper kept inside the service so the create path can call
+  // it without dragging Prisma types through fitness-core. Returns
+  // ml/kg/min or null when the workout doesn't qualify (strength, short
+  // jog, no HR data, no profile).
+  private async deriveVo2maxEstimate(
+    userId: string,
+    input: CreateWorkoutLogInput,
+  ): Promise<number | null> {
+    const samples = input.heartRateSamples ?? [];
+    if (samples.length === 0) return null;
+    if (input.durationSeconds == null) return null;
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { dateOfBirth: true },
+    });
+    if (!user) return null;
+
+    const ageYears = ageYearsFromDob(user.dateOfBirth);
+    const maxHRBpm = calculateMaxHR(ageYears);
+
+    const avgHRBpm = samples.reduce((s, sample) => s + sample.bpm, 0) / samples.length;
+
+    if (
+      !qualifiesForVo2maxEstimate({
+        durationSeconds: input.durationSeconds,
+        avgHRBpm,
+        maxHRBpm,
+      })
+    ) {
+      return null;
+    }
+
+    return estimateVo2maxFromWorkout({ maxHRBpm, avgHRBpm });
   }
 }

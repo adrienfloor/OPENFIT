@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useDailyStats } from '../../hooks/useDailyStats';
 import { useAuth } from '../../hooks/useAuth';
+import { useFitnessAge } from '../../hooks/useFitnessAge';
 import { TodayScoresHeader } from '../../components/TodayScoresHeader';
 import { NutritionCard } from '../../components/NutritionCard';
 import { AIInsightCard } from '../../components/AIInsightCard';
@@ -17,7 +18,6 @@ import { MetricCard } from '../../components/MetricCard';
 import {
   useMockFatigueLoad,
   useMockTrainingStatus,
-  useMockVO2Max,
   useMockPAI,
   useMockWeight,
 } from '../../mocks';
@@ -26,6 +26,7 @@ import { StepsDetail } from './overview/details/StepsDetail';
 import { CaloriesDetail } from './overview/details/CaloriesDetail';
 import { WeightDetail } from './overview/details/WeightDetail';
 import { SimpleMetricDetail } from './overview/details/SimpleMetricDetail';
+import { FitnessAgeDetail } from './overview/details/FitnessAgeDetail';
 import { colors, spacing, radii, typography, themedRefresh } from '../../theme';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -52,6 +53,7 @@ type DetailKey =
   | 'fatigueLoad'
   | 'trainingStatus'
   | 'vo2max'
+  | 'fitnessAge'
   | 'sleepDuration'
   | 'hrv'
   | 'heart'
@@ -74,9 +76,9 @@ export function HomeOverview() {
 
   const fatigue = useMockFatigueLoad();
   const trainingStatus = useMockTrainingStatus();
-  const vo2max = useMockVO2Max();
   const pai = useMockPAI();
   const weight = useMockWeight();
+  const { data: fitnessAgeData } = useFitnessAge();
 
   const [detail, setDetail] = useState<DetailKey>(null);
   const close = () => setDetail(null);
@@ -143,8 +145,15 @@ export function HomeOverview() {
       />
       <MetricRow
         label="VO₂ Max"
-        value={`${vo2max.current}`}
-        status={{ text: vo2max.label.toUpperCase(), tone: 'good' }}
+        value={fitnessAgeData?.vo2max != null ? fitnessAgeData.vo2max.toFixed(1) : '--'}
+        status={
+          fitnessAgeData?.vo2max != null
+            ? {
+                text: fitnessAgeData.vo2max >= fitnessAgeData.popVo2max ? 'GOOD' : 'BUILDING',
+                tone: fitnessAgeData.vo2max >= fitnessAgeData.popVo2max ? 'good' : 'neutral',
+              }
+            : { text: 'CALIBRATING', tone: 'neutral' }
+        }
         icon={<MetricGlyph color={colors.accent}>♥</MetricGlyph>}
         onPress={() => setDetail('vo2max')}
       />
@@ -226,6 +235,23 @@ export function HomeOverview() {
         onPress={() => setDetail('weight')}
       />
 
+      <MetricCard
+        title="Fitness Age"
+        icon="⌛"
+        value={fitnessAgeData ? `${fitnessAgeData.fitnessAge}` : '--'}
+        unit="yr"
+        subtitle={
+          fitnessAgeData
+            ? fitnessAgeData.calibrating
+              ? `Calibrating · chrono ${fitnessAgeData.chronoAge}`
+              : `${fitnessAgeData.fitnessAge - fitnessAgeData.chronoAge >= 0 ? '+' : ''}${
+                  fitnessAgeData.fitnessAge - fitnessAgeData.chronoAge
+                } yr vs chrono ${fitnessAgeData.chronoAge}`
+            : 'Tap for breakdown'
+        }
+        onPress={() => setDetail('fitnessAge')}
+      />
+
       <View style={{ height: spacing.huge }} />
 
       {/* Modals — render once, controlled by `detail` */}
@@ -260,14 +286,22 @@ export function HomeOverview() {
         onClose={close}
         eyebrow="Fitness"
         title="VO₂ Max"
-        value={`${vo2max.current}`}
+        value={fitnessAgeData?.vo2max != null ? fitnessAgeData.vo2max.toFixed(1) : '--'}
         unit="ml/kg/min"
-        status={vo2max.label.toUpperCase()}
-        trend={vo2max.trend7Days.map((p) => p.value)}
-        trendLabels={WEEKDAYS}
-        trendType="line"
+        status={
+          fitnessAgeData?.vo2max != null
+            ? `${(fitnessAgeData.vo2max - fitnessAgeData.popVo2max).toFixed(1)} VS PEER AVG ${fitnessAgeData.popVo2max.toFixed(0)}`
+            : 'CALIBRATING'
+        }
+        // No trend chart yet — we only store the peak per qualifying run,
+        // so a proper VO₂max-over-time series needs Slice 9b. For now the
+        // single bar acts as a placeholder so the modal layout doesn't
+        // collapse.
+        trend={fitnessAgeData?.vo2max != null ? [fitnessAgeData.vo2max] : []}
+        trendLabels={['now']}
+        trendType="bar"
         trendColor={colors.accent}
-        note="Estimated peak aerobic capacity. Currently a placeholder — proper estimation needs a sustained run or a max-effort lab test. We'll wire it once we collect enough heart-rate-vs-pace data from your runs."
+        note="Estimated peak aerobic capacity. Backed out from the best of your last 28 days of qualifying workouts via Uth–Sørensen (HRmax/avgHR × 15). Run a sustained ≥10-minute hard effort to refresh."
       />
       <SimpleMetricDetail
         visible={detail === 'sleepDuration'}
@@ -328,6 +362,11 @@ export function HomeOverview() {
         note="Personal Activity Intelligence — a 7-day rolling score weighting time spent in each HR zone. 100+ is the all-cause-mortality sweet spot."
       />
       <WeightDetail visible={detail === 'weight'} onClose={close} />
+      <FitnessAgeDetail
+        visible={detail === 'fitnessAge'}
+        onClose={close}
+        data={fitnessAgeData}
+      />
     </ScrollView>
   );
 }

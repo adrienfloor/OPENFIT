@@ -1,6 +1,11 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
-import { computeCaloriesFromHRSamples, ageYearsFromDob } from '@openfit/fitness-core';
+import {
+  computeCaloriesFromHRSamples,
+  ageYearsFromDob,
+  estimateVo2maxFromRun,
+  qualifiesForVo2maxEstimate,
+} from '@openfit/fitness-core';
 import { DEFAULT_EXERCISES } from './exercises';
 
 const prisma = new PrismaClient();
@@ -506,6 +511,108 @@ async function main(): Promise<void> {
   }
 
   console.log('Created 12 run workout logs (6 per user) with Marseille GPS routes + HR data');
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Bob ran the Marathon de Paris 2026 — real-world data lifted from a
+  // Strava export to seed a known-good VO₂max sample. The per-km HR / pace
+  // splits are the actual splits; one extra peak-HR sample is appended at
+  // km 38 to mirror the transient 195 bpm spike visible in the chart.
+  // Date: 2026-04-12 10:46 (~3 weeks before today, well inside the 28-day
+  // VO₂max window).
+  // ─────────────────────────────────────────────────────────────────────
+  const bobUser = users.find((u) => u.email === 'bob@openfit.dev')!;
+  const marathonStart = new Date('2026-04-12T10:46:00.000Z');
+  const splits: Array<{ paceSec: number; hr: number; km: number }> = [
+    { km: 1, paceSec: 333, hr: 133 }, { km: 1, paceSec: 337, hr: 152 },
+    { km: 1, paceSec: 329, hr: 157 }, { km: 1, paceSec: 333, hr: 155 },
+    { km: 1, paceSec: 339, hr: 160 }, { km: 1, paceSec: 329, hr: 155 },
+    { km: 1, paceSec: 328, hr: 170 }, { km: 1, paceSec: 333, hr: 164 },
+    { km: 1, paceSec: 340, hr: 165 }, { km: 1, paceSec: 339, hr: 173 },
+    { km: 1, paceSec: 331, hr: 175 }, { km: 1, paceSec: 340, hr: 164 },
+    { km: 1, paceSec: 331, hr: 160 }, { km: 1, paceSec: 338, hr: 162 },
+    { km: 1, paceSec: 329, hr: 163 }, { km: 1, paceSec: 324, hr: 159 },
+    { km: 1, paceSec: 323, hr: 166 }, { km: 1, paceSec: 313, hr: 166 },
+    { km: 1, paceSec: 324, hr: 167 }, { km: 1, paceSec: 325, hr: 163 },
+    { km: 1, paceSec: 332, hr: 162 }, { km: 1, paceSec: 326, hr: 166 },
+    { km: 1, paceSec: 330, hr: 170 }, { km: 1, paceSec: 325, hr: 166 },
+    { km: 1, paceSec: 331, hr: 169 }, { km: 1, paceSec: 329, hr: 168 },
+    { km: 1, paceSec: 332, hr: 166 }, { km: 1, paceSec: 346, hr: 168 },
+    { km: 1, paceSec: 313, hr: 170 }, { km: 1, paceSec: 339, hr: 181 },
+    { km: 1, paceSec: 326, hr: 173 }, { km: 1, paceSec: 319, hr: 173 },
+    { km: 1, paceSec: 325, hr: 174 }, { km: 1, paceSec: 316, hr: 177 },
+    { km: 1, paceSec: 322, hr: 178 }, { km: 1, paceSec: 319, hr: 178 },
+    { km: 1, paceSec: 330, hr: 182 }, { km: 1, paceSec: 328, hr: 177 },
+    { km: 1, paceSec: 328, hr: 177 }, { km: 1, paceSec: 327, hr: 178 },
+    { km: 1, paceSec: 339, hr: 180 }, { km: 1, paceSec: 307, hr: 182 },
+    { km: 0.75, paceSec: 222, hr: 178 }, // final 0.75 km at 4:56/km
+  ];
+
+  const marathonHR: Array<{ timestamp: Date; bpm: number; zone: string }> = [];
+  let cursorMs = marathonStart.getTime();
+  for (const split of splits) {
+    cursorMs += split.paceSec * 1000;
+    const zone =
+      split.hr < 145 ? 'fat_burn' : split.hr < 165 ? 'cardio' : split.hr < 180 ? 'peak' : 'max';
+    marathonHR.push({ timestamp: new Date(cursorMs), bpm: split.hr, zone });
+  }
+  // One extra sample at the late-race peak (chart shows ~195 bpm transient).
+  marathonHR.push({
+    timestamp: new Date(marathonStart.getTime() + 13200 * 1000),
+    bpm: 195,
+    zone: 'max',
+  });
+
+  const marathonDuration = splits.reduce((s, x) => s + x.paceSec, 0); // 14 031 s (3:53:51)
+  const marathonDistance = 42_750;
+  const marathonAvgPace = Math.round(marathonDuration / (marathonDistance / 1000));
+  const marathonAvgHR = marathonHR.reduce((s, h) => s + h.bpm, 0) / marathonHR.length;
+  const marathonPeakHR = Math.max(...marathonHR.map((h) => h.bpm));
+
+  const marathonVo2max = qualifiesForVo2maxEstimate({
+    type: 'run',
+    durationSeconds: marathonDuration,
+    distanceMeters: marathonDistance,
+    avgHRBpm: marathonAvgHR,
+    peakHRBpm: marathonPeakHR,
+  })
+    ? estimateVo2maxFromRun({
+        distanceMeters: marathonDistance,
+        durationSeconds: marathonDuration,
+        avgHRBpm: marathonAvgHR,
+        peakHRBpm: marathonPeakHR,
+      })
+    : null;
+
+  const marathonCalories = computeCaloriesFromHRSamples({
+    samples: marathonHR.map((h) => ({ timestamp: h.timestamp, bpm: h.bpm })),
+    weightKg: bobUser.weightKg,
+    ageYears: ageYearsFromDob(bobUser.dateOfBirth),
+    sex: bobUser.sex,
+  });
+
+  await prisma.workoutLog.create({
+    data: {
+      userId: bobUser.id,
+      type: 'run',
+      startedAt: marathonStart,
+      completedAt: new Date(marathonStart.getTime() + marathonDuration * 1000),
+      durationSeconds: marathonDuration,
+      caloriesBurned: marathonCalories ?? 3395,
+      distanceMeters: marathonDistance,
+      avgPaceSecondsPerKm: marathonAvgPace,
+      bestPaceSecondsPerKm: 296, // 4:56/km — best lap from Strava
+      elevationGainMeters: 169,
+      vo2maxEstimate: marathonVo2max,
+      vo2maxComputedAt: marathonVo2max != null ? marathonStart : null,
+      heartRateSamples: { create: marathonHR },
+    },
+  });
+
+  console.log(
+    `Created Bob's Marathon de Paris 2026 (3:53:51, avgHR ${Math.round(marathonAvgHR)}, ` +
+      `peakHR ${marathonPeakHR}, VO₂max ${marathonVo2max?.toFixed(1) ?? 'null'})`,
+  );
+
   console.log('Seed complete!');
 }
 

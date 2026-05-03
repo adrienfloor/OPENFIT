@@ -7,9 +7,7 @@ import type {
   WorkoutType,
 } from '@openfit/types';
 import {
-  ageYearsFromDob,
-  calculateMaxHR,
-  estimateVo2maxFromWorkout,
+  estimateVo2maxFromRun,
   qualifiesForVo2maxEstimate,
 } from '@openfit/fitness-core';
 
@@ -337,11 +335,11 @@ export class WorkoutService {
       }
     }
 
-    // VO₂max estimate — Uth–Sørensen, gated to sustained high-HR sessions.
-    // Strength logs and short jogs get null; runs/free sessions over the
-    // bar get a stored value that the Fitness Age service later picks
-    // the best of from a 28-day window.
-    const vo2 = await this.deriveVo2maxEstimate(userId, input);
+    // VO₂max estimate — ACSM × HR-fraction, runs only. Strength, free
+    // sessions, and short jogs get null; qualifying runs get a stored
+    // value that MetricsService later picks the best of from a 28-day
+    // window.
+    const vo2 = this.deriveVo2maxEstimate(input);
 
     const data: Parameters<typeof this.prisma.workoutLog.create>[0]['data'] = {
       userId,
@@ -458,39 +456,39 @@ export class WorkoutService {
     await this.prisma.workoutLog.delete({ where: { id: logId } });
   }
 
-  // Pure-ish helper kept inside the service so the create path can call
-  // it without dragging Prisma types through fitness-core. Returns
-  // ml/kg/min or null when the workout doesn't qualify (strength, short
-  // jog, no HR data, no profile).
-  private async deriveVo2maxEstimate(
-    userId: string,
-    input: CreateWorkoutLogInput,
-  ): Promise<number | null> {
+  // Returns the per-workout VO₂max estimate (ml/kg/min) for runs that
+  // pass the qualifying gate, else null. Uses ACSM running × HR-fraction
+  // (see fitness-core/vo2max.ts for the derivation) — runs only, since
+  // non-run activities don't yield an accurate steady-state pace.
+  //
+  // Peak HR is taken from the workout's own samples, NOT the Tanaka
+  // estimate, so the calculation calibrates against what actually
+  // happened on the day.
+  private deriveVo2maxEstimate(input: CreateWorkoutLogInput): number | null {
     const samples = input.heartRateSamples ?? [];
     if (samples.length === 0) return null;
     if (input.durationSeconds == null) return null;
 
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { dateOfBirth: true },
-    });
-    if (!user) return null;
-
-    const ageYears = ageYearsFromDob(user.dateOfBirth);
-    const maxHRBpm = calculateMaxHR(ageYears);
-
+    const peakHRBpm = Math.max(...samples.map((s) => s.bpm));
     const avgHRBpm = samples.reduce((s, sample) => s + sample.bpm, 0) / samples.length;
 
     if (
       !qualifiesForVo2maxEstimate({
+        type: input.type,
         durationSeconds: input.durationSeconds,
+        distanceMeters: input.distanceMeters ?? null,
         avgHRBpm,
-        maxHRBpm,
+        peakHRBpm,
       })
     ) {
       return null;
     }
 
-    return estimateVo2maxFromWorkout({ maxHRBpm, avgHRBpm });
+    return estimateVo2maxFromRun({
+      distanceMeters: input.distanceMeters!,
+      durationSeconds: input.durationSeconds,
+      avgHRBpm,
+      peakHRBpm,
+    });
   }
 }

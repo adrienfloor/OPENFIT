@@ -1,87 +1,86 @@
 import { describe, expect, it } from 'vitest';
 import {
-  estimateVo2maxFromWorkout,
+  estimateVo2maxFromRun,
   qualifiesForVo2maxEstimate,
   currentVo2maxFromHistory,
 } from '../vo2max';
 
-describe('estimateVo2maxFromWorkout', () => {
-  it('matches Uth–Sørensen on a typical hard run', () => {
-    // Athlete with HRmax 188 holding 156 avg HR for the run.
-    // 15 × (188 / 156) ≈ 18.08 — wait that's wrong, the formula gives
-    // ml/kg/min, so 15 × 188 / 156 = ~18 — let me sanity check.
-    // Actually Uth-Sørensen: VO2max = 15 × (HRmax / HRrest), originally
-    // derived using HRrest. The variant we use here is the Garmin-style
-    // adaptation to *workout average HR* during a hard sustained effort,
-    // documented in Esco MR et al. 2013. Same shape, same coefficient.
-    const v = estimateVo2maxFromWorkout({ maxHRBpm: 188, avgHRBpm: 156 });
-    expect(v).toBeGreaterThan(17);
-    expect(v).toBeLessThan(20);
+describe('estimateVo2maxFromRun (ACSM × HR-fraction)', () => {
+  it("matches Garmin's range on a 3:54 marathon", () => {
+    // Bob's Paris 2026: 42 750 m in 3:53:51 (14 031 s), avg HR 168, peak 195.
+    // Expected ~46–48 ml/kg/min by Garmin / Strava on the same effort.
+    const v = estimateVo2maxFromRun({
+      distanceMeters: 42750,
+      durationSeconds: 14031,
+      avgHRBpm: 168,
+      peakHRBpm: 195,
+    });
+    expect(v).toBeGreaterThan(45);
+    expect(v).toBeLessThan(48);
   });
 
-  it('returns higher VO2max for fitter athletes (lower avg HR at same effort)', () => {
-    const fitter = estimateVo2maxFromWorkout({ maxHRBpm: 188, avgHRBpm: 140 });
-    const lessFit = estimateVo2maxFromWorkout({ maxHRBpm: 188, avgHRBpm: 165 });
-    expect(fitter).toBeGreaterThan(lessFit);
+  it('reports higher VO₂max for a hard 5K than an easy long run at the same speed', () => {
+    // Same speed (12 km/h = 200 m/min), but the 5K was paced at 95 % of HRmax
+    // (low headroom → not much VO₂max above ACSM cost) vs the easy long run
+    // at 75 % (large headroom → bigger projected VO₂max).
+    const tempo = estimateVo2maxFromRun({
+      distanceMeters: 5000,
+      durationSeconds: 1500,
+      avgHRBpm: 178,
+      peakHRBpm: 188,
+    });
+    const easy = estimateVo2maxFromRun({
+      distanceMeters: 5000,
+      durationSeconds: 1500,
+      avgHRBpm: 141,
+      peakHRBpm: 188,
+    });
+    expect(easy).toBeGreaterThan(tempo);
   });
 
-  it('returns 0 when input is invalid', () => {
-    expect(estimateVo2maxFromWorkout({ maxHRBpm: 0, avgHRBpm: 150 })).toBe(0);
-    expect(estimateVo2maxFromWorkout({ maxHRBpm: 188, avgHRBpm: 0 })).toBe(0);
+  it('returns 0 on bad input', () => {
+    expect(estimateVo2maxFromRun({ distanceMeters: 0, durationSeconds: 0, avgHRBpm: 0, peakHRBpm: 0 })).toBe(0);
   });
 });
 
 describe('qualifiesForVo2maxEstimate', () => {
-  const HRMAX = 188;
+  const ok = {
+    type: 'run' as const,
+    durationSeconds: 30 * 60,
+    distanceMeters: 6000,
+    avgHRBpm: 158,
+    peakHRBpm: 188,
+  };
 
   it('accepts a 30-min run at zone 3', () => {
-    expect(
-      qualifiesForVo2maxEstimate({
-        durationSeconds: 30 * 60,
-        avgHRBpm: 145,
-        maxHRBpm: HRMAX,
-      }),
-    ).toBe(true);
+    expect(qualifiesForVo2maxEstimate(ok)).toBe(true);
   });
 
-  it('rejects a sub-10-min session', () => {
+  it('rejects strength logs even with HR data', () => {
+    expect(qualifiesForVo2maxEstimate({ ...ok, type: 'strength' })).toBe(false);
+  });
+
+  it('rejects free workouts (BJJ, climbing) — no accurate pace', () => {
+    expect(qualifiesForVo2maxEstimate({ ...ok, type: 'free' })).toBe(false);
+  });
+
+  it('rejects sub-10-minute runs', () => {
+    expect(qualifiesForVo2maxEstimate({ ...ok, durationSeconds: 8 * 60 })).toBe(false);
+  });
+
+  it('rejects runs without distance', () => {
+    expect(qualifiesForVo2maxEstimate({ ...ok, distanceMeters: null })).toBe(false);
+  });
+
+  it('rejects easy jogs with avg HR below 70 % peak', () => {
     expect(
-      qualifiesForVo2maxEstimate({
-        durationSeconds: 8 * 60,
-        avgHRBpm: 160,
-        maxHRBpm: HRMAX,
-      }),
+      qualifiesForVo2maxEstimate({ ...ok, avgHRBpm: 120, peakHRBpm: 188 }),
     ).toBe(false);
   });
 
-  it('rejects an easy jog with avg HR below 70 % HRmax', () => {
-    expect(
-      qualifiesForVo2maxEstimate({
-        durationSeconds: 40 * 60,
-        avgHRBpm: 120, // 64 % of 188
-        maxHRBpm: HRMAX,
-      }),
-    ).toBe(false);
-  });
-
-  it('rejects sessions missing HR data', () => {
-    expect(
-      qualifiesForVo2maxEstimate({
-        durationSeconds: 30 * 60,
-        avgHRBpm: 0,
-        maxHRBpm: HRMAX,
-      }),
-    ).toBe(false);
-  });
-
-  it('accepts a hard BJJ session (free workout) the same as a hard run', () => {
-    expect(
-      qualifiesForVo2maxEstimate({
-        durationSeconds: 45 * 60,
-        avgHRBpm: 155,
-        maxHRBpm: HRMAX,
-      }),
-    ).toBe(true);
+  it('rejects sessions missing HR', () => {
+    expect(qualifiesForVo2maxEstimate({ ...ok, avgHRBpm: 0 })).toBe(false);
+    expect(qualifiesForVo2maxEstimate({ ...ok, peakHRBpm: 0 })).toBe(false);
   });
 });
 

@@ -1,72 +1,95 @@
 /**
- * VO₂max estimation from a single HR-tracked sustained workout.
+ * VO₂max estimation from a single sustained run.
  *
- * Uth–Sørensen formula (Uth N. et al. 2004, Eur J Appl Physiol):
+ * The naive 15·HRmax/avgHR shape some apps quote is a misreading of
+ * Uth–Sørensen 2004 (which uses HRmax/HRrest, not workout-average HR).
+ * For a per-workout estimate, the principled approach Garmin (Firstbeat)
+ * uses is the **ACSM running equation** scaled by relative HR effort:
  *
- *     VO₂max ≈ 15 · (HRmax / avgHR)
+ *     VO₂_at_pace = 0.2 · speed_m_per_min + 3.5      (ACSM, flat ground)
+ *     VO₂max     = VO₂_at_pace × (HRmax / avgHR)
  *
- * It estimates the user's *peak* aerobic capacity (ml O₂ / kg / min) from
- * the ratio of their max HR to their average HR during a sustained, mostly
- * aerobic effort. The intuition: someone whose heart can pump for 30 min
- * at 70 % of HRmax is fitter than someone who has to push to 90 % to keep
- * the same pace.
+ * The intuition: ACSM gives the steady-state oxygen cost of running at a
+ * given speed; if you held that speed at fraction `avgHR / HRmax` of your
+ * heart's maximum, your peak capacity is the cost divided by that
+ * fraction.
  *
- * The estimate is noisy on a single workout — that's why we only take the
- * *best* of the qualifying workouts in a recent window (the same approach
- * Garmin and Zepp use). One easy run won't drop your number.
+ * For Bob's 3:54 Paris marathon (5:28/km avg, avgHR 168, peakHR 195) this
+ * lands at ~46.5 ml/kg/min — matches what Garmin / Strava report on the
+ * same effort.
+ *
+ * Non-run workouts can't yield a meaningful VO₂max via this method (no
+ * accurate distance/pace), so the qualifying gate is run-only. Those
+ * workouts still feed the broader Fitness Age via the activity / sleep /
+ * lifting bonuses — they just don't move the VO₂max term.
  */
 
-export interface Vo2maxEstimateInput {
-  /** User's age-derived HRmax (Tanaka: 208 − 0.7·age, computed by caller). */
-  maxHRBpm: number;
-  /** Average HR over the qualifying portion of the workout. */
-  avgHRBpm: number;
-}
-
-/**
- * Apply the Uth–Sørensen formula. The caller is responsible for filtering
- * to qualifying workouts via `qualifiesForVo2maxEstimate` first — running
- * this on a 5-minute warm-up returns garbage.
- */
-export function estimateVo2maxFromWorkout({
-  maxHRBpm,
-  avgHRBpm,
-}: Vo2maxEstimateInput): number {
-  if (avgHRBpm <= 0 || maxHRBpm <= 0) return 0;
-  return 15 * (maxHRBpm / avgHRBpm);
-}
-
-export interface Vo2maxQualifyingInput {
+export interface Vo2maxRunInput {
+  distanceMeters: number;
   durationSeconds: number;
   avgHRBpm: number;
-  maxHRBpm: number;
+  /** Observed peak HR over the workout (max of heartRateSamples), not the
+   *  age-derived Tanaka estimate. Using observed peak makes the estimate
+   *  self-calibrating — a workout that hits a higher HR than your previous
+   *  ceiling refines HRmax. */
+  peakHRBpm: number;
 }
 
 /**
- * Gate for whether a workout's HR signal is rich enough to back out a
- * meaningful VO₂max estimate. Reject:
- *   - sub-10-minute sessions (too short for steady-state HR)
- *   - sessions whose average HR is below 70 % of HRmax (jogs, warm-ups)
- *   - sessions missing HR data
- *
- * These thresholds match the Norwegian HUNT cohort's inclusion criteria
- * for VO₂max regressions, which is where the population norms come from.
+ * Apply the ACSM-running equation scaled by relative-HR effort. Returns
+ * ml O₂ / kg / min. Caller is responsible for filtering to qualifying
+ * runs first via `qualifiesForVo2maxEstimate`.
  */
-export function qualifiesForVo2maxEstimate({
+export function estimateVo2maxFromRun({
+  distanceMeters,
   durationSeconds,
   avgHRBpm,
-  maxHRBpm,
+  peakHRBpm,
+}: Vo2maxRunInput): number {
+  if (durationSeconds <= 0 || avgHRBpm <= 0 || peakHRBpm <= 0) return 0;
+  const speedMperMin = distanceMeters / (durationSeconds / 60);
+  const acsmVo2 = 0.2 * speedMperMin + 3.5;
+  const hrFraction = avgHRBpm / peakHRBpm;
+  if (hrFraction <= 0) return 0;
+  return acsmVo2 / hrFraction;
+}
+
+export type WorkoutTypeForGate = 'strength' | 'free' | 'run';
+
+export interface Vo2maxQualifyingInput {
+  type: WorkoutTypeForGate;
+  durationSeconds: number;
+  distanceMeters: number | null;
+  avgHRBpm: number;
+  peakHRBpm: number;
+}
+
+/**
+ * Per-workout VO₂max estimate is reliable only when:
+ *   - the activity is a run (need accurate distance / steady speed)
+ *   - duration ≥ 10 min (steady-state HR has settled)
+ *   - avg HR is at least 70 % of peak (excludes warm-ups, recovery jogs)
+ *   - distance is present and non-trivial
+ */
+export function qualifiesForVo2maxEstimate({
+  type,
+  durationSeconds,
+  distanceMeters,
+  avgHRBpm,
+  peakHRBpm,
 }: Vo2maxQualifyingInput): boolean {
+  if (type !== 'run') return false;
   if (durationSeconds < 600) return false;
-  if (maxHRBpm <= 0 || avgHRBpm <= 0) return false;
-  if (avgHRBpm < 0.7 * maxHRBpm) return false;
+  if (distanceMeters == null || distanceMeters < 1500) return false;
+  if (avgHRBpm <= 0 || peakHRBpm <= 0) return false;
+  if (avgHRBpm < 0.7 * peakHRBpm) return false;
   return true;
 }
 
 /**
  * Pick today's representative VO₂max from a history of per-workout
- * estimates. Garmin / Zepp both report the *best* recent estimate rather
- * than the average — your peak capacity is your peak capacity, not your
+ * estimates. Garmin / Strava both report the *best* recent estimate
+ * rather than the average — peak capacity is peak capacity, not the
  * mean of easy days.
  *
  * Window defaults to 28 days, mirroring Garmin's "current" definition.

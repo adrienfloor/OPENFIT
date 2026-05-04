@@ -9,6 +9,7 @@ import {
 import { useDailyStats } from '../../hooks/useDailyStats';
 import { HeroRing } from '../../components/HeroRing';
 import { AIInsightCard } from '../../components/AIInsightCard';
+import { HomeLoadingOverlay } from '../../components/HomeLoadingOverlay';
 import { RingExplainerSheet } from '../../components/RingExplainerSheet';
 import {
   IntradayLineChart,
@@ -48,9 +49,18 @@ function formatTime(d: Date): string {
  * tappable. Everything else is read-only.
  */
 export function HomeBioCharge() {
-  const { today, loading, refetch } = useDailyStats();
+  const { today, refetch, hasEverLoaded, healthConnectAvailable, permissionsGranted } = useDailyStats();
   const dashboard = useMockBioCharge(today?.recoveryScore ?? null);
   const [explainerOpen, setExplainerOpen] = useState(false);
+  const [pulling, setPulling] = useState(false);
+  const onPullRefresh = async () => {
+    setPulling(true);
+    try { await refetch(); } finally { setPulling(false); }
+  };
+
+  if (!hasEverLoaded && healthConnectAvailable !== false && permissionsGranted) {
+    return <HomeLoadingOverlay />;
+  }
 
   const tier = bioChargeTier(dashboard.current);
   const lastUpdated = `Updated ${formatTime(dashboard.lastUpdated)}`;
@@ -66,7 +76,7 @@ export function HomeBioCharge() {
     <ScrollView
       style={styles.container}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={refetch} {...themedRefresh} />
+        <RefreshControl refreshing={pulling} onRefresh={onPullRefresh} {...themedRefresh} />
       }
     >
       {/* Hero ring */}

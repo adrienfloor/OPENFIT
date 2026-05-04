@@ -12,6 +12,7 @@ import { apiClient } from '../../services/api';
 import { useDailyStats } from '../../hooks/useDailyStats';
 import { HeroRing } from '../../components/HeroRing';
 import { AIInsightCard } from '../../components/AIInsightCard';
+import { HomeLoadingOverlay } from '../../components/HomeLoadingOverlay';
 import { RingExplainerSheet } from '../../components/RingExplainerSheet';
 import { SparkLine } from '../../components/charts/SparkLine';
 import { SparkBars } from '../../components/charts/SparkBars';
@@ -49,7 +50,8 @@ type DetailKey = 'fatigue' | 'fitness' | 'trainingStatus' | 'daily' | 'workout' 
  * 7-day series and today's per-activity breakdown are mocked.
  */
 export function HomeEffort() {
-  const { today, loading, refetch } = useDailyStats();
+  const { today, refetch, hasEverLoaded, healthConnectAvailable, permissionsGranted } = useDailyStats();
+  const [pulling, setPulling] = useState(false);
   const fatigue = useMockFatigueLoad();
   const fitness = useMockFitnessLevel();
   const trainingStatus = useMockTrainingStatus();
@@ -84,6 +86,16 @@ export function HomeEffort() {
     fetchTodayWorkouts();
   }, [fetchTodayWorkouts]);
 
+  const onPullRefresh = async () => {
+    setPulling(true);
+    try {
+      await refetch();
+      await fetchTodayWorkouts();
+    } finally {
+      setPulling(false);
+    }
+  };
+
   const earned = today?.effortEarnedMinutes ?? null;
   const target = today?.effortTargetMinutes ?? null;
   const score = today?.effortScore ?? null;
@@ -101,16 +113,17 @@ export function HomeEffort() {
   const ringSubtitle =
     earned != null && target != null ? `${earned}/${target} min` : '';
 
+  if (!hasEverLoaded && healthConnectAvailable !== false && permissionsGranted) {
+    return <HomeLoadingOverlay />;
+  }
+
   return (
     <ScrollView
       style={styles.container}
       refreshControl={
         <RefreshControl
-          refreshing={loading}
-          onRefresh={() => {
-            refetch();
-            fetchTodayWorkouts();
-          }}
+          refreshing={pulling}
+          onRefresh={onPullRefresh}
           {...themedRefresh}
         />
       }

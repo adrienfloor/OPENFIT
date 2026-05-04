@@ -10,6 +10,7 @@ import {
 import { useDailyStats } from '../../hooks/useDailyStats';
 import { HeroRing } from '../../components/HeroRing';
 import { AIInsightCard } from '../../components/AIInsightCard';
+import { HomeLoadingOverlay } from '../../components/HomeLoadingOverlay';
 import { RingExplainerSheet } from '../../components/RingExplainerSheet';
 import { Hypnogram } from '../../components/charts/Hypnogram';
 import { StackedBars } from '../../components/charts/StackedBars';
@@ -48,19 +49,28 @@ function pct(part: number, total: number): string {
  * Per the matrix only the ring, insight, and hypnogram are tappable.
  */
 export function HomeSleep() {
-  const { today, loading, refetch } = useDailyStats();
+  const { today, refetch, hasEverLoaded, healthConnectAvailable, permissionsGranted } = useDailyStats();
   const sleep = useMockSleep({
     score: today?.sleepScore ?? null,
     totalMinutes: today?.sleepDurationMinutes ?? null,
   });
   const [explainerOpen, setExplainerOpen] = useState(false);
   const [hypnogramOpen, setHypnogramOpen] = useState(false);
+  const [pulling, setPulling] = useState(false);
+  const onPullRefresh = async () => {
+    setPulling(true);
+    try { await refetch(); } finally { setPulling(false); }
+  };
+
+  if (!hasEverLoaded && healthConnectAvailable !== false && permissionsGranted) {
+    return <HomeLoadingOverlay />;
+  }
 
   return (
     <ScrollView
       style={styles.container}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={refetch} {...themedRefresh} />
+        <RefreshControl refreshing={pulling} onRefresh={onPullRefresh} {...themedRefresh} />
       }
     >
       {/* Hero ring */}

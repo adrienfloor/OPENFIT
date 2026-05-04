@@ -11,6 +11,7 @@ import { useDailyStats } from '../../hooks/useDailyStats';
 import { useAuth } from '../../hooks/useAuth';
 import { useFitnessAge } from '../../hooks/useFitnessAge';
 import { TodayScoresHeader } from '../../components/TodayScoresHeader';
+import { HomeLoadingOverlay } from '../../components/HomeLoadingOverlay';
 import { NutritionCard } from '../../components/NutritionCard';
 import { AIInsightCard } from '../../components/AIInsightCard';
 import { MetricRow } from '../../components/MetricRow';
@@ -67,12 +68,17 @@ export function HomeOverview() {
   const { user } = useAuth();
   const {
     today,
-    loading,
     refetch,
     healthConnectAvailable,
     permissionsGranted,
+    hasEverLoaded,
     requestPermissions,
   } = useDailyStats();
+  const [pulling, setPulling] = useState(false);
+  const onPullRefresh = async () => {
+    setPulling(true);
+    try { await refetch(); } finally { setPulling(false); }
+  };
 
   const fatigue = useMockFatigueLoad();
   const trainingStatus = useMockTrainingStatus();
@@ -89,11 +95,20 @@ export function HomeOverview() {
   const hrv = today?.hrvRmssd != null ? `${Math.round(today.hrvRmssd)} ms` : '--';
   const restingHR = today?.heartRateResting != null ? `${today.heartRateResting} bpm` : '--';
 
+  // Cold-start gate: render the centered loader until the very first
+  // dashboard fetch resolves OR Health Connect is missing / not granted
+  // (in which case we fall through to the onboarding banner). After
+  // hasEverLoaded flips true, the rings render whatever's in `today` and
+  // never go back to a loading state for the rest of the session.
+  if (!hasEverLoaded && healthConnectAvailable !== false && permissionsGranted) {
+    return <HomeLoadingOverlay />;
+  }
+
   return (
     <ScrollView
       style={styles.container}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={refetch} {...themedRefresh} />
+        <RefreshControl refreshing={pulling} onRefresh={onPullRefresh} {...themedRefresh} />
       }
     >
       {/* Health Connect onboarding */}

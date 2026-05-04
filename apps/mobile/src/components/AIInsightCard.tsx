@@ -5,11 +5,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   Modal,
-  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTodayInsight } from '../hooks/useTodayInsight';
 import type { InsightFocus, InsightOutput } from '../services/insights';
+import { Loader } from './Loader';
 import { colors, spacing, radii, typography } from '../theme';
 
 interface CardProps {
@@ -47,7 +47,9 @@ export function AIInsightCard({ focus = 'general', insight: override }: CardProp
           <Text style={styles.coach}>AI</Text>
         </View>
         {loading ? (
-          <ActivityIndicator color={colors.accent} />
+          <View style={styles.loaderWrap}>
+            <Loader size={24} />
+          </View>
         ) : (
           <Text style={styles.headline}>
             {error ?? 'No brief yet — log a workout or sync to generate one.'}
@@ -154,6 +156,10 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   footer: { marginTop: spacing.md },
+  loaderWrap: {
+    paddingVertical: spacing.sm,
+    alignItems: 'flex-start',
+  },
   cta: {
     fontSize: typography.size.xs + 1,
     color: colors.accent,

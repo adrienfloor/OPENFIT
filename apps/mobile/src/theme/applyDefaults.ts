@@ -15,7 +15,12 @@ import { Text, TextInput } from 'react-native';
 import { colors } from './index';
 
 type WithDefaults<T> = T & {
-  defaultProps?: { style?: unknown; placeholderTextColor?: string };
+  defaultProps?: {
+    style?: unknown;
+    placeholderTextColor?: string;
+    selectionColor?: string;
+    cursorColor?: string;
+  };
 };
 
 const TextWithDefaults = Text as unknown as WithDefaults<typeof Text>;
@@ -31,5 +36,12 @@ InputWithDefaults.defaultProps = {
   // Inputs default to text color matching the page; placeholderTextColor
   // is a separate prop, set globally here too.
   placeholderTextColor: colors.textMuted,
+  // Cursor + selection: Android otherwise picks the theme's colorAccent,
+  // which on Samsung One UI tints the field background green when text
+  // is selected or autofill is suggested. Pin to a muted dim so the
+  // selection feels like a polished neutral handle, not a brand color
+  // bleed.
+  selectionColor: 'rgba(245, 245, 247, 0.25)',
+  cursorColor: colors.text,
   style: [{ color: colors.text }, InputWithDefaults.defaultProps?.style],
 };

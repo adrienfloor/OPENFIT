@@ -12,6 +12,7 @@ import { apiClient } from '../../services/api';
 import { useDailyStats } from '../../hooks/useDailyStats';
 import { HeroRing } from '../../components/HeroRing';
 import { AIInsightCard } from '../../components/AIInsightCard';
+import { HomeLoadingOverlay } from '../../components/HomeLoadingOverlay';
 import { RingExplainerSheet } from '../../components/RingExplainerSheet';
 import { SparkLine } from '../../components/charts/SparkLine';
 import { SparkBars } from '../../components/charts/SparkBars';
@@ -49,7 +50,7 @@ type DetailKey = 'fatigue' | 'fitness' | 'trainingStatus' | 'daily' | 'workout' 
  * 7-day series and today's per-activity breakdown are mocked.
  */
 export function HomeEffort() {
-  const { today, loading, refetch } = useDailyStats();
+  const { today, loading, refetch, permissionsGranted, healthConnectAvailable } = useDailyStats();
   const fatigue = useMockFatigueLoad();
   const fitness = useMockFitnessLevel();
   const trainingStatus = useMockTrainingStatus();
@@ -100,6 +101,10 @@ export function HomeEffort() {
 
   const ringSubtitle =
     earned != null && target != null ? `${earned}/${target} min` : '';
+
+  if (today === null && permissionsGranted && healthConnectAvailable !== false) {
+    return <HomeLoadingOverlay />;
+  }
 
   return (
     <ScrollView

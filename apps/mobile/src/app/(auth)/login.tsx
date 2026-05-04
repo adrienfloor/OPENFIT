@@ -35,7 +35,17 @@ export default function LoginScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>OpenFit</Text>
       <Text style={styles.subtitle}>Sign in to your account</Text>
-      <TextInput style={styles.input} placeholder="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" textContentType="emailAddress" />
+      <TextInput
+        style={styles.input}
+        placeholder="Email"
+        value={email}
+        onChangeText={setEmail}
+        autoCapitalize="none"
+        keyboardType="email-address"
+        textContentType="emailAddress"
+        importantForAutofill="no"
+        autoComplete="off"
+      />
       <View style={styles.passwordContainer}>
         <TextInput
           style={styles.passwordInput}
@@ -44,6 +54,8 @@ export default function LoginScreen() {
           onChangeText={setPassword}
           secureTextEntry={!showPassword}
           textContentType="password"
+          importantForAutofill="no"
+          autoComplete="off"
         />
         <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn}>
           <Text style={styles.eyeText}>{showPassword ? '🙈' : '👁'}</Text>

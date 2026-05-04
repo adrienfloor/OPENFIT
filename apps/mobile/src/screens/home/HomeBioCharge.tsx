@@ -9,6 +9,7 @@ import {
 import { useDailyStats } from '../../hooks/useDailyStats';
 import { HeroRing } from '../../components/HeroRing';
 import { AIInsightCard } from '../../components/AIInsightCard';
+import { HomeLoadingOverlay } from '../../components/HomeLoadingOverlay';
 import { RingExplainerSheet } from '../../components/RingExplainerSheet';
 import {
   IntradayLineChart,
@@ -48,9 +49,13 @@ function formatTime(d: Date): string {
  * tappable. Everything else is read-only.
  */
 export function HomeBioCharge() {
-  const { today, loading, refetch } = useDailyStats();
+  const { today, loading, refetch, permissionsGranted, healthConnectAvailable } = useDailyStats();
   const dashboard = useMockBioCharge(today?.recoveryScore ?? null);
   const [explainerOpen, setExplainerOpen] = useState(false);
+
+  if (today === null && permissionsGranted && healthConnectAvailable !== false) {
+    return <HomeLoadingOverlay />;
+  }
 
   const tier = bioChargeTier(dashboard.current);
   const lastUpdated = `Updated ${formatTime(dashboard.lastUpdated)}`;

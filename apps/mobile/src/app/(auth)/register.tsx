@@ -51,8 +51,24 @@ export default function RegisterScreen() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Create account</Text>
-      <TextInput style={styles.input} placeholder="Full name" value={form.name} onChangeText={(v) => update('name', v)} />
-      <TextInput style={styles.input} placeholder="Email" value={form.email} onChangeText={(v) => update('email', v)} autoCapitalize="none" keyboardType="email-address" />
+      <TextInput
+        style={styles.input}
+        placeholder="Full name"
+        value={form.name}
+        onChangeText={(v) => update('name', v)}
+        importantForAutofill="no"
+        autoComplete="off"
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Email"
+        value={form.email}
+        onChangeText={(v) => update('email', v)}
+        autoCapitalize="none"
+        keyboardType="email-address"
+        importantForAutofill="no"
+        autoComplete="off"
+      />
       <View style={styles.passwordContainer}>
         <TextInput
           style={styles.passwordInput}
@@ -60,14 +76,39 @@ export default function RegisterScreen() {
           value={form.password}
           onChangeText={(v) => update('password', v)}
           secureTextEntry={!showPassword}
+          importantForAutofill="no"
+          autoComplete="off"
         />
         <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn}>
           <Text style={styles.eyeText}>{showPassword ? '🙈' : '👁'}</Text>
         </TouchableOpacity>
       </View>
-      <TextInput style={styles.input} placeholder="Date of birth (YYYY-MM-DD)" value={form.dateOfBirth} onChangeText={(v) => update('dateOfBirth', v)} />
-      <TextInput style={styles.input} placeholder="Weight (kg)" value={form.weightKg} onChangeText={(v) => update('weightKg', v)} keyboardType="numeric" />
-      <TextInput style={styles.input} placeholder="Height (cm)" value={form.heightCm} onChangeText={(v) => update('heightCm', v)} keyboardType="numeric" />
+      <TextInput
+        style={styles.input}
+        placeholder="Date of birth (YYYY-MM-DD)"
+        value={form.dateOfBirth}
+        onChangeText={(v) => update('dateOfBirth', v)}
+        importantForAutofill="no"
+        autoComplete="off"
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Weight (kg)"
+        value={form.weightKg}
+        onChangeText={(v) => update('weightKg', v)}
+        keyboardType="numeric"
+        importantForAutofill="no"
+        autoComplete="off"
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Height (cm)"
+        value={form.heightCm}
+        onChangeText={(v) => update('heightCm', v)}
+        keyboardType="numeric"
+        importantForAutofill="no"
+        autoComplete="off"
+      />
       <View style={styles.sexRow}>
         <TouchableOpacity
           style={[styles.sexBtn, form.sex === 'male' && styles.sexBtnActive]}

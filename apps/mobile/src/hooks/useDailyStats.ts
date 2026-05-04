@@ -5,6 +5,23 @@ import { apiClient } from '../services/api';
 import { useAuth } from './useAuth';
 
 /**
+ * Module-level cache shared across all useDailyStats instances. The four
+ * Home sub-tabs (Overview / BioCharge / Sleep / Effort) each call this
+ * hook, but they're conceptually viewing the same underlying snapshot —
+ * without a shared cache, switching tabs would flash the rings back to
+ * "--" while the new instance fetches. We keep the latest payload in
+ * module scope and seed every new hook with it; subsequent refetches
+ * silently swap in fresher data without ever clearing the rings.
+ */
+let cachedToday: TodayDailyStats | null = null;
+const cacheSubscribers = new Set<(t: TodayDailyStats | null) => void>();
+
+function publishCache(value: TodayDailyStats | null): void {
+  cachedToday = value;
+  for (const sub of cacheSubscribers) sub(value);
+}
+
+/**
  * Fetch the last 7 days of workout logs and bucket them by completion date
  * (`YYYY-MM-DD`), summing `caloriesBurned` per bucket. Logs without a
  * `completedAt` or `caloriesBurned` are skipped. The map is consumed by
@@ -36,8 +53,17 @@ export function useDailyStats(): {
   requestPermissions: () => Promise<void>;
 } {
   const { user } = useAuth();
-  const [today, setToday] = useState<TodayDailyStats | null>(null);
+  const [today, setToday] = useState<TodayDailyStats | null>(cachedToday);
   const [loading, setLoading] = useState(false);
+
+  // Subscribe to module-level cache updates so a fetch in one hook
+  // instance lights up every other instance instantly.
+  useEffect(() => {
+    cacheSubscribers.add(setToday);
+    return () => {
+      cacheSubscribers.delete(setToday);
+    };
+  }, []);
   const [error, setError] = useState<Error | null>(null);
   const [healthConnectAvailable, setHealthConnectAvailable] = useState<boolean | null>(null);
   const [permissionsGranted, setPermissionsGranted] = useState(false);
@@ -116,10 +142,12 @@ export function useDailyStats(): {
         );
         const result = await getTodayDashboard(profile, workoutKcalByDate);
         console.log('[useDailyStats] dashboard result:', JSON.stringify(result));
-        setToday(result);
+        publishCache(result);
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Failed to fetch daily stats'));
-        setToday(null);
+        // Don't blow away the cached snapshot on transient errors — the
+        // rings keep showing the last-known values, the user gets
+        // a non-fatal error surfaced via `error`.
       } finally {
         setLoading(false);
       }

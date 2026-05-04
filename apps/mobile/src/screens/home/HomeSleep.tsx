@@ -10,6 +10,7 @@ import {
 import { useDailyStats } from '../../hooks/useDailyStats';
 import { HeroRing } from '../../components/HeroRing';
 import { AIInsightCard } from '../../components/AIInsightCard';
+import { HomeLoadingOverlay } from '../../components/HomeLoadingOverlay';
 import { RingExplainerSheet } from '../../components/RingExplainerSheet';
 import { Hypnogram } from '../../components/charts/Hypnogram';
 import { StackedBars } from '../../components/charts/StackedBars';
@@ -48,13 +49,17 @@ function pct(part: number, total: number): string {
  * Per the matrix only the ring, insight, and hypnogram are tappable.
  */
 export function HomeSleep() {
-  const { today, loading, refetch } = useDailyStats();
+  const { today, loading, refetch, permissionsGranted, healthConnectAvailable } = useDailyStats();
   const sleep = useMockSleep({
     score: today?.sleepScore ?? null,
     totalMinutes: today?.sleepDurationMinutes ?? null,
   });
   const [explainerOpen, setExplainerOpen] = useState(false);
   const [hypnogramOpen, setHypnogramOpen] = useState(false);
+
+  if (today === null && permissionsGranted && healthConnectAvailable !== false) {
+    return <HomeLoadingOverlay />;
+  }
 
   return (
     <ScrollView

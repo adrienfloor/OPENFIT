@@ -62,7 +62,12 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.borderSubtle,
     borderBottomWidth: 1,
   },
-  tabBar: { paddingHorizontal: spacing.md, gap: spacing.sm },
+  tabBar: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+    gap: spacing.sm,
+  },
   pill: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,

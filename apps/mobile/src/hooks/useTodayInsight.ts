@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import {
   getTodayInsight,
@@ -40,10 +40,10 @@ export function useTodayInsight(focus: InsightFocus = 'general'):
     }
   }, [focus]);
 
-  useEffect(() => {
-    refetch();
-  }, [refetch]);
-
+  // useFocusEffect fires on initial mount AND every subsequent focus,
+  // so a separate useEffect would just double-fire on mount and cause
+  // two parallel /insights/today calls — the second one races against
+  // the unique-key INSERT on the server. One trigger is enough.
   useFocusEffect(
     useCallback(() => {
       refetch();

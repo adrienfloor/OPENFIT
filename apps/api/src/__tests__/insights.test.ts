@@ -217,6 +217,28 @@ describe('InsightsService.getOrCreate', () => {
     expect(create).toHaveBeenCalledTimes(2);
   });
 
+  it('tolerates a concurrent INSERT (P2002) without 500-ing', async () => {
+    const prisma = makePrisma();
+    prisma.user.findUnique.mockResolvedValue(baseUser);
+    prisma.workoutLog.findFirst.mockResolvedValue({ completedAt: new Date('2026-05-04T08:00:00Z') });
+    prisma.dailyHealth.findFirst.mockResolvedValue({ updatedAt: new Date('2026-05-04T07:30:00Z') });
+    prisma.dailyHealth.findMany.mockResolvedValue([]);
+    prisma.insight.findUnique.mockResolvedValue(null);
+    // Simulate a sibling request having already inserted the row.
+    const p2002 = Object.assign(new Error('Unique constraint failed'), { code: 'P2002' });
+    prisma.insight.create.mockRejectedValue(p2002);
+
+    const service = new InsightsService({
+      prisma: prisma as never,
+      anthropic: makeAnthropic(),
+      logger: silentLogger(),
+      now: () => new Date('2026-05-04T10:00:00Z'),
+    });
+
+    const out = await service.getOrCreate('user_bob', 'general');
+    expect(out.headline).toBe(goodToolInput.headline);
+  });
+
   it('multi-tenancy: cache lookup is scoped to the requesting user', async () => {
     const prisma = makePrisma();
     prisma.user.findUnique.mockResolvedValue(baseUser);

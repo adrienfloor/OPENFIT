@@ -98,17 +98,34 @@ export class InsightsService {
     const promptInput = await this.gatherPromptInput(userId, focus, now);
     const output = await this.callLLM(promptInput);
 
-    await this.prisma.insight.create({
-      data: {
-        userId,
-        focus,
-        dateBucket,
-        lastEventStamp,
-        promptInput: promptInput as unknown as object,
-        output: output as unknown as object,
-        model: this.model,
-      },
-    });
+    try {
+      await this.prisma.insight.create({
+        data: {
+          userId,
+          focus,
+          dateBucket,
+          lastEventStamp,
+          promptInput: promptInput as unknown as object,
+          output: output as unknown as object,
+          model: this.model,
+        },
+      });
+    } catch (err) {
+      // Concurrent requests for the same (userId, focus, dateBucket,
+      // lastEventStamp) will both miss the cache and try to INSERT.
+      // The second INSERT trips the unique constraint — that's fine,
+      // a sibling already persisted an equivalent brief, so we return
+      // ours without erroring. The duplicate LLM cost is bounded by
+      // request fan-out; the dedup primarily lives client-side.
+      if (isUniqueViolation(err)) {
+        this.logger.info(
+          { userId, focus, dateBucket },
+          'Concurrent insight insert skipped (duplicate cache key)',
+        );
+      } else {
+        throw err;
+      }
+    }
 
     return output;
   }
@@ -362,6 +379,15 @@ export class InsightsService {
 // ──────────────────────────────────────────────────────────────────────────
 // Helpers
 // ──────────────────────────────────────────────────────────────────────────
+
+function isUniqueViolation(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'code' in err &&
+    (err as { code?: string }).code === 'P2002'
+  );
+}
 
 function isoDay(d: Date): string {
   const yyyy = d.getUTCFullYear();

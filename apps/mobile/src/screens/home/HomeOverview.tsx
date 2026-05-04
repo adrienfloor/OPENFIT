@@ -11,7 +11,6 @@ import { useDailyStats } from '../../hooks/useDailyStats';
 import { useAuth } from '../../hooks/useAuth';
 import { useFitnessAge } from '../../hooks/useFitnessAge';
 import { TodayScoresHeader } from '../../components/TodayScoresHeader';
-import { HomeLoadingOverlay } from '../../components/HomeLoadingOverlay';
 import { NutritionCard } from '../../components/NutritionCard';
 import { AIInsightCard } from '../../components/AIInsightCard';
 import { MetricRow } from '../../components/MetricRow';
@@ -89,14 +88,6 @@ export function HomeOverview() {
     : '--';
   const hrv = today?.hrvRmssd != null ? `${Math.round(today.hrvRmssd)} ms` : '--';
   const restingHR = today?.heartRateResting != null ? `${today.heartRateResting} bpm` : '--';
-
-  // First-render gate: until the shared cache has any payload at all
-  // (and Health Connect is connected), show a centered loader so the
-  // rings never flash through "--". Once `today` is populated it stays
-  // populated for the lifetime of the session.
-  if (today === null && permissionsGranted && healthConnectAvailable !== false) {
-    return <HomeLoadingOverlay />;
-  }
 
   return (
     <ScrollView

@@ -293,15 +293,13 @@ export function HomeOverview() {
             ? `${(fitnessAgeData.vo2max - fitnessAgeData.popVo2max).toFixed(1)} VS PEER AVG ${fitnessAgeData.popVo2max.toFixed(0)}`
             : 'CALIBRATING'
         }
-        // No trend chart yet — we only store the peak per qualifying run,
-        // so a proper VO₂max-over-time series needs Slice 9b. For now the
-        // single bar acts as a placeholder so the modal layout doesn't
-        // collapse.
-        trend={fitnessAgeData?.vo2max != null ? [fitnessAgeData.vo2max] : []}
-        trendLabels={['now']}
-        trendType="bar"
+        trend={fitnessAgeData?.vo2maxHistory.map((p) => p.value) ?? []}
+        trendLabels={vo2maxTrendLabels(fitnessAgeData?.vo2maxHistory ?? [])}
+        trendType="line"
         trendColor={colors.accent}
-        note="Estimated peak aerobic capacity. Backed out from the best of your last 28 days of qualifying workouts via Uth–Sørensen (HRmax/avgHR × 15). Run a sustained ≥10-minute hard effort to refresh."
+        trendTitle="Last 90 days"
+        trendEmpty="Run one more sustained ≥10-min effort to start your trend."
+        note="Estimated peak aerobic capacity. Each point is one qualifying run, scored via the ACSM running equation scaled by your average HR fraction (avgHR / peakHR) — the same approach Garmin's Firstbeat engine uses, and within ~1 ml/kg/min of Garmin / Strava on the same effort. Run a sustained ≥10-minute hard effort to add a fresh point."
       />
       <SimpleMetricDetail
         visible={detail === 'sleepDuration'}
@@ -368,6 +366,24 @@ export function HomeOverview() {
         data={fitnessAgeData}
       />
     </ScrollView>
+  );
+}
+
+/**
+ * Label only the first and last sample on the VO₂max trend so the axis
+ * stays readable when there are 2–10 sparse points spread across 90
+ * days. SparkLine renders one tick per value; empty strings hide the
+ * intermediate ones without breaking alignment.
+ */
+function vo2maxTrendLabels(history: Array<{ computedAt: string; value: number }>): string[] {
+  if (history.length === 0) return [];
+  const fmt = (iso: string) => {
+    const d = new Date(iso);
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  };
+  if (history.length === 1) return [fmt(history[0]!.computedAt)];
+  return history.map((p, i) =>
+    i === 0 || i === history.length - 1 ? fmt(p.computedAt) : '',
   );
 }
 

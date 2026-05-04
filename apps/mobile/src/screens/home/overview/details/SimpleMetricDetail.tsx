@@ -19,6 +19,10 @@ interface Props {
   trendLabels?: string[];
   trendType?: 'line' | 'bar';
   trendColor?: string;
+  /** Section heading above the chart. Defaults to "Last 7 days". */
+  trendTitle?: string;
+  /** Shown in place of the chart when fewer than 2 points exist. */
+  trendEmpty?: string;
   /** Explanatory paragraph at the bottom. */
   note?: string;
 }
@@ -42,8 +46,11 @@ export function SimpleMetricDetail({
   trendLabels,
   trendType = 'line',
   trendColor = colors.accent,
+  trendTitle = 'Last 7 days',
+  trendEmpty,
   note,
 }: Props) {
+  const hasTrend = trend.length >= 2;
   return (
     <DetailModal visible={visible} onClose={onClose} eyebrow={eyebrow} title={title}>
       <View style={styles.heroCard}>
@@ -54,24 +61,30 @@ export function SimpleMetricDetail({
         {status ? <Text style={styles.status}>{status}</Text> : null}
       </View>
 
-      <Text style={styles.sectionLabel}>Last 7 days</Text>
+      <Text style={styles.sectionLabel}>{trendTitle}</Text>
       <View style={styles.chartCard}>
-        {trendType === 'bar' ? (
-          <SparkBars
-            values={trend}
-            color={trendColor}
-            labels={trendLabels}
-            showValues
-            height={120}
-          />
+        {hasTrend ? (
+          trendType === 'bar' ? (
+            <SparkBars
+              values={trend}
+              color={trendColor}
+              labels={trendLabels}
+              showValues
+              height={120}
+            />
+          ) : (
+            <SparkLine
+              values={trend}
+              color={trendColor}
+              labels={trendLabels}
+              showValues
+              height={140}
+            />
+          )
         ) : (
-          <SparkLine
-            values={trend}
-            color={trendColor}
-            labels={trendLabels}
-            showValues
-            height={140}
-          />
+          <Text style={styles.emptyText}>
+            {trendEmpty ?? 'Not enough data yet — keep training to build a trend.'}
+          </Text>
         )}
       </View>
 
@@ -122,5 +135,11 @@ const styles = StyleSheet.create({
     fontSize: typography.size.sm,
     color: colors.textSecondary,
     lineHeight: 22,
+  },
+  emptyText: {
+    fontSize: typography.size.sm,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    paddingVertical: spacing.lg,
   },
 });

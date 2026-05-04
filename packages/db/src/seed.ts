@@ -491,6 +491,23 @@ async function main(): Promise<void> {
         sex: user.sex,
       });
 
+      const runAvgHR = runHR.reduce((s, h) => s + h.bpm, 0) / runHR.length;
+      const runPeakHR = Math.max(...runHR.map((h) => h.bpm));
+      const runVo2max = qualifiesForVo2maxEstimate({
+        type: 'run',
+        durationSeconds,
+        distanceMeters,
+        avgHRBpm: runAvgHR,
+        peakHRBpm: runPeakHR,
+      })
+        ? estimateVo2maxFromRun({
+            distanceMeters,
+            durationSeconds,
+            avgHRBpm: runAvgHR,
+            peakHRBpm: runPeakHR,
+          })
+        : null;
+
       await prisma.workoutLog.create({
         data: {
           userId: user.id,
@@ -503,6 +520,8 @@ async function main(): Promise<void> {
           avgPaceSecondsPerKm: paceBase,
           bestPaceSecondsPerKm: paceBase - 15 - Math.floor(Math.random() * 20),
           elevationGainMeters: Math.round(elevationGain),
+          vo2maxEstimate: runVo2max,
+          vo2maxComputedAt: runVo2max != null ? startedAt : null,
           gpsPoints: { create: gpsPoints },
           heartRateSamples: { create: runHR },
         },

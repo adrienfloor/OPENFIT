@@ -45,10 +45,42 @@ describe('MetricsService.getFitnessAge', () => {
     expect(result.vo2max).toBe(49); // max of recent
     expect(result.vo2maxSampleCount).toBe(2);
     expect(result.calibrating).toBe(false);
+    // History is returned oldest → newest, rounded to 1 dp, with ISO dates.
+    expect(result.vo2maxHistory).toHaveLength(2);
+    expect(result.vo2maxHistory.map((p) => p.value)).toEqual([47, 49]);
+    expect(result.vo2maxHistory[0]!.computedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     // Fit profile → fitness age clearly below chrono.
     expect(result.fitnessAge).toBeLessThan(result.chronoAge);
     // Components are populated.
     expect(result.components.vo2max).toBeLessThan(0);
+  });
+
+  it('separates the 28-day VO2max sample count from the 90-day trend window', async () => {
+    const prisma = makePrismaMock();
+    prisma.user.findUnique.mockResolvedValue({
+      dateOfBirth: new Date('1990-02-22'),
+      sex: 'male',
+    });
+
+    const now = new Date();
+    // Three samples in the broader window: one from 60d ago (out of 28d
+    // count) and two from inside.
+    prisma.workoutLog.findMany
+      .mockResolvedValueOnce([
+        { vo2maxEstimate: 45, vo2maxComputedAt: new Date(now.getTime() - 60 * 86_400_000) },
+        { vo2maxEstimate: 47, vo2maxComputedAt: new Date(now.getTime() - 5 * 86_400_000) },
+        { vo2maxEstimate: 49, vo2maxComputedAt: new Date(now.getTime() - 12 * 86_400_000) },
+      ])
+      .mockResolvedValueOnce([]);
+
+    prisma.dailyHealth.findMany.mockResolvedValue([]);
+
+    const service = new MetricsService(prisma as never);
+    const result = await service.getFitnessAge('user_01');
+
+    expect(result.vo2maxHistory).toHaveLength(3);
+    expect(result.vo2max).toBe(49); // max of 28d window
+    expect(result.vo2maxSampleCount).toBe(2); // only the two within 28d
   });
 
   it('returns calibrating=true when no qualifying VO2max samples exist', async () => {

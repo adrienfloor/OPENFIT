@@ -23,8 +23,16 @@ export interface FitnessAgeResponse extends FitnessAgeResult {
   vo2max: number | null;
   /** Population VO₂max for the user's age + sex — drives "compared to peers". */
   popVo2max: number;
-  /** How many qualifying VO₂max samples back the current value. */
+  /** How many qualifying VO₂max samples back the current value (28d window). */
   vo2maxSampleCount: number;
+  /**
+   * Per-run VO₂max estimates over the last 90 days, oldest → newest.
+   * Drives the trend chart in the VO₂max detail modal. Garmin / Strava
+   * publish a similar chart against time; ours is per-qualifying-run
+   * rather than smoothed because the underlying signal is already noisy
+   * and we want the user to see the raw points.
+   */
+  vo2maxHistory: Array<{ computedAt: string; value: number }>;
 }
 
 export class MetricsService {
@@ -42,16 +50,20 @@ export class MetricsService {
     const chronoAge = ageYearsFromDob(user.dateOfBirth);
     const now = new Date();
     const since28 = new Date(now.getTime() - 28 * 86_400_000);
+    const since90 = new Date(now.getTime() - 90 * 86_400_000);
     const since14 = new Date(now.getTime() - 14 * 86_400_000);
 
-    // VO₂max history — only logs with a stored estimate count.
+    // VO₂max history — pull 90d for the trend chart, then derive the 28d
+    // "current" window by filtering. currentVo2maxFromHistory does its
+    // own cutoff so we just hand it the wider set.
     const vo2Logs = await this.prisma.workoutLog.findMany({
       where: {
         userId,
         vo2maxEstimate: { not: null },
-        vo2maxComputedAt: { gte: since28 },
+        vo2maxComputedAt: { gte: since90 },
       },
       select: { vo2maxEstimate: true, vo2maxComputedAt: true },
+      orderBy: { vo2maxComputedAt: 'asc' },
     });
     const vo2Estimates = vo2Logs
       .filter((l): l is { vo2maxEstimate: number; vo2maxComputedAt: Date } =>
@@ -59,6 +71,11 @@ export class MetricsService {
       )
       .map((l) => ({ value: l.vo2maxEstimate, computedAt: l.vo2maxComputedAt }));
     const vo2max = currentVo2maxFromHistory(vo2Estimates, { now, windowDays: 28 });
+    const vo2max28dCount = vo2Estimates.filter((e) => e.computedAt >= since28).length;
+    const vo2maxHistory = vo2Estimates.map((e) => ({
+      computedAt: e.computedAt.toISOString(),
+      value: Math.round(e.value * 10) / 10,
+    }));
 
     // Activity snapshot over the last 28 days.
     const recentLogs = await this.prisma.workoutLog.findMany({
@@ -120,7 +137,8 @@ export class MetricsService {
       chronoAge,
       vo2max,
       popVo2max: popVo2max(chronoAge, user.sex),
-      vo2maxSampleCount: vo2Estimates.length,
+      vo2maxSampleCount: vo2max28dCount,
+      vo2maxHistory,
     };
   }
 }

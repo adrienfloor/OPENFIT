@@ -6,6 +6,7 @@ export interface FitnessAgeResponse extends FitnessAgeResult {
   vo2max: number | null;
   popVo2max: number;
   vo2maxSampleCount: number;
+  vo2maxHistory: Array<{ computedAt: string; value: number }>;
 }
 
 export async function getFitnessAge(): Promise<FitnessAgeResponse> {

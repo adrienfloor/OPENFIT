@@ -68,12 +68,16 @@ export function HomeOverview() {
   const { user } = useAuth();
   const {
     today,
-    loading,
     refetch,
     healthConnectAvailable,
     permissionsGranted,
     requestPermissions,
   } = useDailyStats();
+  const [pulling, setPulling] = useState(false);
+  const onPullRefresh = async () => {
+    setPulling(true);
+    try { await refetch(); } finally { setPulling(false); }
+  };
 
   const fatigue = useMockFatigueLoad();
   const trainingStatus = useMockTrainingStatus();
@@ -102,7 +106,7 @@ export function HomeOverview() {
     <ScrollView
       style={styles.container}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={refetch} {...themedRefresh} />
+        <RefreshControl refreshing={pulling} onRefresh={onPullRefresh} {...themedRefresh} />
       }
     >
       {/* Health Connect onboarding */}

@@ -49,9 +49,14 @@ function formatTime(d: Date): string {
  * tappable. Everything else is read-only.
  */
 export function HomeBioCharge() {
-  const { today, loading, refetch, permissionsGranted, healthConnectAvailable } = useDailyStats();
+  const { today, refetch, permissionsGranted, healthConnectAvailable } = useDailyStats();
   const dashboard = useMockBioCharge(today?.recoveryScore ?? null);
   const [explainerOpen, setExplainerOpen] = useState(false);
+  const [pulling, setPulling] = useState(false);
+  const onPullRefresh = async () => {
+    setPulling(true);
+    try { await refetch(); } finally { setPulling(false); }
+  };
 
   if (today === null && permissionsGranted && healthConnectAvailable !== false) {
     return <HomeLoadingOverlay />;
@@ -71,7 +76,7 @@ export function HomeBioCharge() {
     <ScrollView
       style={styles.container}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={refetch} {...themedRefresh} />
+        <RefreshControl refreshing={pulling} onRefresh={onPullRefresh} {...themedRefresh} />
       }
     >
       {/* Hero ring */}

@@ -49,13 +49,18 @@ function pct(part: number, total: number): string {
  * Per the matrix only the ring, insight, and hypnogram are tappable.
  */
 export function HomeSleep() {
-  const { today, loading, refetch, permissionsGranted, healthConnectAvailable } = useDailyStats();
+  const { today, refetch, permissionsGranted, healthConnectAvailable } = useDailyStats();
   const sleep = useMockSleep({
     score: today?.sleepScore ?? null,
     totalMinutes: today?.sleepDurationMinutes ?? null,
   });
   const [explainerOpen, setExplainerOpen] = useState(false);
   const [hypnogramOpen, setHypnogramOpen] = useState(false);
+  const [pulling, setPulling] = useState(false);
+  const onPullRefresh = async () => {
+    setPulling(true);
+    try { await refetch(); } finally { setPulling(false); }
+  };
 
   if (today === null && permissionsGranted && healthConnectAvailable !== false) {
     return <HomeLoadingOverlay />;
@@ -65,7 +70,7 @@ export function HomeSleep() {
     <ScrollView
       style={styles.container}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={refetch} {...themedRefresh} />
+        <RefreshControl refreshing={pulling} onRefresh={onPullRefresh} {...themedRefresh} />
       }
     >
       {/* Hero ring */}

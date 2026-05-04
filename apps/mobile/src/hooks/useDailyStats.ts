@@ -49,7 +49,15 @@ export function useDailyStats(): {
   error: Error | null;
   healthConnectAvailable: boolean | null;
   permissionsGranted: boolean;
-  refetch: () => void;
+  /**
+   * Triggers a refetch of TodayDailyStats. Returns a promise that
+   * resolves when the fetch completes — wrap it in your own local
+   * "pulling" state if you want to drive a RefreshControl spinner;
+   * the hook's internal `loading` flag is for "is anything in-flight?"
+   * not "is the user pulling?", so binding RefreshControl to it would
+   * show the system spinner on every focus refetch.
+   */
+  refetch: () => Promise<void>;
   requestPermissions: () => Promise<void>;
 } {
   const { user } = useAuth();
@@ -114,47 +122,50 @@ export function useDailyStats(): {
     }
   }, []);
 
-  // Fetch data when permissions are granted
-  useEffect(() => {
+  const fetchStats = useCallback(async (): Promise<void> => {
     if (!permissionsGranted || !initializedRef.current) return;
+    setLoading(true);
+    setError(null);
+    try {
+      console.log('[useDailyStats] fetching dashboard (7d window)...');
+      const { getTodayDashboard } = await import('../services/healthConnect');
+      const profile = user
+        ? {
+            weightKg: user.weightKg,
+            heightCm: user.heightCm,
+            sex: user.sex,
+            dateOfBirth: new Date(user.dateOfBirth),
+          }
+        : undefined;
 
-    async function fetchStats() {
-      setLoading(true);
-      setError(null);
-      try {
-        console.log('[useDailyStats] fetching dashboard (7d window)...');
-        const { getTodayDashboard } = await import('../services/healthConnect');
-        const profile = user
-          ? {
-              weightKg: user.weightKg,
-              heightCm: user.heightCm,
-              sex: user.sex,
-              dateOfBirth: new Date(user.dateOfBirth),
-            }
-          : undefined;
-
-        // Fetch the same 7-day window of WorkoutLogs so HR-derived workout
-        // calories (Keytel) get added on top of the step-based casual
-        // estimate inside getDailyStats. Failing this call shouldn't block
-        // the dashboard — fall back to a step-only estimate.
-        const workoutKcalByDate = await fetchWorkoutKcalByDate().catch(
-          () => ({}),
-        );
-        const result = await getTodayDashboard(profile, workoutKcalByDate);
-        console.log('[useDailyStats] dashboard result:', JSON.stringify(result));
-        publishCache(result);
-      } catch (err) {
-        setError(err instanceof Error ? err : new Error('Failed to fetch daily stats'));
-        // Don't blow away the cached snapshot on transient errors — the
-        // rings keep showing the last-known values, the user gets
-        // a non-fatal error surfaced via `error`.
-      } finally {
-        setLoading(false);
-      }
+      // Fetch the same 7-day window of WorkoutLogs so HR-derived workout
+      // calories (Keytel) get added on top of the step-based casual
+      // estimate inside getDailyStats. Failing this call shouldn't block
+      // the dashboard — fall back to a step-only estimate.
+      const workoutKcalByDate = await fetchWorkoutKcalByDate().catch(
+        () => ({}),
+      );
+      const result = await getTodayDashboard(profile, workoutKcalByDate);
+      console.log('[useDailyStats] dashboard result:', JSON.stringify(result));
+      publishCache(result);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error('Failed to fetch daily stats'));
+      // Don't blow away the cached snapshot on transient errors — the
+      // rings keep showing the last-known values, the user gets
+      // a non-fatal error surfaced via `error`.
+    } finally {
+      setLoading(false);
     }
+  }, [permissionsGranted, user]);
 
-    fetchStats();
-  }, [permissionsGranted, fetchTrigger, user]);
+  // Drive the initial / permission-change fetch via the trigger ref.
+  useEffect(() => {
+    void fetchStats();
+  }, [fetchStats, fetchTrigger]);
+
+  const refetch = useCallback(async (): Promise<void> => {
+    await fetchStats();
+  }, [fetchStats]);
 
   return {
     today,
@@ -162,7 +173,7 @@ export function useDailyStats(): {
     error,
     healthConnectAvailable,
     permissionsGranted,
-    refetch: () => setFetchTrigger((t) => t + 1),
+    refetch,
     requestPermissions,
   };
 }

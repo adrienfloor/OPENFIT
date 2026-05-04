@@ -50,7 +50,8 @@ type DetailKey = 'fatigue' | 'fitness' | 'trainingStatus' | 'daily' | 'workout' 
  * 7-day series and today's per-activity breakdown are mocked.
  */
 export function HomeEffort() {
-  const { today, loading, refetch, permissionsGranted, healthConnectAvailable } = useDailyStats();
+  const { today, refetch, permissionsGranted, healthConnectAvailable } = useDailyStats();
+  const [pulling, setPulling] = useState(false);
   const fatigue = useMockFatigueLoad();
   const fitness = useMockFitnessLevel();
   const trainingStatus = useMockTrainingStatus();
@@ -85,6 +86,16 @@ export function HomeEffort() {
     fetchTodayWorkouts();
   }, [fetchTodayWorkouts]);
 
+  const onPullRefresh = async () => {
+    setPulling(true);
+    try {
+      await refetch();
+      await fetchTodayWorkouts();
+    } finally {
+      setPulling(false);
+    }
+  };
+
   const earned = today?.effortEarnedMinutes ?? null;
   const target = today?.effortTargetMinutes ?? null;
   const score = today?.effortScore ?? null;
@@ -111,11 +122,8 @@ export function HomeEffort() {
       style={styles.container}
       refreshControl={
         <RefreshControl
-          refreshing={loading}
-          onRefresh={() => {
-            refetch();
-            fetchTodayWorkouts();
-          }}
+          refreshing={pulling}
+          onRefresh={onPullRefresh}
           {...themedRefresh}
         />
       }

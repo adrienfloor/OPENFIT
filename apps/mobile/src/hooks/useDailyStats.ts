@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { useDailyStatsStore } from '../stores/dailyStats.store';
 import type { TodayDailyStats } from '../services/healthConnect';
 
@@ -41,6 +42,19 @@ export function useDailyStats(): {
   useEffect(() => {
     void init();
   }, [init]);
+
+  // Background refetch on every screen focus. The store keeps the
+  // existing `today` snapshot in place during the fetch (only swaps in
+  // a non-null result), so the rings never flash — they just update
+  // when fresher data arrives. The cold-start fetch is owned by
+  // `init`, so this only fires from the second focus onward.
+  useFocusEffect(
+    useCallback(() => {
+      if (hasEverLoaded) {
+        void refetch();
+      }
+    }, [hasEverLoaded, refetch]),
+  );
 
   return {
     today,

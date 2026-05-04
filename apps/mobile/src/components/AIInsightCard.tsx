@@ -5,32 +5,57 @@ import {
   StyleSheet,
   TouchableOpacity,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useMockAIInsight, type AIInsight } from '../mocks';
+import { useTodayInsight } from '../hooks/useTodayInsight';
+import type { InsightFocus, InsightOutput } from '../services/insights';
 import { colors, spacing, radii, typography } from '../theme';
 
 interface CardProps {
-  /** Override the default Overview-flavored insight with a focus-specific one. */
-  insight?: AIInsight;
+  /**
+   * Which insight to fetch. Overview uses `general`; the BioCharge,
+   * Sleep, and Effort sub-tabs pass their respective focus.
+   */
+  focus?: InsightFocus;
+  /** Pre-fetched insight (skips the network — used by parents that already have it). */
+  insight?: InsightOutput;
 }
 
 /**
- * AI insight card for Home → Overview.
+ * AI insight card.
  *
- * Collapsed: shows the headline + a "Why?" affordance.
- * Tapping opens a bottom-sheet modal with the full body and the model
- * inputs (transparency — same idea as Zepp's BioCharge insights, but
- * we expose the inputs so the user understands what drove it).
+ * Collapsed: shows the headline + a "Why?" affordance. Tapping opens a
+ * bottom-sheet modal with the full body and the model inputs
+ * (transparency — same idea as Zepp's BioCharge insights, but we expose
+ * the inputs so the user understands what drove it).
  *
- * Currently fed by a mock hook. Slice 9 swaps the source to
- * `/insights/today?focus=overview`.
+ * Backed by `/insights/today?focus=…`, server-side cached so refreshes
+ * don't burn LLM tokens unless an input has actually changed.
  */
-export function AIInsightCard({ insight: override }: CardProps = {}) {
-  const fallback = useMockAIInsight();
-  const insight = override ?? fallback;
+export function AIInsightCard({ focus = 'general', insight: override }: CardProps = {}) {
+  const { data, loading, error } = useTodayInsight(focus);
+  const insight = override ?? data;
   const [expanded, setExpanded] = useState(false);
   const insets = useSafeAreaInsets();
+
+  if (!insight) {
+    return (
+      <View style={styles.card}>
+        <View style={styles.header}>
+          <Text style={styles.eyebrow}>Daily brief</Text>
+          <Text style={styles.coach}>AI</Text>
+        </View>
+        {loading ? (
+          <ActivityIndicator color={colors.accent} />
+        ) : (
+          <Text style={styles.headline}>
+            {error ?? 'No brief yet — log a workout or sync to generate one.'}
+          </Text>
+        )}
+      </View>
+    );
+  }
 
   const windowLabel = insight.window === 'morning'
     ? 'Morning brief'

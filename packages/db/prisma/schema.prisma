@@ -85,6 +85,7 @@ model User {
   dailyHealth      DailyHealth[]
   foodAnalyses     FoodAnalysis[]
   foodLogs         FoodLog[]
+  insights         Insight[]
 }
 
 model RefreshToken {
@@ -329,6 +330,39 @@ model FoodLog {
   @@index([userId, loggedAt])
 }
 
+// AI-generated Today-tab insight rows. Cached per
+// (userId, focus, dateBucket, lastEventStamp) so the same key is reused
+// across refreshes and the row is regenerated only when the calendar
+// day rolls over OR a downstream input (workout / health) advances the
+// event stamp. Multiple rows per (user, focus, day) are expected over
+// the day's lifetime; a janitor can prune dateBucket < today−30d.
+model Insight {
+  id              String   @id @default(cuid())
+  userId          String
+  focus           String   // InsightFocus zod enum
+  // Local-day bucket (UTC) the insight was generated for, formatted as
+  // YYYY-MM-DD. Stored as a string so a Postgres unique index plays
+  // nicely with the rolling window — no @db.Date conversion edge cases.
+  dateBucket      String
+  // ISO timestamp of the latest event feeding this insight
+  // (max(WorkoutLog.completedAt, DailyHealth.updatedAt)). When inputs
+  // shift, this advances and creates a fresh cache row.
+  lastEventStamp  DateTime
+  // Snapshot of the InsightPromptInput used — useful for debugging and
+  // for "based on" transparency in the UI.
+  promptInput     Json
+  // Headline / body / inputs[] / window — the InsightOutput payload.
+  output          Json
+  model           String
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, focus, dateBucket, lastEventStamp])
+  @@index([userId])
+  @@index([userId, dateBucket])
+}
+
 model DailyHealth {
   id                   String   @id @default(cuid())
   date                 DateTime @db.Date
@@ -343,6 +377,9 @@ model DailyHealth {
   recoveryScore        Float?
   effortScore          Float?
   effortEarnedMinutes  Float?
+  // Tracks the most recent write so the AI insight cache can invalidate
+  // when a Health Connect bulk sync fills in last night's sleep / HRV.
+  updatedAt            DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

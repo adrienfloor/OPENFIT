@@ -12,19 +12,6 @@
  * name and delete the mocks entry.
  */
 
-export interface AIInsight {
-  /** Short one-liner shown collapsed. */
-  headline: string;
-  /** Longer paragraph shown when the card expands. */
-  body: string;
-  /** Bullet list of inputs feeding the model — surfaced for transparency. */
-  inputs: string[];
-  /** Window the insight is keyed on (morning / afternoon / evening). */
-  window: 'morning' | 'afternoon' | 'evening';
-  /** When this insight was generated. */
-  generatedAt: Date;
-}
-
 export interface TrendPoint {
   date: Date;
   value: number;
@@ -69,53 +56,6 @@ function daysAgo(n: number): Date {
 
 function sevenDayTrend(values: number[]): TrendPoint[] {
   return values.map((value, i) => ({ date: daysAgo(6 - i), value }));
-}
-
-/**
- * AI insight — three-window rotation. Real version will hit
- * `/insights/today?focus=overview&window=…` once Slice 9 ships.
- */
-export function useMockAIInsight(): AIInsight {
-  const hour = new Date().getHours();
-  const window: AIInsight['window'] =
-    hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
-  const morning: AIInsight = {
-    window: 'morning',
-    headline: 'Recovered well — go push it today.',
-    body:
-      'Your HRV is back near baseline and BioCharge is in the green. ' +
-      'A high-effort training day is on the table — aim for the upper end ' +
-      'of the prescribed RPE on your main lifts. Keep something in the ' +
-      'tank for tomorrow if you have a session planned.',
-    inputs: [
-      'Sleep score 79',
-      'HRV 71 ms (baseline 67)',
-      'RHR 42 bpm',
-      '3-day load: balanced',
-    ],
-    generatedAt: new Date(),
-  };
-  const afternoon: AIInsight = {
-    window: 'afternoon',
-    headline: 'Solid day — protein on point.',
-    body:
-      'You are tracking ahead of your protein target with calories in a ' +
-      'mild deficit. If you train this evening, plan ~30 g of carbs in ' +
-      'the next 90 min. Otherwise stay the course.',
-    inputs: ['Calorie balance −410 kcal', 'Protein 126/197 g', 'Steps 4 380'],
-    generatedAt: new Date(),
-  };
-  const evening: AIInsight = {
-    window: 'evening',
-    headline: 'Wind down — sleep is the multiplier.',
-    body:
-      'Today’s effort was meaningful; the gains compound during sleep. ' +
-      'Cut bright screens within an hour of bedtime and aim for the same ' +
-      'lights-out time as the past three nights to keep regularity high.',
-    inputs: ['Effort 124/100', 'Avg bedtime last 3d: 22:15', 'Caffeine after 16:00 → none'],
-    generatedAt: new Date(),
-  };
-  return window === 'morning' ? morning : window === 'afternoon' ? afternoon : evening;
 }
 
 export function useMockVO2Max(): VO2Max {
@@ -463,26 +403,6 @@ export function useMockSleep(input: {
   };
 }
 
-export function useMockSleepInsight(): AIInsight {
-  return {
-    window: 'morning',
-    headline: 'Solid regularity — keep the schedule.',
-    body:
-      'Sleep timing has been consistent for the past 5 nights, which is one ' +
-      'of the highest-leverage habits for sleep quality. Total duration ran ' +
-      'a bit long last night (9h 47m vs your recent average ~8h 15m); a ' +
-      'slightly earlier wake time would tighten the rhythm without costing ' +
-      'recovery.',
-    inputs: [
-      'Sleep score 70 (Fair)',
-      'Regularity 85%',
-      'Bedtime stddev 38 min over 7 days',
-      'Deep 16% · REM 22% — both in target range',
-    ],
-    generatedAt: new Date(),
-  };
-}
-
 export interface FitnessLevel {
   current: number;
   /** Trend in cyan in the screenshots — typically rises with consistent training. */
@@ -536,44 +456,6 @@ export function useMockTodayActivities(input: {
       endTime: end,
     },
   ];
-}
-
-export function useMockEffortInsight(): AIInsight {
-  return {
-    window: 'afternoon',
-    headline: 'Target hit — fitness trend is climbing.',
-    body:
-      'Today’s session pushed earned effort minutes past the personalised ' +
-      'target with sustained time in zone 4. Your 7-day fitness curve is ' +
-      'still rising while fatigue dropped over the weekend — a productive ' +
-      'spot. Keep one easy day in the next 48 h to bank the gain.',
-    inputs: [
-      'Effort 100% (92/32 min)',
-      'Workout cost: 78 effort min',
-      '7d fitness +2 vs week prior',
-      'Training status −4 (balanced)',
-    ],
-    generatedAt: new Date(),
-  };
-}
-
-export function useMockBioChargeInsight(): AIInsight {
-  return {
-    window: 'afternoon',
-    headline: 'BioCharge holding steady — push or rest both work.',
-    body:
-      'Your BioCharge dropped 12 points during the cross-training block but recovered ' +
-      'most of the buffer afterward. With ~6 hours of awake time left and HRV near ' +
-      'baseline, a moderate evening session would only cost another ~10 points. ' +
-      'Skip the session if tomorrow is a heavy training day.',
-    inputs: [
-      'Wake BioCharge 92',
-      'Workout cost −12',
-      'Current 58',
-      'HRV 71 ms (baseline 67)',
-    ],
-    generatedAt: new Date(),
-  };
 }
 
 export function useMockWeight(): WeightTrend {

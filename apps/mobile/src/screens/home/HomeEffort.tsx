@@ -16,7 +16,6 @@ import { RingExplainerSheet } from '../../components/RingExplainerSheet';
 import { SparkLine } from '../../components/charts/SparkLine';
 import { SparkBars } from '../../components/charts/SparkBars';
 import {
-  useMockEffortInsight,
   useMockFatigueLoad,
   useMockFitnessLevel,
   useMockTodayActivities,
@@ -54,7 +53,6 @@ export function HomeEffort() {
   const fatigue = useMockFatigueLoad();
   const fitness = useMockFitnessLevel();
   const trainingStatus = useMockTrainingStatus();
-  const insight = useMockEffortInsight();
   const activities = useMockTodayActivities({
     earnedMinutes: today?.effortEarnedMinutes ?? null,
   });
@@ -130,7 +128,7 @@ export function HomeEffort() {
       </View>
 
       {/* AI insight */}
-      <AIInsightCard insight={insight} />
+      <AIInsightCard focus="effort" />
 
       {/* Today's activities */}
       <Text style={styles.sectionLabel}>Today's activities</Text>

@@ -8,6 +8,7 @@ import { healthRoutes } from './routes/health/index.js';
 import { coachRoutes } from './routes/coach/index.js';
 import { nutritionRoutes } from './routes/nutrition/index.js';
 import { metricsRoutes } from './routes/metrics/index.js';
+import { insightsRoutes } from './routes/insights/index.js';
 
 const server = Fastify({
   logger: {
@@ -26,6 +27,7 @@ async function bootstrap(): Promise<void> {
   await server.register(coachRoutes, { prefix: '/coach' });
   await server.register(nutritionRoutes, { prefix: '/nutrition' });
   await server.register(metricsRoutes, { prefix: '/metrics' });
+  await server.register(insightsRoutes, { prefix: '/insights' });
 
   server.get('/healthz', async () => ({ status: 'ok' }));
 

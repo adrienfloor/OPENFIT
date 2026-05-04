@@ -16,7 +16,7 @@ import {
 } from '../../components/charts/IntradayLineChart';
 import { SparkBars } from '../../components/charts/SparkBars';
 import { SparkLine } from '../../components/charts/SparkLine';
-import { useMockBioCharge, useMockBioChargeInsight } from '../../mocks';
+import { useMockBioCharge } from '../../mocks';
 import { colors, spacing, radii, typography, themedRefresh } from '../../theme';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -50,7 +50,6 @@ function formatTime(d: Date): string {
 export function HomeBioCharge() {
   const { today, loading, refetch } = useDailyStats();
   const dashboard = useMockBioCharge(today?.recoveryScore ?? null);
-  const insight = useMockBioChargeInsight();
   const [explainerOpen, setExplainerOpen] = useState(false);
 
   const tier = bioChargeTier(dashboard.current);
@@ -83,7 +82,7 @@ export function HomeBioCharge() {
       </View>
 
       {/* AI insight */}
-      <AIInsightCard insight={insight} />
+      <AIInsightCard focus="biocharge" />
 
       {/* Intraday */}
       <Text style={styles.sectionLabel}>BioCharge through the day</Text>

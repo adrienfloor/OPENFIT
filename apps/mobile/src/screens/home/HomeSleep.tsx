@@ -15,7 +15,7 @@ import { Hypnogram } from '../../components/charts/Hypnogram';
 import { StackedBars } from '../../components/charts/StackedBars';
 import { RegularityBars } from '../../components/charts/RegularityBars';
 import { SparkLine } from '../../components/charts/SparkLine';
-import { useMockSleep, useMockSleepInsight } from '../../mocks';
+import { useMockSleep } from '../../mocks';
 import { HypnogramDetail } from './sleep/HypnogramDetail';
 import { colors, spacing, radii, typography, themedRefresh } from '../../theme';
 
@@ -53,7 +53,6 @@ export function HomeSleep() {
     score: today?.sleepScore ?? null,
     totalMinutes: today?.sleepDurationMinutes ?? null,
   });
-  const insight = useMockSleepInsight();
   const [explainerOpen, setExplainerOpen] = useState(false);
   const [hypnogramOpen, setHypnogramOpen] = useState(false);
 
@@ -77,7 +76,7 @@ export function HomeSleep() {
       </View>
 
       {/* AI insight */}
-      <AIInsightCard insight={insight} />
+      <AIInsightCard focus="sleep" />
 
       {/* Hypnogram */}
       <Text style={styles.sectionLabel}>Sleep stages</Text>

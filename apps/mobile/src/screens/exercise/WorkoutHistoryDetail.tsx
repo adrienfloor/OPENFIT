@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Loader } from '../../components/Loader';
 import MapLibreGL, { setConnected } from '@maplibre/maplibre-react-native';
-import type { WorkoutType } from '@openfit/types';
+import type { WorkoutSource, WorkoutType } from '@openfit/types';
 import { DetailModal } from '../../components/DetailModal';
 import { apiClient } from '../../services/api';
 import { formatDuration } from '../../utils';
+import { friendlyOrigin } from '../../utils/origin';
 import { colors, spacing, radii, typography } from '../../theme';
 
 setConnected(true);
@@ -24,6 +25,8 @@ interface HeartRateSample {
 interface WorkoutLogDetail {
   id: string;
   type: WorkoutType;
+  source: WorkoutSource;
+  dataOrigin: string | null;
   startedAt: string;
   completedAt: string | null;
   caloriesBurned: number | null;
@@ -217,6 +220,17 @@ export function WorkoutHistoryDetail({ visible, onClose, workoutId }: Props) {
               <Divider />
               <MetaRow label="Max HR" value={`${maxHR} bpm`} />
             </View>
+          ) : null}
+
+          {/* Source footer for Health-Connect-imported workouts. The
+              detail view has no edit affordances today, but this line
+              tells the user the row is read-only and where it came
+              from — paving the way for "Open in Garmin Connect"-style
+              deeplinks later without surprising anyone now. */}
+          {log.source === 'health_connect' ? (
+            <Text style={styles.sourceFooter}>
+              From {friendlyOrigin(log.dataOrigin)} — synced via Health Connect
+            </Text>
           ) : null}
 
           {/* Strength-specific: exercise table */}
@@ -422,6 +436,13 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: spacing.sm,
+  },
+  sourceFooter: {
+    fontSize: typography.size.xs,
+    color: colors.textMuted,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginBottom: spacing.lg,
   },
   exerciseCard: {
     backgroundColor: colors.surface,

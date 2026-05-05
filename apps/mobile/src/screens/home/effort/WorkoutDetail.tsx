@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet } from 'react-native';
-import type { WorkoutType } from '@openfit/types';
+import type { WorkoutSource, WorkoutType } from '@openfit/types';
 import { DetailModal } from '../../../components/DetailModal';
 import { formatDuration } from '../../../utils';
 import { colors, spacing, radii, typography } from '../../../theme';
@@ -12,6 +12,8 @@ import { colors, spacing, radii, typography } from '../../../theme';
 export interface TodayWorkout {
   id: string;
   type: WorkoutType;
+  source: WorkoutSource;
+  dataOrigin: string | null;
   startedAt: string | Date;
   completedAt: string | Date | null;
   durationSeconds: number | null;

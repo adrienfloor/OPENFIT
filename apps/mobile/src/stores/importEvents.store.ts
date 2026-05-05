@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { ImportSummary } from '../services/healthConnectImport';
+import { friendlyOrigin } from '../utils/origin';
 
 /**
  * Lightweight pub/sub for Health-Connect-import side effects.
@@ -41,27 +42,6 @@ function summarize(summary: ImportSummary): string {
     return `Imported ${imported} ${noun} from ${label}`;
   }
   return `Imported ${imported} ${noun}`;
-}
-
-const ORIGIN_LABELS: Record<string, string> = {
-  'com.garmin.android.apps.connectmobile': 'Garmin',
-  'com.strava': 'Strava',
-  'com.huami.watch.hmwatchmanager': 'Zepp',
-  'com.xiaomi.hm.health': 'Zepp',
-  'com.fitbit.FitbitMobile': 'Fitbit',
-  'com.samsung.health': 'Samsung Health',
-  'com.google.android.apps.fitness': 'Google Fit',
-  'com.coros.coros': 'Coros',
-  'fi.polar.polarflow': 'Polar',
-  'com.suunto.movescountmobile': 'Suunto',
-};
-
-function friendlyOrigin(packageName: string): string {
-  if (ORIGIN_LABELS[packageName]) return ORIGIN_LABELS[packageName]!;
-  // Fall back to the writer's last segment with a capitalized first letter
-  // — better than the raw package name in the toast.
-  const last = packageName.split('.').pop() ?? packageName;
-  return last.charAt(0).toUpperCase() + last.slice(1);
 }
 
 export const useImportEventsStore = create<ImportEventsState>((set) => ({

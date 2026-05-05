@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import type { WorkoutType } from '@openfit/types';
 import { formatDuration } from '../../utils';
+import { friendlyOrigin } from '../../utils/origin';
 import { colors, spacing, radii, typography } from '../../theme';
 import type { TodayWorkout } from '../home/effort/WorkoutDetail';
 
@@ -163,6 +164,13 @@ export function HistoryList({ workouts, onSelect }: Props) {
                   <View style={[styles.typeChip, { backgroundColor: TYPE_COLOR[w.type] }]}>
                     <Text style={styles.typeChipText}>{TYPE_LABEL[w.type]}</Text>
                   </View>
+                  {w.source === 'health_connect' ? (
+                    <View style={styles.sourceChip}>
+                      <Text style={styles.sourceChipText} numberOfLines={1}>
+                        {friendlyOrigin(w.dataOrigin)}
+                      </Text>
+                    </View>
+                  ) : null}
                   <Text style={styles.rowDate}>{formatDate(w.startedAt)}</Text>
                 </View>
                 <Text style={styles.rowName} numberOfLines={1}>
@@ -256,6 +264,21 @@ const styles = StyleSheet.create({
     fontWeight: typography.weight.bold,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
+  },
+  sourceChip: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radii.sm,
+    backgroundColor: colors.surfaceRaised,
+    borderWidth: 1,
+    borderColor: colors.border,
+    maxWidth: 120,
+  },
+  sourceChipText: {
+    color: colors.textSecondary,
+    fontSize: 10,
+    fontWeight: typography.weight.semibold,
+    letterSpacing: 0.3,
   },
   rowDate: { fontSize: typography.size.xs, color: colors.textMuted },
   rowName: {

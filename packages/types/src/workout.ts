@@ -221,7 +221,14 @@ export const CreateWorkoutLogInputSchema = z
     dataOrigin: z.string().min(1).optional(),
   })
   .refine(
-    (data) => data.type !== 'strength' || data.exerciseLogs.length > 0,
+    // Manual strength entry must list its sets — that's the whole point.
+    // HC-imported strength sessions (Zepp, Garmin, Coros, etc.) carry no
+    // per-set data through the bridge, so we skip the check for them and
+    // store the row with HR + duration + calories only.
+    (data) =>
+      data.type !== 'strength' ||
+      data.source === 'health_connect' ||
+      data.exerciseLogs.length > 0,
     { message: 'Strength workouts require at least one exerciseLog', path: ['exerciseLogs'] },
   )
   .refine(

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { WorkoutService, WorkoutError } from '../services/workout.service.js';
+import { CreateWorkoutLogInputSchema } from '@openfit/types';
 
 const mockExercise = {
   id: 'ex_01',
@@ -643,5 +644,42 @@ describe('WorkoutService.swapProgramExercise', () => {
     ).rejects.toMatchObject({ statusCode: 400 });
 
     expect(prisma.plannedExercise.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('CreateWorkoutLogInputSchema strength rule', () => {
+  const baseStrength = {
+    type: 'strength' as const,
+    startedAt: '2026-05-04T06:56:00Z',
+    completedAt: '2026-05-04T07:43:00Z',
+    durationSeconds: 2820,
+  };
+
+  it('rejects a manual strength log with no exerciseLogs', () => {
+    const parsed = CreateWorkoutLogInputSchema.safeParse({
+      ...baseStrength,
+      exerciseLogs: [],
+    });
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) {
+      expect(parsed.error.flatten().fieldErrors.exerciseLogs).toContain(
+        'Strength workouts require at least one exerciseLog',
+      );
+    }
+  });
+
+  it('accepts an HC-imported strength log with no exerciseLogs', () => {
+    // Zepp / Garmin / Coros etc. don't expose per-set data through the
+    // Health Connect bridge, so the row stores duration + HR + calories
+    // only and the strength-must-have-exerciseLogs rule is skipped for
+    // source='health_connect' imports.
+    const parsed = CreateWorkoutLogInputSchema.safeParse({
+      ...baseStrength,
+      source: 'health_connect',
+      externalId: 'hc_session_strength',
+      dataOrigin: 'com.huami.watch.hmwatchmanager',
+      exerciseLogs: [],
+    });
+    expect(parsed.success).toBe(true);
   });
 });

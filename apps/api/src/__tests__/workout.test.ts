@@ -305,6 +305,37 @@ describe('WorkoutService.createWorkoutLog', () => {
     ).rejects.toMatchObject({ statusCode: 400 });
   });
 
+  it('manual writes never run the HC dedup query', async () => {
+    const prisma = createMockPrisma();
+    const service = new WorkoutService(prisma as never);
+
+    prisma.exercise.findMany.mockResolvedValue([{ id: 'ex_01' }]);
+    prisma.workoutLog.create.mockResolvedValue({
+      ...mockWorkoutLog,
+      exerciseLogs: [],
+    });
+
+    await service.createWorkoutLog('user_01', {
+      type: 'strength',
+      source: 'manual',
+      startedAt: new Date(),
+      completedAt: new Date(),
+      exerciseLogs: [
+        {
+          exerciseId: 'ex_01',
+          sets: [{ setIndex: 0, reps: 8, weight: 60, restTaken: 90 }],
+        },
+      ],
+    });
+
+    // The HC-only short-circuit must not touch findFirst / findMany on
+    // the manual write path — manual logs have no externalId to look
+    // up and we don't want to pay the round-trip.
+    expect(prisma.workoutLog.findFirst).not.toHaveBeenCalled();
+    expect(prisma.workoutLog.findMany).not.toHaveBeenCalled();
+    expect(prisma.workoutLog.create).toHaveBeenCalledOnce();
+  });
+
   it('returns 409 when an HC import with the same externalId already exists', async () => {
     const prisma = createMockPrisma();
     const service = new WorkoutService(prisma as never);

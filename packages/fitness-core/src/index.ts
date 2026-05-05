@@ -3,6 +3,7 @@ export * from './calories';
 export * from './coach-adjust';
 export * from './coach-prompt';
 export * from './fitness-age';
+export * from './health-connect-import';
 export * from './heart-rate';
 export * from './nutrition';
 export * from './running';

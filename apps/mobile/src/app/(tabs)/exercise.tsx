@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { apiClient } from '../../services/api';
+import { useImportEventsStore } from '../../stores/importEvents.store';
 import { WorkoutTypePicker } from '../../screens/exercise/WorkoutTypePicker';
 import { WeeklySummaryCard } from '../../screens/exercise/WeeklySummaryCard';
 import {
@@ -60,6 +61,14 @@ export default function ExerciseScreen() {
       fetchData();
     }, [fetchData]),
   );
+
+  // Refetch when the auto-importer pulls something new from HC, even
+  // if the user is already on this tab and hasn't pulled to refresh.
+  const lastImportedAt = useImportEventsStore((s) => s.lastImportedAt);
+  useEffect(() => {
+    if (lastImportedAt == null) return;
+    fetchData();
+  }, [lastImportedAt, fetchData]);
 
   const summary = useMemo(() => computeWeeklySummary(workouts), [workouts]);
 

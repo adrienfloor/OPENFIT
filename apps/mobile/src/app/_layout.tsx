@@ -9,12 +9,15 @@ import { apiClient } from '../services/api';
 import { colors } from '../theme';
 import '../theme/applyDefaults';
 import { DialogHost } from '../components/DialogHost';
+import { ImportToast } from '../components/ImportToast';
+import { useHCAutoImport } from '../hooks/useHCAutoImport';
 
 export default function RootLayout() {
   const router = useRouter();
   const segments = useSegments();
   const { isAuthenticated, setAuth } = useAuthStore();
   const [isReady, setIsReady] = useState(false);
+  useHCAutoImport();
 
   // Try to restore session from stored refresh token on app launch
   useEffect(() => {
@@ -87,6 +90,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" />
       </Stack>
       <DialogHost />
+      <ImportToast />
     </SafeAreaProvider>
   );
 }

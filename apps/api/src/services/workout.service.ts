@@ -309,16 +309,33 @@ export class WorkoutService {
 
   async createWorkoutLog(userId: string, input: CreateWorkoutLogInput) {
     // Health Connect imports carry the upstream session UID so re-syncs
-    // are idempotent. Same `(userId, externalId)` ⇒ already imported,
-    // 409 lets the mobile importer swallow the duplicate without fanfare.
+    // are idempotent. Same `(userId, externalId)` OR a manual log that
+    // already absorbed this externalId via overlap-merge ⇒ already
+    // imported. 409 lets the mobile importer swallow the duplicate
+    // without fanfare.
     if (input.source === 'health_connect' && input.externalId) {
       const existing = await this.prisma.workoutLog.findFirst({
-        where: { userId, externalId: input.externalId },
+        where: {
+          userId,
+          OR: [
+            { externalId: input.externalId },
+            { linkedExternalId: input.externalId },
+          ],
+        },
         select: { id: true },
       });
       if (existing) {
         throw new WorkoutError('Workout already imported', 409);
       }
+
+      // Overlap merge: if the user recorded this workout in OpenFit
+      // (manual) AND the watch later pushed the same activity into HC,
+      // we don't want a duplicate row. Find a manual log whose time
+      // window meaningfully overlaps the import (≥50 % of the longer
+      // session), enrich it with the import's HR / GPS / dataOrigin,
+      // stamp linkedExternalId so the next sync skips, and return.
+      const merged = await this.tryMergeIntoOverlappingManualLog(userId, input);
+      if (merged) return merged;
     }
 
     // Validate session belongs to user if provided
@@ -470,6 +487,115 @@ export class WorkoutService {
     }
 
     await this.prisma.workoutLog.delete({ where: { id: logId } });
+  }
+
+  // Overlap merge for HC imports. When the user records a workout in
+  // OpenFit AND the watch later pushes the same activity into HC, we'd
+  // otherwise show two rows for the same session. Strategy: find a
+  // manual log whose time window meaningfully overlaps the import
+  // (≥50 % of the longer session), enrich it with whatever extra HC
+  // data the writer provides (HR samples + GPS route, plus dataOrigin
+  // for the source badge), stamp `linkedExternalId` so re-syncs of
+  // the same upstream session skip via the 409 path. Returns the
+  // enriched log on merge, null otherwise.
+  //
+  // The threshold is intentionally simple: ratio = overlapSeconds /
+  // max(durationA, durationB). 0.5 catches "watch session of the same
+  // workout" without merging back-to-back sessions that happened to
+  // touch.
+  private async tryMergeIntoOverlappingManualLog(
+    userId: string,
+    input: CreateWorkoutLogInput,
+  ) {
+    const importStart = input.startedAt;
+    const importEnd = input.completedAt ?? input.startedAt;
+    const importMs = importEnd.getTime() - importStart.getTime();
+    if (importMs <= 0) return null;
+
+    // Pull manual logs whose window touches the import. Postgres
+    // doesn't have a native interval-overlap index for this access
+    // pattern, but the per-user volume is small (≤ a few hundred logs
+    // in any practical history) so a simple range scan is fine.
+    const candidates = await this.prisma.workoutLog.findMany({
+      where: {
+        userId,
+        source: 'manual',
+        // touches the import window: startedAt < importEnd AND completedAt > importStart
+        startedAt: { lt: importEnd },
+        completedAt: { gt: importStart },
+      },
+      include: {
+        heartRateSamples: { select: { id: true }, take: 1 },
+        gpsPoints: { select: { id: true }, take: 1 },
+      },
+    });
+
+    for (const candidate of candidates) {
+      if (!candidate.completedAt) continue;
+      const candStart = candidate.startedAt.getTime();
+      const candEnd = candidate.completedAt.getTime();
+      const candMs = candEnd - candStart;
+      if (candMs <= 0) continue;
+
+      const overlapMs =
+        Math.min(candEnd, importEnd.getTime()) -
+        Math.max(candStart, importStart.getTime());
+      if (overlapMs <= 0) continue;
+
+      const ratio = overlapMs / Math.max(candMs, importMs);
+      if (ratio < 0.5) continue;
+
+      // Found a merge target. Only attach HR / GPS the manual log is
+      // missing — never overwrite what the user's own recording
+      // produced (BLE strap → user trusts those samples; we only
+      // backfill).
+      const data: Parameters<typeof this.prisma.workoutLog.update>[0]['data'] = {
+        linkedExternalId: input.externalId ?? null,
+        dataOrigin: input.dataOrigin ?? candidate.dataOrigin,
+      };
+
+      const importHR = input.heartRateSamples ?? [];
+      if (candidate.heartRateSamples.length === 0 && importHR.length > 0) {
+        data.heartRateSamples = {
+          create: importHR.map((s) => ({
+            timestamp: s.timestamp,
+            bpm: s.bpm,
+            zone: s.zone,
+          })),
+        };
+      }
+
+      const importGPS = input.gpsPoints ?? [];
+      if (candidate.gpsPoints.length === 0 && importGPS.length > 0) {
+        data.gpsPoints = {
+          create: importGPS.map((p) => ({
+            lat: p.lat,
+            lng: p.lng,
+            altitudeMeters: p.altitudeMeters,
+            timestamp: p.timestamp,
+            speedMps: p.speedMps,
+          })),
+        };
+      }
+
+      return this.prisma.workoutLog.update({
+        where: { id: candidate.id },
+        data,
+        include: {
+          session: true,
+          exerciseLogs: {
+            include: {
+              exercise: true,
+              completedSets: { orderBy: { setIndex: 'asc' } },
+            },
+          },
+          heartRateSamples: { orderBy: { timestamp: 'asc' } },
+          gpsPoints: { orderBy: { timestamp: 'asc' } },
+        },
+      });
+    }
+
+    return null;
   }
 
   // Returns the per-workout VO₂max estimate (ml/kg/min) for runs that

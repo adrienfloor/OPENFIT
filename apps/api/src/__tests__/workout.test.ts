@@ -49,6 +49,7 @@ function createMockPrisma() {
       findMany: vi.fn(),
       findFirst: vi.fn(),
       create: vi.fn(),
+      update: vi.fn(),
       delete: vi.fn(),
     },
   };
@@ -332,6 +333,120 @@ describe('WorkoutService.createWorkoutLog', () => {
     const service = new WorkoutService(prisma as never);
 
     prisma.workoutLog.findFirst.mockResolvedValue(null);
+    prisma.workoutLog.findMany.mockResolvedValue([]);
+    prisma.exercise.findMany.mockResolvedValue([]);
+    prisma.workoutLog.create.mockImplementation(async (args: { data: Record<string, unknown> }) => ({
+      ...mockWorkoutLog,
+      ...args.data,
+    }));
+
+    const start = new Date('2026-05-05T08:00:00Z');
+    const end = new Date('2026-05-05T08:30:00Z');
+
+    await service.createWorkoutLog('user_01', {
+      type: 'run',
+      source: 'health_connect',
+      externalId: 'hc_session_xyz',
+      dataOrigin: 'com.garmin.android.apps.connectmobile',
+      startedAt: start,
+      completedAt: end,
+      durationSeconds: 1800,
+      distanceMeters: 5000,
+      exerciseLogs: [],
+    });
+
+    expect(prisma.workoutLog.create).toHaveBeenCalledOnce();
+    const data = (prisma.workoutLog.create.mock.calls[0]![0] as { data: Record<string, unknown> }).data;
+    expect(data['source']).toBe('health_connect');
+    expect(data['externalId']).toBe('hc_session_xyz');
+    expect(data['dataOrigin']).toBe('com.garmin.android.apps.connectmobile');
+  });
+
+  it('merges an HC import into an overlapping manual log instead of creating a duplicate', async () => {
+    const prisma = createMockPrisma();
+    const service = new WorkoutService(prisma as never);
+
+    const manualStart = new Date('2026-05-05T08:00:00Z');
+    const manualEnd = new Date('2026-05-05T08:30:00Z');
+    const manualLog = {
+      id: 'wl_manual',
+      userId: 'user_01',
+      source: 'manual',
+      startedAt: manualStart,
+      completedAt: manualEnd,
+      dataOrigin: null,
+      // No HR / GPS yet → both should get backfilled from the import.
+      heartRateSamples: [],
+      gpsPoints: [],
+    };
+    const enrichedLog = { ...manualLog, linkedExternalId: 'hc_session_xyz' };
+
+    prisma.workoutLog.findFirst.mockResolvedValue(null); // no externalId / linkedExternalId match
+    prisma.workoutLog.findMany.mockResolvedValue([manualLog]);
+    prisma.workoutLog.update.mockResolvedValue(enrichedLog);
+
+    // Import lands at 08:05 → 08:28 (well within the manual window).
+    const importStart = new Date('2026-05-05T08:05:00Z');
+    const importEnd = new Date('2026-05-05T08:28:00Z');
+
+    const result = await service.createWorkoutLog('user_01', {
+      type: 'run',
+      source: 'health_connect',
+      externalId: 'hc_session_xyz',
+      dataOrigin: 'com.garmin.android.apps.connectmobile',
+      startedAt: importStart,
+      completedAt: importEnd,
+      durationSeconds: 1380,
+      distanceMeters: 4000,
+      heartRateSamples: [
+        { timestamp: new Date('2026-05-05T08:10:00Z'), bpm: 150, zone: 'cardio' },
+      ],
+      gpsPoints: [
+        {
+          lat: 43.3,
+          lng: 5.4,
+          altitudeMeters: 30,
+          timestamp: new Date('2026-05-05T08:11:00Z'),
+          speedMps: 3,
+        },
+      ],
+      exerciseLogs: [],
+    });
+
+    expect(prisma.workoutLog.update).toHaveBeenCalledOnce();
+    expect(prisma.workoutLog.create).not.toHaveBeenCalled();
+    const updateArgs = prisma.workoutLog.update.mock.calls[0]![0] as {
+      where: { id: string };
+      data: Record<string, unknown>;
+    };
+    expect(updateArgs.where.id).toBe('wl_manual');
+    expect(updateArgs.data['linkedExternalId']).toBe('hc_session_xyz');
+    expect(updateArgs.data['dataOrigin']).toBe('com.garmin.android.apps.connectmobile');
+    // HR + GPS got backfilled because the manual log had neither.
+    expect(updateArgs.data['heartRateSamples']).toBeDefined();
+    expect(updateArgs.data['gpsPoints']).toBeDefined();
+    expect(result).toEqual(enrichedLog);
+  });
+
+  it('skips merge when overlap is below the 0.5 ratio', async () => {
+    const prisma = createMockPrisma();
+    const service = new WorkoutService(prisma as never);
+
+    // Manual log: 08:00–08:10 (10 min). Import: 08:09–08:30 (21 min).
+    // Overlap = 1 min. ratio = 1 / 21 = 0.048 → no merge.
+    const manualLog = {
+      id: 'wl_manual',
+      userId: 'user_01',
+      source: 'manual',
+      startedAt: new Date('2026-05-05T08:00:00Z'),
+      completedAt: new Date('2026-05-05T08:10:00Z'),
+      dataOrigin: null,
+      heartRateSamples: [],
+      gpsPoints: [],
+    };
+
+    prisma.workoutLog.findFirst.mockResolvedValue(null);
+    prisma.workoutLog.findMany.mockResolvedValue([manualLog]);
     prisma.exercise.findMany.mockResolvedValue([]);
     prisma.workoutLog.create.mockImplementation(async (args: { data: Record<string, unknown> }) => ({
       ...mockWorkoutLog,
@@ -343,18 +458,39 @@ describe('WorkoutService.createWorkoutLog', () => {
       source: 'health_connect',
       externalId: 'hc_session_xyz',
       dataOrigin: 'com.garmin.android.apps.connectmobile',
-      startedAt: new Date(),
-      completedAt: new Date(),
-      durationSeconds: 1800,
-      distanceMeters: 5000,
+      startedAt: new Date('2026-05-05T08:09:00Z'),
+      completedAt: new Date('2026-05-05T08:30:00Z'),
+      durationSeconds: 1260,
+      distanceMeters: 4000,
       exerciseLogs: [],
     });
 
+    expect(prisma.workoutLog.update).not.toHaveBeenCalled();
     expect(prisma.workoutLog.create).toHaveBeenCalledOnce();
-    const data = (prisma.workoutLog.create.mock.calls[0]![0] as { data: Record<string, unknown> }).data;
-    expect(data['source']).toBe('health_connect');
-    expect(data['externalId']).toBe('hc_session_xyz');
-    expect(data['dataOrigin']).toBe('com.garmin.android.apps.connectmobile');
+  });
+
+  it('returns 409 when re-syncing an externalId already absorbed via linkedExternalId', async () => {
+    const prisma = createMockPrisma();
+    const service = new WorkoutService(prisma as never);
+
+    // First lookup checks both externalId and linkedExternalId — return
+    // the previously-merged manual log on the linkedExternalId branch.
+    prisma.workoutLog.findFirst.mockResolvedValue({ id: 'wl_manual_already_linked' });
+
+    await expect(
+      service.createWorkoutLog('user_01', {
+        type: 'run',
+        source: 'health_connect',
+        externalId: 'hc_session_xyz',
+        dataOrigin: 'com.garmin.android.apps.connectmobile',
+        startedAt: new Date(),
+        completedAt: new Date(),
+        exerciseLogs: [],
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    expect(prisma.workoutLog.update).not.toHaveBeenCalled();
+    expect(prisma.workoutLog.create).not.toHaveBeenCalled();
   });
 });
 

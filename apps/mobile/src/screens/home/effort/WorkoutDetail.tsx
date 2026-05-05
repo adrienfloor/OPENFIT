@@ -38,13 +38,25 @@ function formatTime(d: Date): string {
 function typeLabel(t: WorkoutType): string {
   if (t === 'strength') return 'Strength';
   if (t === 'free') return 'Free';
-  return 'Run';
+  if (t === 'martial_arts') return 'Martial Arts';
+  if (t === 'run') return 'Run';
+  if (t === 'bike') return 'Bike';
+  if (t === 'swim') return 'Swim';
+  if (t === 'hike') return 'Hike';
+  if (t === 'walk') return 'Walk';
+  return 'Other';
 }
 
 function typeColor(t: WorkoutType): string {
   if (t === 'strength') return colors.strength;
   if (t === 'free') return colors.free;
-  return colors.run;
+  if (t === 'martial_arts') return colors.martial_arts;
+  if (t === 'run') return colors.run;
+  if (t === 'bike') return colors.bike;
+  if (t === 'swim') return colors.swim;
+  if (t === 'hike') return colors.hike;
+  if (t === 'walk') return colors.walk;
+  return colors.other;
 }
 
 /**

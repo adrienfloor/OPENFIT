@@ -388,6 +388,7 @@ export class WorkoutService {
       source: input.source ?? 'manual',
       externalId: input.externalId ?? null,
       dataOrigin: input.dataOrigin ?? null,
+      hcRouteType: input.hcRouteType ?? null,
       exerciseLogs: {
         create: input.exerciseLogs.map((el) => ({
           exerciseId: el.exerciseId,
@@ -452,9 +453,34 @@ export class WorkoutService {
       throw new WorkoutError('Workout log not found', 404);
     }
 
+    // GPS points are write-once-replace: lazy-loaded after the user
+    // grants per-session HC consent. Wipe and re-insert in a single
+    // transaction so a partial write can't leave the row half-routed.
+    if (input.gpsPoints !== undefined) {
+      const points = input.gpsPoints;
+      await this.prisma.$transaction([
+        this.prisma.gPSPoint.deleteMany({ where: { workoutLogId: logId } }),
+        ...(points.length > 0
+          ? [
+              this.prisma.gPSPoint.createMany({
+                data: points.map((p) => ({
+                  workoutLogId: logId,
+                  lat: p.lat,
+                  lng: p.lng,
+                  altitudeMeters: p.altitudeMeters,
+                  speedMps: p.speedMps,
+                  timestamp: p.timestamp,
+                })),
+              }),
+            ]
+          : []),
+      ]);
+    }
+
     return this.prisma.workoutLog.update({
       where: { id: logId },
       data: {
+        ...(input.type !== undefined ? { type: input.type } : {}),
         ...(input.completedAt !== undefined ? { completedAt: input.completedAt } : {}),
         ...(input.caloriesBurned !== undefined ? { caloriesBurned: input.caloriesBurned } : {}),
         ...(input.distanceMeters !== undefined ? { distanceMeters: input.distanceMeters } : {}),
@@ -462,6 +488,7 @@ export class WorkoutService {
         ...(input.avgPaceSecondsPerKm !== undefined ? { avgPaceSecondsPerKm: input.avgPaceSecondsPerKm } : {}),
         ...(input.bestPaceSecondsPerKm !== undefined ? { bestPaceSecondsPerKm: input.bestPaceSecondsPerKm } : {}),
         ...(input.elevationGainMeters !== undefined ? { elevationGainMeters: input.elevationGainMeters } : {}),
+        ...(input.hcRouteType !== undefined ? { hcRouteType: input.hcRouteType } : {}),
       },
       include: {
         session: true,

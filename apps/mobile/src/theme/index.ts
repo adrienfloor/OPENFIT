@@ -34,6 +34,7 @@ export const colors = {
   strength: '#22c55e',
   run: '#3b82f6',
   free: '#a855f7',
+  martial_arts: '#ec4899',
   bike: '#06b6d4',
   swim: '#0ea5e9',
   hike: '#84cc16',

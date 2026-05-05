@@ -357,7 +357,13 @@ export function HomeEffort() {
 function typeNameFor(t: WorkoutType): string {
   if (t === 'strength') return 'Strength';
   if (t === 'free') return 'Free';
-  return 'Run';
+  if (t === 'martial_arts') return 'Martial Arts';
+  if (t === 'run') return 'Run';
+  if (t === 'bike') return 'Bike';
+  if (t === 'swim') return 'Swim';
+  if (t === 'hike') return 'Hike';
+  if (t === 'walk') return 'Walk';
+  return 'Other';
 }
 
 const styles = StyleSheet.create({

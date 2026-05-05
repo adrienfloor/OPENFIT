@@ -28,6 +28,12 @@ interface ImportEventsState {
   lastImportedAt: number | null;
   toast: ToastPayload | null;
   recordImport: (summary: ImportSummary) => void;
+  /**
+   * Signal a non-import data mutation (e.g. user reclassified a workout's
+   * type from the detail modal). Bumps `lastImportedAt` so subscribers
+   * refetch, but does not surface a toast.
+   */
+  bumpDataStale: () => void;
   dismissToast: () => void;
 }
 
@@ -56,6 +62,8 @@ export const useImportEventsStore = create<ImportEventsState>((set) => ({
       toast: { message: summarize(summary), key: toastKey },
     });
   },
+
+  bumpDataStale: () => set({ lastImportedAt: Date.now() }),
 
   dismissToast: () => set({ toast: null }),
 }));

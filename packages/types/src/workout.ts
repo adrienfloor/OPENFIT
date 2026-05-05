@@ -4,6 +4,7 @@ import { HeartRateSampleSchema } from './health';
 export const WorkoutTypeSchema = z.enum([
   'strength',
   'free',
+  'martial_arts',
   'run',
   'bike',
   'swim',
@@ -17,6 +18,14 @@ export type WorkoutType = z.infer<typeof WorkoutTypeSchema>;
 // another writer (Garmin Connect, Strava, etc.) via Health Connect.
 export const WorkoutSourceSchema = z.enum(['manual', 'health_connect']);
 export type WorkoutSource = z.infer<typeof WorkoutSourceSchema>;
+
+// HC's three exercise-route states. Captured at import time.
+// `DATA` — route already attached to the WorkoutLog as gpsPoints.
+// `CONSENT_REQUIRED` — writer shared the route, but Google gates it
+//   behind a per-session consent dialog (Zepp behaviour).
+// `NO_DATA` — writer never shared a route (Garmin behaviour today).
+export const HCRouteTypeSchema = z.enum(['DATA', 'CONSENT_REQUIRED', 'NO_DATA']);
+export type HCRouteType = z.infer<typeof HCRouteTypeSchema>;
 
 export const MuscleGroupSchema = z.enum([
   'chest',
@@ -127,6 +136,7 @@ export const WorkoutLogSchema = z.object({
   externalId: z.string().nullable(),
   dataOrigin: z.string().nullable(),
   linkedExternalId: z.string().nullable(),
+  hcRouteType: HCRouteTypeSchema.nullable(),
   heartRateData: z.array(HeartRateSampleSchema),
   exerciseLogs: z.array(ExerciseLogSchema),
   gpsTrack: z.array(GPSPointSchema),
@@ -219,6 +229,7 @@ export const CreateWorkoutLogInputSchema = z
     source: WorkoutSourceSchema.optional().default('manual'),
     externalId: z.string().min(1).optional(),
     dataOrigin: z.string().min(1).optional(),
+    hcRouteType: HCRouteTypeSchema.optional(),
   })
   .refine(
     // Manual strength entry must list its sets — that's the whole point.
@@ -240,6 +251,11 @@ export const CreateWorkoutLogInputSchema = z
   );
 
 export const UpdateWorkoutLogInputSchema = z.object({
+  // Reclassify a workout — useful for HC imports that came in as 'other'
+  // or 'free' because the upstream writer (Zepp, Garmin, etc.) didn't
+  // have a code for the actual activity (e.g. BJJ → OTHER_WORKOUT). The
+  // user picks the right WorkoutType from the detail screen.
+  type: WorkoutTypeSchema.optional(),
   completedAt: z.coerce.date().nullable().optional(),
   caloriesBurned: z.number().nonnegative().nullable().optional(),
   distanceMeters: z.number().nonnegative().optional(),
@@ -247,6 +263,13 @@ export const UpdateWorkoutLogInputSchema = z.object({
   avgPaceSecondsPerKm: z.number().positive().nullable().optional(),
   bestPaceSecondsPerKm: z.number().positive().nullable().optional(),
   elevationGainMeters: z.number().nonnegative().optional(),
+  // Lazy-loaded GPS route — populated when the user grants per-session
+  // consent on an HC-imported run. Replaces any existing gpsPoints on
+  // the log (HC routes are immutable once consented).
+  gpsPoints: z.array(CreateGPSPointInputSchema).optional(),
+  // After a successful consent fetch, the client flips this to 'DATA'
+  // so the detail screen stops showing the load button.
+  hcRouteType: HCRouteTypeSchema.optional(),
 });
 
 export type CreateExerciseInput = z.infer<typeof CreateExerciseInputSchema>;

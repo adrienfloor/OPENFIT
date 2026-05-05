@@ -129,6 +129,7 @@ function buildPayload(
   totalActiveKcal: number | undefined,
   totalElevationMeters: number | undefined,
   gps: GPSPoint[],
+  hcRouteType: 'DATA' | 'CONSENT_REQUIRED' | 'NO_DATA' | undefined,
 ): CreateWorkoutLogInput {
   const startedAt = new Date(session.startTime);
   const completedAt = new Date(session.endTime);
@@ -155,6 +156,7 @@ function buildPayload(
     source: 'health_connect',
     externalId,
     dataOrigin,
+    hcRouteType,
     startedAt,
     completedAt,
     durationSeconds,
@@ -224,6 +226,7 @@ export async function importRecentWorkouts(
         readIntervalRecords<ElevationGainedRecord>('ElevationGained', sStart, sEnd),
       ]);
 
+
       const hr = flattenHeartRate(hrRecords, maxHRBpm);
       const distMeters = distRecords.length
         ? distRecords.reduce((s, r) => s + (lengthToMeters(r.distance) ?? 0), 0)
@@ -236,8 +239,11 @@ export async function importRecentWorkouts(
         : undefined;
 
       const gps = locationsToGPSPoints(session.exerciseRoute?.route);
+      const hcRouteType = (session.exerciseRoute as
+        | { type?: 'DATA' | 'CONSENT_REQUIRED' | 'NO_DATA' }
+        | undefined)?.type;
 
-      const payload = buildPayload(session, hr, distMeters, kcal, elev, gps);
+      const payload = buildPayload(session, hr, distMeters, kcal, elev, gps, hcRouteType);
 
       await apiClient.post('/workouts/logs', payload);
       summary.imported += 1;

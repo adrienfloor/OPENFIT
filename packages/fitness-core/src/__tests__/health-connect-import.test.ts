@@ -40,10 +40,13 @@ describe('mapExerciseTypeToWorkoutType', () => {
     expect(mapExerciseTypeToWorkoutType(11)).toBe('free'); // BOXING
     expect(mapExerciseTypeToWorkoutType(51)).toBe('free'); // ROCK_CLIMBING
     expect(mapExerciseTypeToWorkoutType(48)).toBe('free'); // PILATES
-    expect(mapExerciseTypeToWorkoutType(44)).toBe('free'); // MARTIAL_ARTS
     expect(mapExerciseTypeToWorkoutType(13)).toBe('free'); // CALISTHENICS
     expect(mapExerciseTypeToWorkoutType(10)).toBe('free'); // BOOT_CAMP
     expect(mapExerciseTypeToWorkoutType(26)).toBe('free'); // EXERCISE_CLASS
+  });
+
+  it('maps MARTIAL_ARTS (44) to martial_arts', () => {
+    expect(mapExerciseTypeToWorkoutType(44)).toBe('martial_arts');
   });
 
   it('falls back to other for unknown / unmapped enums', () => {
@@ -57,6 +60,7 @@ describe('mapExerciseTypeToWorkoutType', () => {
     const valid = new Set([
       'strength',
       'free',
+      'martial_arts',
       'run',
       'bike',
       'swim',
@@ -89,6 +93,17 @@ describe('lengthToMeters', () => {
   it('falls back to the raw value on an unknown unit string', () => {
     expect(lengthToMeters({ value: 42, unit: 'parsec' })).toBe(42);
   });
+
+  // The library's runtime payload is the LengthResult shape (every unit
+  // pre-converted) — this is what `readRecords` actually returns at
+  // runtime, despite its TS types claiming `{value, unit}`. Regression
+  // guard: if the lib ever ships a fix and we accidentally drop the new
+  // branch, tests catch it.
+  it('reads LengthResult shape from the native bridge (inMeters)', () => {
+    expect(lengthToMeters({ inMeters: 530 } as never)).toBe(530);
+    expect(lengthToMeters({ inKilometers: 5 } as never)).toBe(5000);
+    expect(lengthToMeters({ inMiles: 1 } as never)).toBeCloseTo(1609.344, 3);
+  });
 });
 
 describe('energyToKcal', () => {
@@ -103,6 +118,12 @@ describe('energyToKcal', () => {
   it('converts kilojoules and joules', () => {
     expect(energyToKcal({ value: 4.184, unit: 'kilojoules' })).toBeCloseTo(1, 3);
     expect(energyToKcal({ value: 4184, unit: 'joules' })).toBeCloseTo(1, 3);
+  });
+
+  it('reads EnergyResult shape from the native bridge (inKilocalories)', () => {
+    expect(energyToKcal({ inKilocalories: 320 } as never)).toBe(320);
+    expect(energyToKcal({ inCalories: 320_000 } as never)).toBe(320);
+    expect(energyToKcal({ inKilojoules: 4.184 } as never)).toBeCloseTo(1, 3);
   });
 });
 

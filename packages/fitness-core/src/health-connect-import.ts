@@ -33,7 +33,7 @@ export const HC_EXERCISE_TYPE_MAP: Readonly<Record<number, WorkoutType>> = {
   13: 'free', // CALISTHENICS
   26: 'free', // EXERCISE_CLASS
   36: 'free', // HIGH_INTENSITY_INTERVAL_TRAINING
-  44: 'free', // MARTIAL_ARTS
+  44: 'martial_arts', // MARTIAL_ARTS — covers BJJ / judo / boxing / kickboxing
   48: 'free', // PILATES
   51: 'free', // ROCK_CLIMBING
   83: 'free', // YOGA
@@ -43,52 +43,81 @@ export function mapExerciseTypeToWorkoutType(exerciseType: number): WorkoutType 
   return HC_EXERCISE_TYPE_MAP[exerciseType] ?? 'other';
 }
 
+/**
+ * react-native-health-connect's runtime payload for a Length is the
+ * Kotlin-side `LengthResult` shape — every unit pre-converted, not the
+ * `{value, unit}` shape its outdated TypeScript types declare. We accept
+ * either to stay forward-compatible if the lib ever fixes its types,
+ * but in practice all reads come back as the multi-unit object.
+ */
 export interface HCLength {
-  value: number;
-  unit: string;
+  inMeters?: number;
+  inKilometers?: number;
+  inMiles?: number;
+  inFeet?: number;
+  inInches?: number;
+  // Legacy / write-side shape — kept so old callers don't break.
+  value?: number;
+  unit?: string;
 }
 
-/**
- * Health Connect's Length record can come back in any of meters /
- * kilometers / miles / feet / inches. Normalize to meters.
- */
 export function lengthToMeters(length: HCLength | undefined): number | undefined {
   if (!length) return undefined;
-  switch (length.unit) {
-    case 'meters':
-      return length.value;
-    case 'kilometers':
-      return length.value * 1000;
-    case 'miles':
-      return length.value * 1609.344;
-    case 'feet':
-      return length.value * 0.3048;
-    case 'inches':
-      return length.value * 0.0254;
-    default:
-      return length.value;
+  if (typeof length.inMeters === 'number') return length.inMeters;
+  if (typeof length.inKilometers === 'number') return length.inKilometers * 1000;
+  if (typeof length.inMiles === 'number') return length.inMiles * 1609.344;
+  if (typeof length.inFeet === 'number') return length.inFeet * 0.3048;
+  if (typeof length.inInches === 'number') return length.inInches * 0.0254;
+  if (typeof length.value === 'number') {
+    switch (length.unit) {
+      case 'meters':
+        return length.value;
+      case 'kilometers':
+        return length.value * 1000;
+      case 'miles':
+        return length.value * 1609.344;
+      case 'feet':
+        return length.value * 0.3048;
+      case 'inches':
+        return length.value * 0.0254;
+      default:
+        return length.value;
+    }
   }
+  return undefined;
 }
 
 export interface HCEnergy {
-  value: number;
-  unit: string;
+  inKilocalories?: number;
+  inCalories?: number;
+  inKilojoules?: number;
+  inJoules?: number;
+  value?: number;
+  unit?: string;
 }
 
-/** Normalize HC's Energy unit zoo (calories / joules / kcal / kJ) to kcal. */
+/** Normalize HC's Energy zoo to kcal — runtime returns LengthResult-style
+ *  multi-unit objects from Kotlin, not `{value, unit}`. */
 export function energyToKcal(energy: HCEnergy): number {
-  switch (energy.unit) {
-    case 'kilocalories':
-      return energy.value;
-    case 'calories':
-      return energy.value / 1000;
-    case 'kilojoules':
-      return energy.value / 4.184;
-    case 'joules':
-      return energy.value / 4184;
-    default:
-      return energy.value;
+  if (typeof energy.inKilocalories === 'number') return energy.inKilocalories;
+  if (typeof energy.inCalories === 'number') return energy.inCalories / 1000;
+  if (typeof energy.inKilojoules === 'number') return energy.inKilojoules / 4.184;
+  if (typeof energy.inJoules === 'number') return energy.inJoules / 4184;
+  if (typeof energy.value === 'number') {
+    switch (energy.unit) {
+      case 'kilocalories':
+        return energy.value;
+      case 'calories':
+        return energy.value / 1000;
+      case 'kilojoules':
+        return energy.value / 4.184;
+      case 'joules':
+        return energy.value / 4184;
+      default:
+        return energy.value;
+    }
   }
+  return 0;
 }
 
 export function haversineMeters(

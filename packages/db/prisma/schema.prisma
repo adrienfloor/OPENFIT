@@ -23,6 +23,7 @@ enum Sex {
 enum WorkoutType {
   strength
   free
+  martial_arts
   run
   bike
   swim
@@ -234,6 +235,13 @@ model WorkoutLog {
   // it instead of being inserted. Prevents the next sync from
   // re-creating the duplicate.
   linkedExternalId  String?
+  // For HC imports, the route-availability state captured at import
+  // time. "DATA" = route already in gpsPoints; "CONSENT_REQUIRED" = the
+  // writer (Zepp etc.) shared the route but Google gates it behind a
+  // per-session consent prompt; "NO_DATA" = the writer (Garmin, Coros)
+  // doesn't share routes via HC at all. Drives the detail-screen
+  // affordance (load button vs static "not shared" line).
+  hcRouteType       String?
 
   user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   session          Session?          @relation(fields: [sessionId], references: [id], onDelete: SetNull)

@@ -233,7 +233,7 @@ export default function CoachScreen() {
       <Section title="Secondary sports">
         <SecondarySportRow
           type="free"
-          label="Other (jiu-jitsu, boxing, climbing…)"
+          label="Other (martial arts, climbing, classes…)"
           profile={draft}
           setProfile={setDraft}
         />

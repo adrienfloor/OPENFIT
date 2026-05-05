@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Loader } from '../../components/Loader';
 import MapLibreGL, { setConnected } from '@maplibre/maplibre-react-native';
 import type { WorkoutSource, WorkoutType } from '@openfit/types';
@@ -8,6 +8,7 @@ import { apiClient } from '../../services/api';
 import { formatDuration } from '../../utils';
 import { friendlyOrigin } from '../../utils/origin';
 import { colors, spacing, radii, typography } from '../../theme';
+import { useImportEventsStore } from '../../stores/importEvents.store';
 
 setConnected(true);
 
@@ -15,6 +16,8 @@ interface GPSPoint {
   lat: number;
   lng: number;
   altitudeMeters: number;
+  timestamp?: string;
+  speedMps?: number;
 }
 
 interface HeartRateSample {
@@ -27,6 +30,8 @@ interface WorkoutLogDetail {
   type: WorkoutType;
   source: WorkoutSource;
   dataOrigin: string | null;
+  externalId: string | null;
+  hcRouteType: 'DATA' | 'CONSENT_REQUIRED' | 'NO_DATA' | null;
   startedAt: string;
   completedAt: string | null;
   caloriesBurned: number | null;
@@ -54,6 +59,7 @@ const TYPE_COLOR: Record<WorkoutType, string> = {
   strength: colors.strength,
   run: colors.run,
   free: colors.free,
+  martial_arts: colors.martial_arts,
   bike: colors.bike,
   swim: colors.swim,
   hike: colors.hike,
@@ -65,12 +71,25 @@ const TYPE_LABEL: Record<WorkoutType, string> = {
   strength: 'Strength',
   run: 'Run',
   free: 'Free',
+  martial_arts: 'Martial Arts',
   bike: 'Bike',
   swim: 'Swim',
   hike: 'Hike',
   walk: 'Walk',
   other: 'Other',
 };
+
+const ALL_TYPES: WorkoutType[] = [
+  'strength',
+  'run',
+  'free',
+  'martial_arts',
+  'bike',
+  'swim',
+  'hike',
+  'walk',
+  'other',
+];
 
 function formatPace(secondsPerKm: number | null): string {
   if (secondsPerKm == null) return '—';
@@ -101,10 +120,13 @@ function formatTime(d: string | Date): string {
 export function WorkoutHistoryDetail({ visible, onClose, workoutId }: Props) {
   const [log, setLog] = useState<WorkoutLogDetail | null>(null);
   const [loading, setLoading] = useState(false);
+  const [typePickerOpen, setTypePickerOpen] = useState(false);
+  const [savingType, setSavingType] = useState(false);
 
   useEffect(() => {
     if (!visible || !workoutId) {
       setLog(null);
+      setTypePickerOpen(false);
       return;
     }
     let cancelled = false;
@@ -124,6 +146,28 @@ export function WorkoutHistoryDetail({ visible, onClose, workoutId }: Props) {
       cancelled = true;
     };
   }, [visible, workoutId]);
+
+  async function reclassify(nextType: WorkoutType) {
+    if (!log || nextType === log.type) {
+      setTypePickerOpen(false);
+      return;
+    }
+    setSavingType(true);
+    try {
+      const res = await apiClient.patch<WorkoutLogDetail>(
+        `/workouts/logs/${log.id}`,
+        { type: nextType },
+      );
+      setLog((prev) => (prev ? { ...prev, type: res.data.type } : prev));
+      setTypePickerOpen(false);
+      // Tell the Exercise tab + any other list subscriber to refetch.
+      useImportEventsStore.getState().bumpDataStale();
+    } catch {
+      // surface nothing — picker stays open so the user can retry
+    } finally {
+      setSavingType(false);
+    }
+  }
 
   if (!visible) return null;
 
@@ -181,6 +225,59 @@ export function WorkoutHistoryDetail({ visible, onClose, workoutId }: Props) {
             </Text>
           </View>
 
+          {/* Type editor — lets the user reclassify HC imports that came
+              in as 'other' (e.g. BJJ, padel, climbing) or rectify any
+              other mistype. */}
+          <View style={styles.typeCard}>
+            <View style={styles.typeHeader}>
+              <Text style={styles.typeLabel}>Type</Text>
+              <TouchableOpacity
+                disabled={savingType}
+                onPress={() => setTypePickerOpen((v) => !v)}
+                style={[
+                  styles.typePill,
+                  { backgroundColor: TYPE_COLOR[log.type] },
+                  savingType && { opacity: 0.5 },
+                ]}
+              >
+                <Text style={styles.typePillText}>{TYPE_LABEL[log.type]}</Text>
+                <Text style={styles.typePillCaret}>
+                  {typePickerOpen ? '▴' : '▾'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {typePickerOpen ? (
+              <View style={styles.typeChipRow}>
+                {ALL_TYPES.map((t) => {
+                  const selected = t === log.type;
+                  return (
+                    <TouchableOpacity
+                      key={t}
+                      disabled={savingType}
+                      onPress={() => reclassify(t)}
+                      style={[
+                        styles.typeChip,
+                        selected && {
+                          backgroundColor: TYPE_COLOR[t],
+                          borderColor: TYPE_COLOR[t],
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.typeChipText,
+                          selected && styles.typeChipTextSelected,
+                        ]}
+                      >
+                        {TYPE_LABEL[t]}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ) : null}
+          </View>
+
           {/* Run-specific: pace + elevation + map */}
           {log.type === 'run' ? (
             <>
@@ -209,6 +306,17 @@ export function WorkoutHistoryDetail({ visible, onClose, workoutId }: Props) {
                 <View style={styles.mapWrap}>
                   <RunMap points={log.gpsPoints} />
                 </View>
+              ) : log.source === 'health_connect' ? (
+                // HC's per-session route consent contract has been
+                // verified non-functional in practice (Garmin sends
+                // NO_DATA, Zepp sends CONSENT_REQUIRED with empty
+                // route data — both auto-deny). Be honest: routes
+                // only render for runs recorded inside OpenFit.
+                <View style={styles.routeNote}>
+                  <Text style={styles.routeNoteText}>
+                    Route not shared by {friendlyOrigin(log.dataOrigin)}.
+                  </Text>
+                </View>
               ) : null}
             </>
           ) : null}
@@ -222,11 +330,9 @@ export function WorkoutHistoryDetail({ visible, onClose, workoutId }: Props) {
             </View>
           ) : null}
 
-          {/* Source footer for Health-Connect-imported workouts. The
-              detail view has no edit affordances today, but this line
-              tells the user the row is read-only and where it came
-              from — paving the way for "Open in Garmin Connect"-style
-              deeplinks later without surprising anyone now. */}
+          {/* Source footer for Health-Connect-imported workouts. Type is
+              user-editable above; the rest of the metrics still come
+              straight from the upstream writer. */}
           {log.source === 'health_connect' ? (
             <Text style={styles.sourceFooter}>
               From {friendlyOrigin(log.dataOrigin)} — synced via Health Connect
@@ -460,5 +566,76 @@ const styles = StyleSheet.create({
   exerciseSets: {
     fontSize: typography.size.xs + 1,
     color: colors.textSecondary,
+  },
+  typeCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  typeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  typeLabel: {
+    fontSize: typography.size.sm + 1,
+    color: colors.textSecondary,
+    fontWeight: typography.weight.semibold,
+  },
+  typePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radii.pill,
+  },
+  typePillText: {
+    color: '#fff',
+    fontSize: typography.size.xs + 1,
+    fontWeight: typography.weight.bold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  typePillCaret: {
+    color: '#fff',
+    fontSize: typography.size.xs,
+    fontWeight: typography.weight.bold,
+  },
+  typeChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  typeChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceRaised,
+  },
+  typeChipText: {
+    color: colors.textSecondary,
+    fontSize: typography.size.xs + 1,
+    fontWeight: typography.weight.semibold,
+  },
+  typeChipTextSelected: { color: '#fff' },
+  routeNote: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+    alignItems: 'center',
+  },
+  routeNoteText: {
+    color: colors.textMuted,
+    fontSize: typography.size.xs + 1,
+    fontStyle: 'italic',
+    textAlign: 'center',
   },
 });

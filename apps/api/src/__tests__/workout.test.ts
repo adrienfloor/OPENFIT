@@ -647,6 +647,44 @@ describe('WorkoutService.swapProgramExercise', () => {
   });
 });
 
+describe('WorkoutService.updateWorkoutLog reclassify type', () => {
+  it('forwards a new `type` to prisma.update when the user reclassifies', async () => {
+    const prisma = createMockPrisma();
+    const service = new WorkoutService(prisma as never);
+
+    prisma.workoutLog.findFirst.mockResolvedValue({
+      id: 'wl_01',
+      userId: 'user_01',
+      type: 'other',
+    });
+    prisma.workoutLog.update.mockResolvedValue({
+      ...mockWorkoutLog,
+      type: 'free',
+    });
+
+    await service.updateWorkoutLog('user_01', 'wl_01', { type: 'free' });
+
+    const updateArgs = prisma.workoutLog.update.mock.calls[0]![0] as {
+      where: { id: string };
+      data: Record<string, unknown>;
+    };
+    expect(updateArgs.where.id).toBe('wl_01');
+    expect(updateArgs.data['type']).toBe('free');
+  });
+
+  it('rejects updates to logs owned by other users (404)', async () => {
+    const prisma = createMockPrisma();
+    const service = new WorkoutService(prisma as never);
+
+    prisma.workoutLog.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.updateWorkoutLog('user_01', 'wl_other', { type: 'free' }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(prisma.workoutLog.update).not.toHaveBeenCalled();
+  });
+});
+
 describe('CreateWorkoutLogInputSchema strength rule', () => {
   const baseStrength = {
     type: 'strength' as const,

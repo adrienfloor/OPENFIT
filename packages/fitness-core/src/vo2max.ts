@@ -1,3 +1,5 @@
+import type { WorkoutType } from '@openfit/types';
+
 /**
  * VO₂max estimation from a single sustained run.
  *
@@ -54,7 +56,9 @@ export function estimateVo2maxFromRun({
   return acsmVo2 / hrFraction;
 }
 
-export type WorkoutTypeForGate = 'strength' | 'free' | 'run';
+// Accepts any WorkoutType — the gate only returns true for 'run',
+// everything else (strength, free, bike, swim, …) falls through.
+export type WorkoutTypeForGate = WorkoutType;
 
 export interface Vo2maxQualifyingInput {
   type: WorkoutTypeForGate;

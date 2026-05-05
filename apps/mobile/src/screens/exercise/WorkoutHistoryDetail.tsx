@@ -51,12 +51,22 @@ const TYPE_COLOR: Record<WorkoutType, string> = {
   strength: colors.strength,
   run: colors.run,
   free: colors.free,
+  bike: colors.bike,
+  swim: colors.swim,
+  hike: colors.hike,
+  walk: colors.walk,
+  other: colors.other,
 };
 
 const TYPE_LABEL: Record<WorkoutType, string> = {
   strength: 'Strength',
   run: 'Run',
   free: 'Free',
+  bike: 'Bike',
+  swim: 'Swim',
+  hike: 'Hike',
+  walk: 'Walk',
+  other: 'Other',
 };
 
 function formatPace(secondsPerKm: number | null): string {

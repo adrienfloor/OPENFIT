@@ -268,6 +268,7 @@ describe('WorkoutService.createWorkoutLog', () => {
 
     const result = await service.createWorkoutLog('user_01', {
       type: 'strength',
+      source: 'manual',
       startedAt: new Date(),
       completedAt: new Date(),
       exerciseLogs: [
@@ -291,6 +292,7 @@ describe('WorkoutService.createWorkoutLog', () => {
     await expect(
       service.createWorkoutLog('user_01', {
         type: 'strength',
+        source: 'manual',
         startedAt: new Date(),
         exerciseLogs: [
           {

@@ -24,6 +24,11 @@ enum WorkoutType {
   strength
   free
   run
+  bike
+  swim
+  hike
+  walk
+  other
 }
 
 enum MuscleGroup {
@@ -214,12 +219,29 @@ model WorkoutLog {
   vo2maxEstimate    Float?
   vo2maxComputedAt  DateTime?
 
+  // Provenance — where the row came from. "manual" = recorded inside
+  // OpenFit; "health_connect" = imported from another writer (Garmin,
+  // Strava, etc.) via the HC ExerciseSession bridge.
+  source            String  @default("manual")
+  // For HC imports, the upstream session UID so re-syncs are idempotent.
+  // Postgres allows multiple NULLs in a unique index, so manual rows
+  // (externalId = null) all coexist.
+  externalId        String?
+  // The HC dataOrigin packageName (e.g. "com.garmin.android.apps.connectmobile").
+  // Used to label the History row and to break duplicate-writer ties.
+  dataOrigin        String?
+  // Set on a manual log when an overlapping HC import was absorbed into
+  // it instead of being inserted. Prevents the next sync from
+  // re-creating the duplicate.
+  linkedExternalId  String?
+
   user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   session          Session?          @relation(fields: [sessionId], references: [id], onDelete: SetNull)
   heartRateSamples HeartRateSample[]
   exerciseLogs     ExerciseLog[]
   gpsPoints        GPSPoint[]
 
+  @@unique([userId, externalId])
   @@index([userId])
   @@index([userId, startedAt])
   @@index([userId, type])

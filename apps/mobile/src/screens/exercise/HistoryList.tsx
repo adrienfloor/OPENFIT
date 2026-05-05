@@ -22,18 +22,33 @@ const FILTERS: { value: Filter; label: string }[] = [
   { value: 'strength', label: 'Strength' },
   { value: 'run', label: 'Run' },
   { value: 'free', label: 'Free' },
+  { value: 'bike', label: 'Bike' },
+  { value: 'swim', label: 'Swim' },
+  { value: 'hike', label: 'Hike' },
+  { value: 'walk', label: 'Walk' },
+  { value: 'other', label: 'Other' },
 ];
 
 const TYPE_COLOR: Record<WorkoutType, string> = {
   strength: colors.strength,
   run: colors.run,
   free: colors.free,
+  bike: colors.bike,
+  swim: colors.swim,
+  hike: colors.hike,
+  walk: colors.walk,
+  other: colors.other,
 };
 
 const TYPE_LABEL: Record<WorkoutType, string> = {
   strength: 'Strength',
   run: 'Run',
   free: 'Free',
+  bike: 'Bike',
+  swim: 'Swim',
+  hike: 'Hike',
+  walk: 'Walk',
+  other: 'Other',
 };
 
 function formatDate(d: string | Date): string {
@@ -58,12 +73,17 @@ function formatPace(secondsPerKm: number): string {
 export function HistoryList({ workouts, onSelect }: Props) {
   const [filter, setFilter] = useState<Filter>('all');
 
-  const counts = useMemo(() => {
+  const counts = useMemo<Record<Filter, number>>(() => {
     return {
       all: workouts.length,
       strength: workouts.filter((w) => w.type === 'strength').length,
       run: workouts.filter((w) => w.type === 'run').length,
       free: workouts.filter((w) => w.type === 'free').length,
+      bike: workouts.filter((w) => w.type === 'bike').length,
+      swim: workouts.filter((w) => w.type === 'swim').length,
+      hike: workouts.filter((w) => w.type === 'hike').length,
+      walk: workouts.filter((w) => w.type === 'walk').length,
+      other: workouts.filter((w) => w.type === 'other').length,
     };
   }, [workouts]);
 

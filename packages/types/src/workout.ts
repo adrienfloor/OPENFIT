@@ -1,8 +1,22 @@
 import { z } from 'zod';
 import { HeartRateSampleSchema } from './health';
 
-export const WorkoutTypeSchema = z.enum(['strength', 'free', 'run']);
+export const WorkoutTypeSchema = z.enum([
+  'strength',
+  'free',
+  'run',
+  'bike',
+  'swim',
+  'hike',
+  'walk',
+  'other',
+]);
 export type WorkoutType = z.infer<typeof WorkoutTypeSchema>;
+
+// "manual" = recorded inside OpenFit. "health_connect" = imported from
+// another writer (Garmin Connect, Strava, etc.) via Health Connect.
+export const WorkoutSourceSchema = z.enum(['manual', 'health_connect']);
+export type WorkoutSource = z.infer<typeof WorkoutSourceSchema>;
 
 export const MuscleGroupSchema = z.enum([
   'chest',
@@ -108,6 +122,11 @@ export const WorkoutLogSchema = z.object({
   avgPaceSecondsPerKm: z.number().positive().nullable(),
   bestPaceSecondsPerKm: z.number().positive().nullable(),
   elevationGainMeters: z.number().nonnegative().nullable(),
+  // Provenance + dedup metadata (see Prisma schema for the full rationale).
+  source: WorkoutSourceSchema,
+  externalId: z.string().nullable(),
+  dataOrigin: z.string().nullable(),
+  linkedExternalId: z.string().nullable(),
   heartRateData: z.array(HeartRateSampleSchema),
   exerciseLogs: z.array(ExerciseLogSchema),
   gpsTrack: z.array(GPSPointSchema),
@@ -195,10 +214,22 @@ export const CreateWorkoutLogInputSchema = z
     // Strength-only fields
     exerciseLogs: z.array(LogExerciseInputSchema).optional().default([]),
     heartRateSamples: z.array(HeartRateSampleSchema).optional(),
+    // Import provenance — set by the HC import service. Manual writes
+    // omit these and the row defaults to source='manual'.
+    source: WorkoutSourceSchema.optional().default('manual'),
+    externalId: z.string().min(1).optional(),
+    dataOrigin: z.string().min(1).optional(),
   })
   .refine(
     (data) => data.type !== 'strength' || data.exerciseLogs.length > 0,
     { message: 'Strength workouts require at least one exerciseLog', path: ['exerciseLogs'] },
+  )
+  .refine(
+    (data) => data.source !== 'health_connect' || (data.externalId && data.dataOrigin),
+    {
+      message: 'Health Connect imports require externalId and dataOrigin',
+      path: ['externalId'],
+    },
   );
 
 export const UpdateWorkoutLogInputSchema = z.object({

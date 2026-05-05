@@ -112,7 +112,10 @@ const REQUIRED_PERMISSIONS = [
   { accessType: 'read', recordType: 'ExerciseSession' },
   { accessType: 'read', recordType: 'Distance' },
   { accessType: 'read', recordType: 'ElevationGained' },
-  { accessType: 'read', recordType: 'ExerciseRoute' },
+  // ExerciseRoute is not a separately-requestable read permission in
+  // react-native-health-connect — the manifest's READ_EXERCISE_ROUTE is
+  // honored automatically alongside ExerciseSession reads, and listing it
+  // here throws InvalidRecordType in PermissionUtils.parsePermissions.
 ] as const;
 
 export const REQUIRED_PERMISSION_COUNT = REQUIRED_PERMISSIONS.length;

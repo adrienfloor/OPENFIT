@@ -109,6 +109,10 @@ const REQUIRED_PERMISSIONS = [
   { accessType: 'read', recordType: 'HeartRateVariabilityRmssd' },
   { accessType: 'read', recordType: 'ActiveCaloriesBurned' },
   { accessType: 'read', recordType: 'TotalCaloriesBurned' },
+  { accessType: 'read', recordType: 'ExerciseSession' },
+  { accessType: 'read', recordType: 'Distance' },
+  { accessType: 'read', recordType: 'ElevationGained' },
+  { accessType: 'read', recordType: 'ExerciseRoute' },
 ] as const;
 
 export const REQUIRED_PERMISSION_COUNT = REQUIRED_PERMISSIONS.length;

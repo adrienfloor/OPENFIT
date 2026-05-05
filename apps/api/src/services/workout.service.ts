@@ -308,6 +308,19 @@ export class WorkoutService {
   }
 
   async createWorkoutLog(userId: string, input: CreateWorkoutLogInput) {
+    // Health Connect imports carry the upstream session UID so re-syncs
+    // are idempotent. Same `(userId, externalId)` ⇒ already imported,
+    // 409 lets the mobile importer swallow the duplicate without fanfare.
+    if (input.source === 'health_connect' && input.externalId) {
+      const existing = await this.prisma.workoutLog.findFirst({
+        where: { userId, externalId: input.externalId },
+        select: { id: true },
+      });
+      if (existing) {
+        throw new WorkoutError('Workout already imported', 409);
+      }
+    }
+
     // Validate session belongs to user if provided
     if (input.sessionId) {
       const session = await this.prisma.session.findFirst({
@@ -355,6 +368,9 @@ export class WorkoutService {
       elevationGainMeters: input.elevationGainMeters ?? null,
       vo2maxEstimate: vo2,
       vo2maxComputedAt: vo2 != null ? new Date() : null,
+      source: input.source ?? 'manual',
+      externalId: input.externalId ?? null,
+      dataOrigin: input.dataOrigin ?? null,
       exerciseLogs: {
         create: input.exerciseLogs.map((el) => ({
           exerciseId: el.exerciseId,

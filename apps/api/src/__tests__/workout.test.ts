@@ -303,6 +303,59 @@ describe('WorkoutService.createWorkoutLog', () => {
       }),
     ).rejects.toMatchObject({ statusCode: 400 });
   });
+
+  it('returns 409 when an HC import with the same externalId already exists', async () => {
+    const prisma = createMockPrisma();
+    const service = new WorkoutService(prisma as never);
+
+    prisma.workoutLog.findFirst.mockResolvedValue({ id: 'wl_existing' });
+
+    await expect(
+      service.createWorkoutLog('user_01', {
+        type: 'run',
+        source: 'health_connect',
+        externalId: 'hc_session_xyz',
+        dataOrigin: 'com.garmin.android.apps.connectmobile',
+        startedAt: new Date(),
+        completedAt: new Date(),
+        exerciseLogs: [],
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    // No exercise lookup, no row creation when the dedup short-circuits.
+    expect(prisma.exercise.findMany).not.toHaveBeenCalled();
+    expect(prisma.workoutLog.create).not.toHaveBeenCalled();
+  });
+
+  it('persists source / externalId / dataOrigin on a fresh HC import', async () => {
+    const prisma = createMockPrisma();
+    const service = new WorkoutService(prisma as never);
+
+    prisma.workoutLog.findFirst.mockResolvedValue(null);
+    prisma.exercise.findMany.mockResolvedValue([]);
+    prisma.workoutLog.create.mockImplementation(async (args: { data: Record<string, unknown> }) => ({
+      ...mockWorkoutLog,
+      ...args.data,
+    }));
+
+    await service.createWorkoutLog('user_01', {
+      type: 'run',
+      source: 'health_connect',
+      externalId: 'hc_session_xyz',
+      dataOrigin: 'com.garmin.android.apps.connectmobile',
+      startedAt: new Date(),
+      completedAt: new Date(),
+      durationSeconds: 1800,
+      distanceMeters: 5000,
+      exerciseLogs: [],
+    });
+
+    expect(prisma.workoutLog.create).toHaveBeenCalledOnce();
+    const data = (prisma.workoutLog.create.mock.calls[0]![0] as { data: Record<string, unknown> }).data;
+    expect(data['source']).toBe('health_connect');
+    expect(data['externalId']).toBe('hc_session_xyz');
+    expect(data['dataOrigin']).toBe('com.garmin.android.apps.connectmobile');
+  });
 });
 
 describe('WorkoutService.deleteWorkoutLog', () => {

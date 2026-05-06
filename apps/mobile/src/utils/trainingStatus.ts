@@ -19,6 +19,10 @@ export interface TrainingStatusView {
   label: string;
   tone: Tone;
   calibrating: boolean;
+  /** Days with training data so far — for "X/14 days" copy. */
+  daysWithData: number;
+  /** Days needed before calibration completes (currently 14). */
+  daysNeeded: number;
 }
 
 const TIER_TO_LABEL: Record<TrainingStatusTier, string> = {
@@ -37,6 +41,8 @@ const TIER_TO_TONE: Record<TrainingStatusTier, Tone> = {
   overreaching: 'warn',
 };
 
+const DAYS_NEEDED = 14;
+
 export function computeTrainingStatus(
   today: TodayDailyStats | null,
 ): TrainingStatusView {
@@ -48,6 +54,8 @@ export function computeTrainingStatus(
       label: 'CALIBRATING',
       tone: 'neutral',
       calibrating: true,
+      daysWithData: today?.trainingStatusDaysWithData ?? 0,
+      daysNeeded: DAYS_NEEDED,
     };
   }
   return {
@@ -61,5 +69,7 @@ export function computeTrainingStatus(
       ? 'neutral'
       : TIER_TO_TONE[today.trainingStatusTier],
     calibrating: today.trainingStatusCalibrating,
+    daysWithData: today.trainingStatusDaysWithData,
+    daysNeeded: DAYS_NEEDED,
   };
 }

@@ -83,6 +83,7 @@ export function HomeOverview() {
   const fatigue = computeEffortLoad(
     today?.effortLoad7Days ?? null,
     today?.effortTargetMinutes ?? null,
+    today?.trainingStatusCalibrating ?? false,
   );
   const trainingStatus: TrainingStatusView = computeTrainingStatus(today);
   const pai = useMockPAI();
@@ -292,9 +293,11 @@ export function HomeOverview() {
         trendTitle="Last 7 days"
         trendEmpty="Log a workout or wear your strap to start your load trend."
         note={
-          fatigue.weeklyTarget != null
-            ? `Sum of Banister TRIMP over the last 7 days. Your weekly target is ~${fatigue.weeklyTarget} (≈ daily target × 7). Below 50% of target → recovered, 50–100% balanced, 100–130% productive, above that → overreaching.`
-            : 'Sum of Banister TRIMP over the last 7 days. Track the trend, not the daily number — consistent yellow/green is the target.'
+          fatigue.calibrating
+            ? `Calibrating — keep wearing your strap and logging workouts. After ${trainingStatus.daysNeeded} days of activity (currently ${trainingStatus.daysWithData}/${trainingStatus.daysNeeded}) the daily target adapts to your fitness (CTL × 1.6) and the status tiers become reliable.`
+            : fatigue.weeklyTarget != null
+              ? `Sum of Banister TRIMP over the last 7 days. Your weekly target is ~${fatigue.weeklyTarget} (≈ daily target × 7). Below 50% of target → recovered, 50–100% balanced, 100–130% productive, above that → overreaching.`
+              : 'Sum of Banister TRIMP over the last 7 days. Track the trend, not the daily number — consistent yellow/green is the target.'
         }
       />
       <SimpleMetricDetail
@@ -318,7 +321,7 @@ export function HomeOverview() {
         trendEmpty="Wear your strap and log workouts to start your training-status trend."
         note={
           trainingStatus.calibrating
-            ? `Calibrating — needs ≥14 days of TRIMP data. Current fitness (CTL) ${trainingStatus.ctl ?? '--'}, fatigue (ATL) ${trainingStatus.atl ?? '--'}.`
+            ? `Calibrating — ${trainingStatus.daysWithData}/${trainingStatus.daysNeeded} days of activity recorded. Wear your strap consistently and log workouts; once you cross ${trainingStatus.daysNeeded} days the tier becomes reliable. Current fitness (CTL) ${trainingStatus.ctl ?? '--'}, fatigue (ATL) ${trainingStatus.atl ?? '--'}.`
             : `TSB = CTL − ATL. Negative means fatigue exceeds fitness (productive overload around −10 to −30); positive means freshness (rested/peaking). Fitness (CTL) ${trainingStatus.ctl ?? '--'}, fatigue (ATL) ${trainingStatus.atl ?? '--'}.`
         }
       />

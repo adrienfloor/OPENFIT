@@ -407,6 +407,9 @@ model DailyHealth {
   recoveryScore        Float?
   effortScore          Float?
   effortEarnedMinutes  Float?
+  // Banister TRIMP for the day. Persisted so the PMC layer (CTL/ATL/TSB)
+  // can read a 42-day history without re-fetching all HR samples each refresh.
+  dailyTrimp           Float?
   // Tracks the most recent write so the AI insight cache can invalidate
   // when a Health Connect bulk sync fills in last night's sleep / HRV.
   updatedAt            DateTime @updatedAt

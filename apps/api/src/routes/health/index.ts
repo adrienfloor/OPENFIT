@@ -15,6 +15,16 @@ export const healthRoutes: FastifyPluginAsync = async (fastify) => {
     return reply.send(health);
   });
 
+  fastify.get<{ Querystring: { days?: string } }>('/trimp', async (request, reply) => {
+    const raw = request.query.days;
+    const parsed = raw == null ? 42 : Number.parseInt(raw, 10);
+    if (!Number.isFinite(parsed) || parsed < 1 || parsed > 180) {
+      return reply.status(400).send({ error: 'days must be an integer between 1 and 180' });
+    }
+    const series = await service.getTrimpHistory(request.user.sub, parsed);
+    return reply.send(series);
+  });
+
   fastify.get<{ Params: { date: string } }>('/:date', async (request, reply) => {
     try {
       const date = new Date(request.params.date);

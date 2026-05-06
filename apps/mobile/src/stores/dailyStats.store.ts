@@ -121,12 +121,45 @@ export const useDailyStatsStore = create<DailyStatsState>((set, get) => ({
         // hasn't matured yet. Best-effort — null if /metrics/fitness-age fails
         // or the user hasn't logged a qualifying run.
         const { getFitnessAge } = await import('../services/metrics');
-        const fitnessAge = await getFitnessAge().catch(() => null);
+        // Pull 42 days of persisted daily TRIMP up-front so the PMC layer
+        // sees real history (not just the local 7-day HC slice). Best-effort
+        // — null on failure means we fall back to the 7-day series and the
+        // calibrating flag stays on, which is the correct UX in that case.
+        const [fitnessAge, trimpHistory] = await Promise.all([
+          getFitnessAge().catch(() => null),
+          apiClient
+            .get<{ date: string; dailyTrimp: number | null }[]>(
+              '/health/trimp?days=42',
+            )
+            .then((res) => res.data)
+            .catch(() => null),
+        ]);
         const result = await getTodayDashboard(
           profile,
           workoutKcalByDate,
           fitnessAge?.vo2max ?? null,
+          trimpHistory,
         );
+
+        // Persist the 7 freshly computed daily TRIMP values so the next
+        // refresh sees them in the 42-day history. Fire-and-forget — we
+        // don't block the UI on this. The bulk endpoint upserts by
+        // (userId, date), so re-sending the same window is idempotent.
+        if (result?.effortLoad7Days?.length) {
+          const entries = result.effortLoad7Days
+            .filter((d) => d.trimp != null)
+            .map((d) => ({
+              date: d.date.toISOString().slice(0, 10),
+              dailyTrimp: d.trimp,
+            }));
+          if (entries.length > 0) {
+            void apiClient
+              .post('/health/bulk', { entries })
+              .catch(() => {
+                // Swallow — next refresh will retry.
+              });
+          }
+        }
         // Critical: only overwrite `today` with a non-null result. A
         // transient HC blip that returns null shouldn't wipe the rings.
         if (result != null) {

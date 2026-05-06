@@ -56,6 +56,8 @@ export type TodayDailyStats = DailyHealth & {
   trainingStatusTier: TrainingStatusTier | null;
   /** True until ≥ 14 days of TRIMP history have accumulated. */
   trainingStatusCalibrating: boolean;
+  /** Number of days with non-zero TRIMP data in the 42-day window — for "X/14 days" copy. */
+  trainingStatusDaysWithData: number;
 };
 import {
   computeBMR,
@@ -371,6 +373,7 @@ export async function getDailyStats(
       tsb: null,
       trainingStatusTier: null,
       trainingStatusCalibrating: true,
+      trainingStatusDaysWithData: 0,
     });
 
     // Unused but available: avgSpO2
@@ -665,6 +668,15 @@ export async function getTodayDashboard(
   userProfile?: Pick<UserProfile, 'weightKg' | 'heightCm' | 'sex' | 'dateOfBirth'>,
   workoutKcalByDate?: Record<string, number>,
   vo2max?: number | null,
+  /**
+   * Optional 42-day daily-TRIMP history pulled from the API (oldest → newest,
+   * today last; missing days as null → treated as 0). When supplied, drives
+   * the PMC layer instead of the local 7-day HC slice — that's what lets CTL
+   * actually mature past the calibrating threshold. We splice today's freshly
+   * computed TRIMP into the last position so the rolling EMA always reflects
+   * the latest data.
+   */
+  trimpHistory42d?: { date: string; dailyTrimp: number | null }[] | null,
 ): Promise<TodayDailyStats | null> {
   const today = new Date();
   const sixDaysAgo = new Date();
@@ -700,11 +712,22 @@ export async function getTodayDashboard(
     ? ageYearsFromDob(userProfile.dateOfBirth)
     : null;
 
-  // Performance Management Chart from the 7-day TRIMP series. CTL needs ≥14
-  // days to fully stabilise, but we surface partial values in the meantime
-  // and flag `trainingStatusCalibrating` until then. (A future commit will
-  // pull longer history from the API once daily TRIMP is persisted.)
-  const trimpSeries = range.map((d) => d.dailyTrimp ?? 0);
+  // Performance Management Chart. Prefer the 42-day persisted history (so
+  // CTL actually matures past calibration) and splice today's freshly
+  // computed TRIMP into the last slot. Falls back to the local 7-day HC
+  // slice when the API call hasn't run yet (cold start).
+  const trimpSeries = (() => {
+    if (trimpHistory42d && trimpHistory42d.length > 0) {
+      const series = trimpHistory42d.map((d) => d.dailyTrimp ?? 0);
+      // Last entry is today — overwrite with the freshly computed value.
+      const todayTrimp = todayRecord.dailyTrimp;
+      if (todayTrimp != null) {
+        series[series.length - 1] = todayTrimp;
+      }
+      return series;
+    }
+    return range.map((d) => d.dailyTrimp ?? 0);
+  })();
   const pmc = computePMC(trimpSeries);
 
   // Daily TRIMP target — 1.6 × CTL once mature, else VO₂max + age fallback.
@@ -758,6 +781,7 @@ export async function getTodayDashboard(
     tsb: pmc.tsb,
     trainingStatusTier: pmc.tier,
     trainingStatusCalibrating: pmc.calibrating,
+    trainingStatusDaysWithData: trimpSeries.filter((t) => t > 0).length,
   };
 }
 

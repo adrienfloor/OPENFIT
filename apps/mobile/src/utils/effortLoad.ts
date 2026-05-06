@@ -22,11 +22,13 @@ export interface EffortLoadView {
   trend: number[];
   trendLabels: string[];
   weeklyTarget: number | null;
+  calibrating: boolean;
 }
 
 export function computeEffortLoad(
   series: { date: Date; trimp: number | null }[] | null,
   dailyTrimpTarget: number | null,
+  calibrating: boolean = false,
 ): EffortLoadView {
   if (!series || series.length === 0) {
     return {
@@ -36,6 +38,7 @@ export function computeEffortLoad(
       trend: [],
       trendLabels: [],
       weeklyTarget: null,
+      calibrating,
     };
   }
 
@@ -48,7 +51,10 @@ export function computeEffortLoad(
 
   let statusLabel = 'BALANCED';
   let statusTone: Tone = 'good';
-  if (weeklyTarget && weeklyTarget > 0) {
+  if (calibrating) {
+    statusLabel = 'CALIBRATING';
+    statusTone = 'neutral';
+  } else if (weeklyTarget && weeklyTarget > 0) {
     const ratio = current / weeklyTarget;
     if (ratio < 0.5) {
       statusLabel = 'RECOVERED';
@@ -65,5 +71,13 @@ export function computeEffortLoad(
     }
   }
 
-  return { current, statusLabel, statusTone, trend, trendLabels, weeklyTarget };
+  return {
+    current,
+    statusLabel,
+    statusTone,
+    trend,
+    trendLabels,
+    weeklyTarget,
+    calibrating,
+  };
 }

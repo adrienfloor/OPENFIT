@@ -39,11 +39,23 @@ export type TodayDailyStats = DailyHealth & {
    */
   recentLoad: number;
   /**
-   * Last 7 days of earned effort minutes (oldest → newest, today last).
-   * Drives the Effort-load metric on the Overview tab: sum = current load,
-   * series = sparkline trend, ratio to weekly target = status tier.
+   * Last 7 days of daily TRIMP (oldest → newest, today last). Drives the
+   * Effort-load metric on the Overview tab: sum = 7-day load, series =
+   * sparkline trend, ratio to weekly target = status tier.
    */
-  effortLoad7Days: { date: Date; earnedMinutes: number | null }[];
+  effortLoad7Days: { date: Date; trimp: number | null }[];
+  /** Today's Banister TRIMP, or null if HR samples insufficient. */
+  dailyTrimp: number | null;
+  /** Chronic Training Load (42-day EMA) — Zepp's "Niveau de forme". */
+  ctl: number | null;
+  /** Acute Training Load (7-day EMA) — Zepp's "Niveau de fatigue". */
+  atl: number | null;
+  /** Training Stress Balance = CTL_yesterday − ATL_yesterday — Zepp's "Statut d'entraînement". */
+  tsb: number | null;
+  /** TSB tier ('detrained' | 'energetic' | 'balanced' | 'optimal' | 'overreaching'). */
+  trainingStatusTier: TrainingStatusTier | null;
+  /** True until ≥ 14 days of TRIMP history have accumulated. */
+  trainingStatusCalibrating: boolean;
 };
 import {
   computeBMR,
@@ -56,6 +68,10 @@ import {
   readinessScore,
   recentTrainingLoad,
   personalisedEffortTarget,
+  dailyTrimp,
+  computePMC,
+  dailyEffortTarget,
+  type TrainingStatusTier,
   type EffortHRSample,
 } from '@openfit/fitness-core';
 
@@ -303,12 +319,30 @@ export async function getDailyStats(
 
     // Effort score needs user age (→ max HR via Tanaka) and a resting HR. If
     // either is missing we leave it null rather than fake a number.
+    const maxHR = userProfile
+      ? calculateMaxHR(ageYearsFromDob(userProfile.dateOfBirth))
+      : null;
     const effort =
       userProfile !== undefined && latestRestingHR && hrSamples.length >= 2
         ? effortScore({
             samples: hrSamples,
             restingHR: latestRestingHR,
-            maxHR: calculateMaxHR(ageYearsFromDob(userProfile.dateOfBirth)),
+            maxHR: maxHR!,
+          })
+        : null;
+
+    // Banister TRIMP — same daily HR samples, sex-specific weighting.
+    // Used by the PMC layer (CTL/ATL/TSB) computed in getTodayDashboard.
+    const trimpToday =
+      userProfile !== undefined &&
+      latestRestingHR &&
+      maxHR !== null &&
+      hrSamples.length >= 2
+        ? dailyTrimp({
+            samples: hrSamples,
+            restingHR: latestRestingHR,
+            maxHR,
+            sex: userProfile.sex,
           })
         : null;
 
@@ -331,6 +365,12 @@ export async function getDailyStats(
       readinessBaselineDays: 0,
       recentLoad: 0,
       effortLoad7Days: [],
+      dailyTrimp: trimpToday,
+      ctl: null,
+      atl: null,
+      tsb: null,
+      trainingStatusTier: null,
+      trainingStatusCalibrating: true,
     });
 
     // Unused but available: avgSpO2
@@ -624,6 +664,7 @@ export async function getSpO2(date: Date): Promise<number | null> {
 export async function getTodayDashboard(
   userProfile?: Pick<UserProfile, 'weightKg' | 'heightCm' | 'sex' | 'dateOfBirth'>,
   workoutKcalByDate?: Record<string, number>,
+  vo2max?: number | null,
 ): Promise<TodayDailyStats | null> {
   const today = new Date();
   const sixDaysAgo = new Date();
@@ -655,26 +696,37 @@ export async function getTodayDashboard(
     .map((d) => d.effortEarnedMinutes);
   const load = recentTrainingLoad(earnedMostRecentFirst.slice(0, 3));
 
-  // Fitness-level-based target using RHR + HRV as VO2max proxies. Prefers
-  // baselines (stable over 7 days) but falls back to today's values if the
-  // user has < 3 days of history.
   const ageYears = userProfile
     ? ageYearsFromDob(userProfile.dateOfBirth)
     : null;
-  const personalisedTarget = personalisedEffortTarget({
-    restingHR: rhrBaseline ?? todayRecord.heartRateResting,
-    hrvRmssd: hrvBaseline ?? todayRecord.hrvRmssd,
+
+  // Performance Management Chart from the 7-day TRIMP series. CTL needs ≥14
+  // days to fully stabilise, but we surface partial values in the meantime
+  // and flag `trainingStatusCalibrating` until then. (A future commit will
+  // pull longer history from the API once daily TRIMP is persisted.)
+  const trimpSeries = range.map((d) => d.dailyTrimp ?? 0);
+  const pmc = computePMC(trimpSeries);
+
+  // Daily TRIMP target — 1.6 × CTL once mature, else VO₂max + age fallback.
+  // Matches Zepp parity (CTL=72 → target=116, ratio 1.61).
+  const personalisedTarget = dailyEffortTarget({
+    ctl: pmc.ctl,
+    ctlCalibrating: pmc.calibrating,
+    vo2max: vo2max ?? null,
     ageYears,
   });
 
-  // Rescale today's effort score against the personalised target.
+  // Rescale today's effort ring against the new TRIMP target.
   const rescaledEffortScore =
-    todayRecord.effortEarnedMinutes !== null
+    todayRecord.dailyTrimp !== null && personalisedTarget > 0
       ? Math.min(
           100,
-          Math.round((todayRecord.effortEarnedMinutes / personalisedTarget) * 100),
+          Math.round((todayRecord.dailyTrimp / personalisedTarget) * 100),
         )
       : null;
+
+  // Suppress the unused legacy fallback (kept exported for back-compat).
+  void personalisedEffortTarget;
 
   const readiness = readinessScore({
     hrvToday: todayRecord.hrvRmssd,
@@ -689,7 +741,7 @@ export async function getTodayDashboard(
 
   const effortLoad7Days = range.map((d) => ({
     date: d.date,
-    earnedMinutes: d.effortEarnedMinutes,
+    trimp: d.dailyTrimp,
   }));
 
   return {
@@ -701,6 +753,11 @@ export async function getTodayDashboard(
     readinessBaselineDays: baselineDays,
     recentLoad: load,
     effortLoad7Days,
+    ctl: pmc.ctl,
+    atl: pmc.atl,
+    tsb: pmc.tsb,
+    trainingStatusTier: pmc.tier,
+    trainingStatusCalibrating: pmc.calibrating,
   };
 }
 

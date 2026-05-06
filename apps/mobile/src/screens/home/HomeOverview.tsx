@@ -16,12 +16,12 @@ import { NutritionCard } from '../../components/NutritionCard';
 import { AIInsightCard } from '../../components/AIInsightCard';
 import { MetricRow } from '../../components/MetricRow';
 import { MetricCard } from '../../components/MetricCard';
-import {
-  useMockTrainingStatus,
-  useMockPAI,
-  useMockWeight,
-} from '../../mocks';
+import { useMockPAI, useMockWeight } from '../../mocks';
 import { computeEffortLoad } from '../../utils/effortLoad';
+import {
+  computeTrainingStatus,
+  type TrainingStatusView,
+} from '../../utils/trainingStatus';
 import { HeartHealthDetail } from './overview/details/HeartHealthDetail';
 import { StepsDetail } from './overview/details/StepsDetail';
 import { CaloriesDetail } from './overview/details/CaloriesDetail';
@@ -84,7 +84,7 @@ export function HomeOverview() {
     today?.effortLoad7Days ?? null,
     today?.effortTargetMinutes ?? null,
   );
-  const trainingStatus = useMockTrainingStatus();
+  const trainingStatus: TrainingStatusView = computeTrainingStatus(today);
   const pai = useMockPAI();
   const weight = useMockWeight();
   const { data: fitnessAgeData } = useFitnessAge();
@@ -156,8 +156,12 @@ export function HomeOverview() {
       />
       <MetricRow
         label="Training status"
-        value={`${trainingStatus.current}`}
-        status={{ text: trainingStatus.label.toUpperCase(), tone: 'neutral' }}
+        value={
+          trainingStatus.tsb != null
+            ? `${trainingStatus.tsb >= 0 ? '+' : ''}${trainingStatus.tsb}`
+            : '--'
+        }
+        status={{ text: trainingStatus.label, tone: trainingStatus.tone }}
         icon={<MetricGlyph color={colors.sleep}>↻</MetricGlyph>}
         onPress={() => setDetail('trainingStatus')}
       />
@@ -279,7 +283,7 @@ export function HomeOverview() {
         eyebrow="Effort"
         title="Effort load"
         value={fatigue.current != null ? `${fatigue.current}` : '--'}
-        unit="min · 7d"
+        unit="TRIMP · 7d"
         status={fatigue.statusLabel}
         trend={fatigue.trend}
         trendLabels={fatigue.trendLabels}
@@ -289,8 +293,8 @@ export function HomeOverview() {
         trendEmpty="Log a workout or wear your strap to start your load trend."
         note={
           fatigue.weeklyTarget != null
-            ? `Sum of earned effort minutes over the last 7 days. Your weekly target is ~${fatigue.weeklyTarget} min (≈daily target × 7). Below 50% of target → recovered, 50–100% balanced, 100–130% productive, above that → overreaching.`
-            : 'Sum of earned effort minutes over the last 7 days. Track the trend, not the daily number — consistent yellow/green is the target.'
+            ? `Sum of Banister TRIMP over the last 7 days. Your weekly target is ~${fatigue.weeklyTarget} (≈ daily target × 7). Below 50% of target → recovered, 50–100% balanced, 100–130% productive, above that → overreaching.`
+            : 'Sum of Banister TRIMP over the last 7 days. Track the trend, not the daily number — consistent yellow/green is the target.'
         }
       />
       <SimpleMetricDetail
@@ -298,13 +302,25 @@ export function HomeOverview() {
         onClose={close}
         eyebrow="Effort"
         title="Training status"
-        value={`${trainingStatus.current >= 0 ? '+' : ''}${trainingStatus.current}`}
-        status={trainingStatus.label.toUpperCase()}
-        trend={trainingStatus.trend7Days.map((p) => p.value)}
+        value={
+          trainingStatus.tsb != null
+            ? `${trainingStatus.tsb >= 0 ? '+' : ''}${trainingStatus.tsb}`
+            : '--'
+        }
+        status={trainingStatus.label}
+        trend={
+          today?.effortLoad7Days?.map((d) => Math.round(d.trimp ?? 0)) ?? []
+        }
         trendLabels={WEEKDAYS}
         trendType="bar"
         trendColor={colors.sleep}
-        note="Acute load minus 28-day chronic baseline. Negative means you're recovering, positive means you're loading. Stay between −20 and +30 to keep ramping safely."
+        trendTitle="Last 7 days TRIMP"
+        trendEmpty="Wear your strap and log workouts to start your training-status trend."
+        note={
+          trainingStatus.calibrating
+            ? `Calibrating — needs ≥14 days of TRIMP data. Current fitness (CTL) ${trainingStatus.ctl ?? '--'}, fatigue (ATL) ${trainingStatus.atl ?? '--'}.`
+            : `TSB = CTL − ATL. Negative means fatigue exceeds fitness (productive overload around −10 to −30); positive means freshness (rested/peaking). Fitness (CTL) ${trainingStatus.ctl ?? '--'}, fatigue (ATL) ${trainingStatus.atl ?? '--'}.`
+        }
       />
       <SimpleMetricDetail
         visible={detail === 'vo2max'}

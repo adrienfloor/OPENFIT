@@ -1,13 +1,13 @@
 /**
- * Derive the Overview "Effort load" metric from the last 7 days of earned
- * effort minutes plus the user's personalised daily target.
+ * Derive the Overview "Effort load" metric from the last 7 days of daily
+ * Banister TRIMP plus the user's personalised daily target.
  *
- * - `current` = sum of the 7-day series. The daily target × 7 is the implicit
- *   weekly anchor — staying near it = balanced, well above = overreaching,
- *   well below = recovered.
- * - `statusLabel` / `statusTone` mirror Garmin / Zepp tiers based on the ratio
- *   to the weekly target.
- * - `trend` is per-day earned minutes (oldest → newest, today last).
+ * - `current` = sum of the 7-day TRIMP series. The daily target × 7 is the
+ *   implicit weekly anchor — staying near it = balanced, well above =
+ *   overreaching, well below = recovered.
+ * - `statusLabel` / `statusTone` mirror Zepp's training-status tiers based
+ *   on the ratio to the weekly target.
+ * - `trend` is per-day TRIMP (oldest → newest, today last).
  * - `trendLabels` are weekday letters ("S", "M", ...) anchored on the date.
  */
 
@@ -25,8 +25,8 @@ export interface EffortLoadView {
 }
 
 export function computeEffortLoad(
-  series: { date: Date; earnedMinutes: number | null }[] | null,
-  dailyTargetMinutes: number | null,
+  series: { date: Date; trimp: number | null }[] | null,
+  dailyTrimpTarget: number | null,
 ): EffortLoadView {
   if (!series || series.length === 0) {
     return {
@@ -39,12 +39,12 @@ export function computeEffortLoad(
     };
   }
 
-  const trend = series.map((d) => Math.round(d.earnedMinutes ?? 0));
+  const trend = series.map((d) => Math.round(d.trimp ?? 0));
   const trendLabels = series.map((d) => WEEKDAY_LETTERS[d.date.getDay()]!);
   const current = trend.reduce((a, b) => a + b, 0);
 
   const weeklyTarget =
-    dailyTargetMinutes != null ? Math.round(dailyTargetMinutes * 7) : null;
+    dailyTrimpTarget != null ? Math.round(dailyTrimpTarget * 7) : null;
 
   let statusLabel = 'BALANCED';
   let statusTone: Tone = 'good';

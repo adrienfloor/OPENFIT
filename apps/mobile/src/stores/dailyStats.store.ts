@@ -117,7 +117,16 @@ export const useDailyStatsStore = create<DailyStatsState>((set, get) => ({
         const workoutKcalByDate = await fetchWorkoutKcalByDate().catch(
           () => ({} as Record<string, number>),
         );
-        const result = await getTodayDashboard(profile, workoutKcalByDate);
+        // VO₂max feeds the cold-start fallback for dailyEffortTarget when CTL
+        // hasn't matured yet. Best-effort — null if /metrics/fitness-age fails
+        // or the user hasn't logged a qualifying run.
+        const { getFitnessAge } = await import('../services/metrics');
+        const fitnessAge = await getFitnessAge().catch(() => null);
+        const result = await getTodayDashboard(
+          profile,
+          workoutKcalByDate,
+          fitnessAge?.vo2max ?? null,
+        );
         // Critical: only overwrite `today` with a non-null result. A
         // transient HC blip that returns null shouldn't wipe the rings.
         if (result != null) {

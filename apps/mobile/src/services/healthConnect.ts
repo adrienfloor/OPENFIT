@@ -38,6 +38,12 @@ export type TodayDailyStats = DailyHealth & {
    * same load signal that fed today's readiness score.
    */
   recentLoad: number;
+  /**
+   * Last 7 days of earned effort minutes (oldest → newest, today last).
+   * Drives the Effort-load metric on the Overview tab: sum = current load,
+   * series = sparkline trend, ratio to weekly target = status tier.
+   */
+  effortLoad7Days: { date: Date; earnedMinutes: number | null }[];
 };
 import {
   computeBMR,
@@ -324,6 +330,7 @@ export async function getDailyStats(
       readinessCalibrating: false,
       readinessBaselineDays: 0,
       recentLoad: 0,
+      effortLoad7Days: [],
     });
 
     // Unused but available: avgSpO2
@@ -680,6 +687,11 @@ export async function getTodayDashboard(
     todayEarnedMinutes: todayRecord.effortEarnedMinutes,
   });
 
+  const effortLoad7Days = range.map((d) => ({
+    date: d.date,
+    earnedMinutes: d.effortEarnedMinutes,
+  }));
+
   return {
     ...todayRecord,
     effortScore: rescaledEffortScore,
@@ -688,6 +700,7 @@ export async function getTodayDashboard(
     readinessCalibrating: readiness.calibrating,
     readinessBaselineDays: baselineDays,
     recentLoad: load,
+    effortLoad7Days,
   };
 }
 

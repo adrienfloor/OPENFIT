@@ -17,11 +17,11 @@ import { AIInsightCard } from '../../components/AIInsightCard';
 import { MetricRow } from '../../components/MetricRow';
 import { MetricCard } from '../../components/MetricCard';
 import {
-  useMockFatigueLoad,
   useMockTrainingStatus,
   useMockPAI,
   useMockWeight,
 } from '../../mocks';
+import { computeEffortLoad } from '../../utils/effortLoad';
 import { HeartHealthDetail } from './overview/details/HeartHealthDetail';
 import { StepsDetail } from './overview/details/StepsDetail';
 import { CaloriesDetail } from './overview/details/CaloriesDetail';
@@ -80,7 +80,10 @@ export function HomeOverview() {
     try { await refetch(); } finally { setPulling(false); }
   };
 
-  const fatigue = useMockFatigueLoad();
+  const fatigue = computeEffortLoad(
+    today?.effortLoad7Days ?? null,
+    today?.effortTargetMinutes ?? null,
+  );
   const trainingStatus = useMockTrainingStatus();
   const pai = useMockPAI();
   const weight = useMockWeight();
@@ -146,8 +149,8 @@ export function HomeOverview() {
       <Text style={styles.sectionLabel}>Base metrics</Text>
       <MetricRow
         label="Effort load"
-        value={`${fatigue.current}`}
-        status={{ text: 'BALANCED', tone: 'good' }}
+        value={fatigue.current != null ? `${fatigue.current}` : '--'}
+        status={{ text: fatigue.statusLabel, tone: fatigue.statusTone }}
         icon={<MetricGlyph color={colors.warning}>⌃</MetricGlyph>}
         onPress={() => setDetail('fatigueLoad')}
       />
@@ -275,13 +278,20 @@ export function HomeOverview() {
         onClose={close}
         eyebrow="Effort"
         title="Effort load"
-        value={`${fatigue.current}`}
-        status={fatigue.status.toUpperCase()}
-        trend={fatigue.trend7Days.map((p) => p.value)}
-        trendLabels={WEEKDAYS}
-        trendType="line"
+        value={fatigue.current != null ? `${fatigue.current}` : '--'}
+        unit="min · 7d"
+        status={fatigue.statusLabel}
+        trend={fatigue.trend}
+        trendLabels={fatigue.trendLabels}
+        trendType="bar"
         trendColor={colors.warning}
-        note="Aggregate intensity-minutes from training plus background activity. Higher values indicate more cumulative load — track the trend, not the daily number."
+        trendTitle="Last 7 days"
+        trendEmpty="Log a workout or wear your strap to start your load trend."
+        note={
+          fatigue.weeklyTarget != null
+            ? `Sum of earned effort minutes over the last 7 days. Your weekly target is ~${fatigue.weeklyTarget} min (≈daily target × 7). Below 50% of target → recovered, 50–100% balanced, 100–130% productive, above that → overreaching.`
+            : 'Sum of earned effort minutes over the last 7 days. Track the trend, not the daily number — consistent yellow/green is the target.'
+        }
       />
       <SimpleMetricDetail
         visible={detail === 'trainingStatus'}

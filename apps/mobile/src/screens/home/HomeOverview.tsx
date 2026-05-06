@@ -16,7 +16,6 @@ import { NutritionCard } from '../../components/NutritionCard';
 import { AIInsightCard } from '../../components/AIInsightCard';
 import { MetricRow } from '../../components/MetricRow';
 import { MetricCard } from '../../components/MetricCard';
-import { useMockWeight } from '../../mocks';
 import { computeEffortLoad } from '../../utils/effortLoad';
 import {
   computeTrainingStatus,
@@ -88,7 +87,10 @@ export function HomeOverview() {
   const trainingStatus: TrainingStatusView = computeTrainingStatus(today);
   const weeklyPaiTotal = today?.weeklyPAI ?? null;
   const todayPai = today?.dailyPAI ?? null;
-  const weight = useMockWeight();
+  // Prefer the latest scale reading from HC; fall back to the profile weight
+  // entered at registration when no scale is connected.
+  const displayWeightKg = today?.latestWeightKg ?? user?.weightKg ?? null;
+  const weightHistory = today?.weightHistory30Days ?? [];
   const { data: fitnessAgeData } = useFitnessAge();
 
   const [detail, setDetail] = useState<DetailKey>(null);
@@ -259,9 +261,13 @@ export function HomeOverview() {
       <MetricCard
         title="Weight"
         icon="⚖"
-        value={weight.current.toFixed(1)}
+        value={displayWeightKg != null ? displayWeightKg.toFixed(1) : '--'}
         unit="kg"
-        subtitle="30-day trend"
+        subtitle={
+          today?.latestWeightKg != null
+            ? `${weightHistory.length} reading${weightHistory.length === 1 ? '' : 's'} · last 30 days`
+            : 'Connect a scale to Health Connect for trend'
+        }
         onPress={() => setDetail('weight')}
       />
 
@@ -423,7 +429,12 @@ export function HomeOverview() {
         trendEmpty="Wear your HR device — PAI accumulates with any activity above 50% HRR."
         note="Personal Activity Intelligence — published by the HUNT Fitness Study (Nes et al., 230k participants). Weights minutes by intensity tier (light/moderate/vigorous) and rolls them up over 7 days. Maintaining ≥ 100 PAI/week is associated with substantially reduced cardiovascular mortality risk."
       />
-      <WeightDetail visible={detail === 'weight'} onClose={close} />
+      <WeightDetail
+        visible={detail === 'weight'}
+        onClose={close}
+        history={weightHistory}
+        profileWeightKg={user?.weightKg ?? null}
+      />
       <FitnessAgeDetail
         visible={detail === 'fitnessAge'}
         onClose={close}

@@ -65,6 +65,10 @@ export type TodayDailyStats = DailyHealth & {
   weeklyPAI: number | null;
   /** Last 7 days of daily PAI (oldest → newest, today last). */
   paiHistory7Days: { date: Date; pai: number | null }[];
+  /** Most recent body weight reading (kg) from Health Connect, or null. */
+  latestWeightKg: number | null;
+  /** Last 30 days of body-weight readings (oldest → newest). */
+  weightHistory30Days: { time: Date; kg: number }[];
 };
 import {
   computeBMR,
@@ -145,6 +149,7 @@ const REQUIRED_PERMISSIONS = [
   { accessType: 'read', recordType: 'ExerciseSession' },
   { accessType: 'read', recordType: 'Distance' },
   { accessType: 'read', recordType: 'ElevationGained' },
+  { accessType: 'read', recordType: 'Weight' },
   // ExerciseRoute is not a separately-requestable read permission in
   // react-native-health-connect — the manifest's READ_EXERCISE_ROUTE is
   // honored automatically alongside ExerciseSession reads, and listing it
@@ -396,6 +401,8 @@ export async function getDailyStats(
       dailyPAI: paiToday,
       weeklyPAI: null,
       paiHistory7Days: [],
+      latestWeightKg: null,
+      weightHistory30Days: [],
     });
 
     // Unused but available: avgSpO2
@@ -654,6 +661,43 @@ export async function getSteps(date: Date): Promise<number> {
 }
 
 /** Fetch average SpO2 for a given day (null if unavailable). */
+export interface WeightSample {
+  /** Time of the reading (UTC). */
+  time: Date;
+  /** Body weight in kilograms. */
+  kg: number;
+}
+
+/**
+ * Read body-weight records from Health Connect over the last `days` days
+ * (today inclusive). Returned oldest → newest. Empty array when permissions
+ * aren't granted, no scale is connected, or no readings fall in the window.
+ *
+ * Health Connect retains weight indefinitely from any source that writes it
+ * (Garmin Connect, Renpho, Withings, manual entry from any companion app),
+ * so a 30-day window typically returns plenty of points for the trend.
+ */
+export async function getWeightHistory(days: number): Promise<WeightSample[]> {
+  assertInitialized();
+  const end = new Date();
+  const start = new Date(end);
+  start.setDate(start.getDate() - days);
+  const result = await readRecords('Weight', {
+    timeRangeFilter: {
+      operator: 'between' as const,
+      startTime: start.toISOString(),
+      endTime: end.toISOString(),
+    },
+  }).catch(() => ({ records: [] as Array<{ time: string; weight: { inKilograms: number } }> }));
+
+  return result.records
+    .map((r) => ({
+      time: new Date(r.time),
+      kg: r.weight.inKilograms,
+    }))
+    .sort((a, b) => a.time.getTime() - b.time.getTime());
+}
+
 export async function getSpO2(date: Date): Promise<number | null> {
   assertInitialized();
 
@@ -795,6 +839,13 @@ export async function getTodayDashboard(
   }));
   const paiTotal = weeklyPAI(paiHistory7Days.map((d) => d.pai));
 
+  // Body weight — best-effort, latest reading + 30-day series for the modal.
+  const weightHistory30Days = await getWeightHistory(30).catch(() => []);
+  const latestWeightKg =
+    weightHistory30Days.length > 0
+      ? weightHistory30Days[weightHistory30Days.length - 1]!.kg
+      : null;
+
   return {
     ...todayRecord,
     effortScore: rescaledEffortScore,
@@ -812,6 +863,8 @@ export async function getTodayDashboard(
     trainingStatusDaysWithData: trimpSeries.filter((t) => t > 0).length,
     weeklyPAI: paiTotal,
     paiHistory7Days,
+    latestWeightKg,
+    weightHistory30Days,
   };
 }
 

@@ -115,6 +115,8 @@ export type TodayDailyStats = DailyHealth & {
    * `atl` = fatigue, `ctl` = fitness, `tsb` = training-status balance.
    */
   pmcSeries7Days: { date: Date; ctl: number; atl: number; tsb: number }[];
+  /** Last 7 days of step counts (oldest → newest, today last). */
+  stepsHistory7Days: { date: Date; steps: number | null }[];
 };
 import {
   computeBMR,
@@ -482,6 +484,7 @@ export async function getDailyStats(
         breathingTrend: [],
       },
       pmcSeries7Days: [],
+      stepsHistory7Days: [],
     });
 
     // Unused but available: avgSpO2
@@ -1267,6 +1270,11 @@ export async function getTodayDashboard(
     tsb: s.tsb,
   }));
 
+  const stepsHistory7Days = range.map((d) => ({
+    date: d.date,
+    steps: d.steps,
+  }));
+
   const paiHistory7Days = range.map((d) => ({
     date: d.date,
     pai: d.dailyPAI,
@@ -1316,6 +1324,7 @@ export async function getTodayDashboard(
     recoveryHistory7Days,
     sleepDashboardData,
     pmcSeries7Days,
+    stepsHistory7Days,
   };
 }
 

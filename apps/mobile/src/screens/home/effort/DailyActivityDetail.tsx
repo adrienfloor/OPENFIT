@@ -1,6 +1,8 @@
 import { View, Text, StyleSheet } from 'react-native';
+import { activeKcalFromSteps } from '@openfit/fitness-core';
 import { DetailModal } from '../../../components/DetailModal';
 import { SparkBars } from '../../../components/charts/SparkBars';
+import { useAuth } from '../../../hooks/useAuth';
 import type { TodayDailyStats } from '../../../services/healthConnect';
 import { colors, spacing, radii, typography } from '../../../theme';
 
@@ -12,7 +14,8 @@ interface Props {
   earnedMinutes: number;
 }
 
-const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const WEEKDAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const weekdayLetter = (d: Date): string => WEEKDAY_LETTERS[d.getDay()]!;
 
 /**
  * Drill-in for the "Daily activity" row in Effort. Shows steps + active
@@ -20,10 +23,17 @@ const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
  * step series so the user can see how today compares.
  */
 export function DailyActivityDetail({ visible, onClose, today, earnedMinutes }: Props) {
+  const { user } = useAuth();
   const steps = today?.steps ?? 0;
   const distanceKm = (steps * 0.76) / 1000;
-  const stepKcal = today?.caloriesActive ?? 0;
-  const stepTrend = [3200, 4800, 6100, 7200, 5900, 4400, steps];
+  // Step-only kcal — `today.caloriesActive` includes workout kcal too, which
+  // would be misleading on a "Daily activity" (passive movement) panel.
+  const stepKcal = user?.weightKg
+    ? activeKcalFromSteps(steps, user.weightKg)
+    : 0;
+  const history = today?.stepsHistory7Days ?? [];
+  const stepTrend = history.map((d) => d.steps ?? 0);
+  const stepLabels = history.map((d) => weekdayLetter(d.date));
 
   return (
     <DetailModal
@@ -44,13 +54,17 @@ export function DailyActivityDetail({ visible, onClose, today, earnedMinutes }: 
 
       <Text style={styles.sectionLabel}>Steps — last 7 days</Text>
       <View style={styles.chartCard}>
-        <SparkBars
-          values={stepTrend}
-          color={colors.run}
-          labels={WEEKDAYS}
-          showValues
-          height={120}
-        />
+        {stepTrend.length > 0 ? (
+          <SparkBars
+            values={stepTrend}
+            color={colors.run}
+            labels={stepLabels}
+            showValues
+            height={120}
+          />
+        ) : (
+          <Text style={styles.empty}>No step data yet.</Text>
+        )}
       </View>
 
       <Text style={styles.note}>
@@ -129,5 +143,11 @@ const styles = StyleSheet.create({
     fontSize: typography.size.sm,
     color: colors.textSecondary,
     lineHeight: 22,
+  },
+  empty: {
+    fontSize: typography.size.sm,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    paddingVertical: spacing.lg,
   },
 });

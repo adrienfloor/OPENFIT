@@ -228,26 +228,36 @@ export function intradayBioCharge({
     return effortByMinute[effortByMinute.length - 1]!.cumMinutes;
   };
 
-  let lastValue = wakeScore;
-
-  for (let m = 0; m <= 24 * 60; m += stepMinutes) {
+  // Build the curve only up to "now" so the chart dot lands at the user's
+  // actual local time, not at 24h.
+  const cumWake = lookupCum(wakeMinute);
+  for (let m = 0; m <= nowMinute; m += stepMinutes) {
     let v: number;
     if (m <= wakeMinute) {
-      // Sleep ramp.
       const fraction = wakeMinute > 0 ? m / wakeMinute : 1;
       v = preDawn + (wakeScore - preDawn) * fraction;
-    } else if (m <= nowMinute) {
-      // Drain proportional to cumulative effort minutes since wake.
-      const cumNow = lookupCum(m);
-      const cumWake = lookupCum(wakeMinute);
-      const drain = (cumNow - cumWake) * drainPerEffortMinute;
-      v = wakeScore - drain;
-      lastValue = v;
     } else {
-      // Future — hold at the "now" value, don't project.
-      v = lastValue;
+      const drain = (lookupCum(m) - cumWake) * drainPerEffortMinute;
+      v = wakeScore - drain;
     }
     points.push({ minute: m, value: clamp(Math.round(v), 0, 100) });
+  }
+
+  // Always include an explicit point AT nowMinute itself, so the dot is
+  // anchored to the current time even if it falls between step boundaries.
+  if (
+    points.length === 0 ||
+    points[points.length - 1]!.minute !== nowMinute
+  ) {
+    let v: number;
+    if (nowMinute <= wakeMinute) {
+      const fraction = wakeMinute > 0 ? nowMinute / wakeMinute : 1;
+      v = preDawn + (wakeScore - preDawn) * fraction;
+    } else {
+      const drain = (lookupCum(nowMinute) - cumWake) * drainPerEffortMinute;
+      v = wakeScore - drain;
+    }
+    points.push({ minute: nowMinute, value: clamp(Math.round(v), 0, 100) });
   }
 
   return points;

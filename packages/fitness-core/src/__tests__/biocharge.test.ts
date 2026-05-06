@@ -72,7 +72,7 @@ describe('cumulativeEffortMinutes', () => {
 });
 
 describe('intradayBioCharge', () => {
-  it('starts low, ramps to wakeScore at wake, drains, holds after now', () => {
+  it('starts low, ramps to wakeScore at wake, drains, ends at now', () => {
     const points = intradayBioCharge({
       wakeScore: 90,
       wakeMinute: 8 * 60, // 08:00
@@ -86,8 +86,10 @@ describe('intradayBioCharge', () => {
       nowMinute: 16 * 60, // 16:00
     });
 
-    // 49 points over 24h with 30-min step.
-    expect(points.length).toBe(49);
+    // Curve stops at "now" (16:00 = minute 960). With 30-min step,
+    // points 0,30,60,...,960 → 33 points.
+    expect(points.length).toBe(33);
+    expect(points[points.length - 1]!.minute).toBe(16 * 60);
 
     // Pre-wake ramp ends at wakeScore.
     const atWake = points.find((p) => p.minute === 8 * 60)!;
@@ -97,13 +99,19 @@ describe('intradayBioCharge', () => {
     expect(points[0]!.value).toBeLessThan(90);
 
     // 16:00 should be drained: 120 cum × 0.15 = 18 → 90-18 = 72.
-    const atNow = points.find((p) => p.minute === 16 * 60)!;
+    const atNow = points[points.length - 1]!;
     expect(atNow.value).toBeGreaterThanOrEqual(70);
     expect(atNow.value).toBeLessThanOrEqual(74);
+  });
 
-    // After "now" the curve holds flat (no projection).
-    const atEnd = points[points.length - 1]!;
-    expect(atEnd.value).toBe(atNow.value);
+  it('anchors a final point at nowMinute even when it falls between steps', () => {
+    const points = intradayBioCharge({
+      wakeScore: 80,
+      wakeMinute: 8 * 60,
+      effortByMinute: [{ minute: 0, cumMinutes: 0 }],
+      nowMinute: 8 * 60 + 47, // 08:47, between the 480 and 510 steps
+    });
+    expect(points[points.length - 1]!.minute).toBe(8 * 60 + 47);
   });
 
   it('clamps below 0 and above 100', () => {

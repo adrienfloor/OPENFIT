@@ -186,7 +186,8 @@ export function HomeBioCharge() {
           values={recoveryHistory.map((p) => Math.round(p.hrv ?? 0))}
           color={colors.danger}
           labels={recoveryHistory.map(weekdayLetter)}
-          showValues
+          yAxis
+          yUnit="ms"
           height={140}
         />
       </View>
@@ -197,7 +198,8 @@ export function HomeBioCharge() {
           values={recoveryHistory.map((p) => Math.round(p.rhr ?? 0))}
           color={colors.accent}
           labels={recoveryHistory.map(weekdayLetter)}
-          showValues
+          yAxis
+          yUnit="bpm"
           height={140}
         />
       </View>

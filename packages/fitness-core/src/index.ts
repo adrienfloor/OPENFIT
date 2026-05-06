@@ -8,5 +8,6 @@ export * from './heart-rate';
 export * from './nutrition';
 export * from './running';
 export * from './scores';
+export * from './trimp';
 export * from './vo2max';
 export * from './workout';

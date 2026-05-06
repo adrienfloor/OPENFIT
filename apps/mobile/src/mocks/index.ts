@@ -36,17 +36,6 @@ export interface TrainingStatus {
   trend7Days: TrendPoint[];
 }
 
-export interface PAI {
-  current: number;
-  todayDelta: number;
-  trend7Days: TrendPoint[];
-}
-
-export interface WeightTrend {
-  current: number;
-  trend30Days: TrendPoint[];
-}
-
 function daysAgo(n: number): Date {
   const d = new Date();
   d.setDate(d.getDate() - n);
@@ -79,14 +68,6 @@ export function useMockTrainingStatus(): TrainingStatus {
     current: -4,
     label: 'Balanced',
     trend7Days: sevenDayTrend([-14, -9, -16, -16, -9, 3, -4]),
-  };
-}
-
-export function useMockPAI(): PAI {
-  return {
-    current: 178,
-    todayDelta: 22,
-    trend7Days: sevenDayTrend([110, 130, 145, 160, 168, 170, 178]),
   };
 }
 
@@ -458,18 +439,3 @@ export function useMockTodayActivities(input: {
   ];
 }
 
-export function useMockWeight(): WeightTrend {
-  // 30-day downward trend with daily noise.
-  const start = 80.5;
-  const values: number[] = [];
-  for (let i = 29; i >= 0; i--) {
-    const trend = start - (29 - i) * 0.02;
-    const noise = ((i * 7) % 5) * 0.05 - 0.1;
-    values.push(Math.round((trend + noise) * 10) / 10);
-  }
-  const points: TrendPoint[] = values.map((value, i) => ({
-    date: daysAgo(29 - i),
-    value,
-  }));
-  return { current: points[points.length - 1]!.value, trend30Days: points };
-}

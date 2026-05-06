@@ -1,6 +1,8 @@
 /**
- * Real-time BLE connection to the Helio Strap during active workout sessions.
- * Reads the standard GATT Heart Rate Service (UUID 0x180D).
+ * Real-time BLE connection to a heart rate device during active workout
+ * sessions. Reads the standard GATT Heart Rate Service (UUID 0x180D),
+ * which works with chest straps, watches, arm bands, and rings that
+ * implement the spec.
  * Only active during workouts — not running in the background permanently.
  * Android only.
  */

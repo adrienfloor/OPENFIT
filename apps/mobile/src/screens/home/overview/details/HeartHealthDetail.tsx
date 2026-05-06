@@ -24,14 +24,14 @@ function ageYearsFromDob(dob: Date): number {
 }
 
 /**
- * Heart-health drill-in modal: live BLE HR (when a strap is in range) +
- * RHR/HRV from Health Connect + 7-day RHR trend. Detail modals stay
- * opt-in and tap-to-open per the user's design spec.
+ * Heart-health drill-in modal: live BLE HR (when an HR device is in
+ * range) + RHR/HRV from Health Connect + 7-day RHR trend. Detail
+ * modals stay opt-in and tap-to-open per the user's design spec.
  *
  * The live-HR panel is only mounted while the modal is visible — the
  * BLE service connects on mount and disconnects on unmount, so we
- * deliberately return null when hidden to avoid keeping the strap link
- * open across the entire app session.
+ * deliberately return null when hidden to avoid keeping the HR device
+ * link open across the entire app session.
  */
 export function HeartHealthDetail({ visible, onClose, today }: Props) {
   if (!visible) return null;
@@ -89,10 +89,10 @@ function LiveHRPanel() {
   const { bpm, zone, connectionState } = useRealtimeHeartRate(maxHR);
 
   const stateLabel =
-    connectionState === 'scanning' ? 'Scanning for HR strap…'
+    connectionState === 'scanning' ? 'Scanning for HR device…'
       : connectionState === 'connecting' ? 'Connecting…'
       : connectionState === 'connected' ? 'Live'
-      : connectionState === 'error' ? 'No strap found'
+      : connectionState === 'error' ? 'No HR device found'
       : connectionState === 'disconnected' ? 'Disconnected'
       : 'Waiting…';
 

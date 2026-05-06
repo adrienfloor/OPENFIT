@@ -85,7 +85,7 @@ function HeartRateCard({ maxHR, onSamplesRef }: { maxHR: number; onSamplesRef: R
   onSamplesRef.current = () => samples;
 
   const stateLabel =
-    connectionState === 'scanning' ? 'Scanning for HR strap...' :
+    connectionState === 'scanning' ? 'Scanning for HR device...' :
     connectionState === 'connecting' ? 'Connecting...' :
     connectionState === 'connected' ? 'Connected' :
     connectionState === 'error' ? 'Connection failed' :

@@ -44,10 +44,10 @@ function HeartRateLive({
       : null;
 
   const stateLabel =
-    connectionState === 'scanning' ? 'Scanning for HR strap...' :
+    connectionState === 'scanning' ? 'Scanning for HR device...' :
     connectionState === 'connecting' ? 'Connecting...' :
     connectionState === 'connected' ? 'Connected' :
-    connectionState === 'error' ? 'No strap found' :
+    connectionState === 'error' ? 'No HR device found' :
     connectionState === 'disconnected' ? 'Disconnected' :
     'Waiting...';
 
@@ -225,7 +225,7 @@ export default function FreeWorkoutScreen() {
         </TouchableOpacity>
         <Text style={styles.title}>Free</Text>
         <Text style={styles.subtitle}>HR-tracked timed session — anything not strength or run</Text>
-        <Text style={styles.subtitleSmall}>Put on your Helio Strap before starting</Text>
+        <Text style={styles.subtitleSmall}>Put on your HR device before starting</Text>
         <TouchableOpacity style={styles.startBtn} onPress={handleStart}>
           <Text style={styles.startBtnText}>Start Session</Text>
         </TouchableOpacity>

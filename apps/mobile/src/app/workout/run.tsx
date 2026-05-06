@@ -56,7 +56,7 @@ function HeartRateDisplay({ maxHR, avgHrRef }: { maxHR: number; avgHrRef: React.
     connectionState === 'scanning' ? 'Scanning...' :
     connectionState === 'connecting' ? 'Connecting...' :
     connectionState === 'connected' ? 'Connected' :
-    connectionState === 'error' ? 'No strap found' :
+    connectionState === 'error' ? 'No HR device found' :
     connectionState === 'disconnected' ? 'Disconnected' :
     '';
 

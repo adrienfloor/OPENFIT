@@ -1,6 +1,7 @@
 /**
  * All passive daily data is read from Health Connect.
- * Zepp syncs Helio Strap data into Health Connect automatically in the background.
+ * Companion apps (Zepp, Garmin Connect, etc.) sync HR-device data into
+ * Health Connect automatically in the background.
  * This service is the single point of contact for all passive health data.
  * Android only.
  */

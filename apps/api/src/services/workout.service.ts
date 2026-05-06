@@ -574,7 +574,7 @@ export class WorkoutService {
 
       // Found a merge target. Only attach HR / GPS the manual log is
       // missing — never overwrite what the user's own recording
-      // produced (BLE strap → user trusts those samples; we only
+      // produced (BLE HR device → user trusts those samples; we only
       // backfill).
       const data: Parameters<typeof this.prisma.workoutLog.update>[0]['data'] = {
         linkedExternalId: input.externalId ?? null,

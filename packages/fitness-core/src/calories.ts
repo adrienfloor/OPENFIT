@@ -3,7 +3,7 @@
  *
  * The primary method is Keytel et al. (2005) — sex-specific regression that
  * converts heart rate + weight + age into kcal/min. Polar and several
- * clinical-grade HR straps use the same formula.
+ * clinical-grade HR devices use the same formula.
  *
  *   Men:   kcal/min = (−55.0969 + 0.6309·HR + 0.1988·W + 0.2017·A) / 4.184
  *   Women: kcal/min = (−20.4022 + 0.4472·HR − 0.1263·W + 0.0740·A) / 4.184

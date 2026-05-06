@@ -21,6 +21,9 @@ export interface TodayWorkout {
   distanceMeters: number | null;
   session: { name: string } | null;
   exerciseLogs: { completedSets: unknown[] }[];
+  /** Per-sample HR data captured during the session. Empty array when
+   *  the session was logged manually without a connected HR device. */
+  heartRateData: { timestamp: string | Date; bpm: number }[];
 }
 
 interface Props {

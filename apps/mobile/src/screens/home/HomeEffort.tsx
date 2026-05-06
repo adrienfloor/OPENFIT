@@ -8,26 +8,44 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import type { WorkoutType } from '@openfit/types';
+import {
+  ageYearsFromDob,
+  calculateMaxHR,
+  effortScore,
+} from '@openfit/fitness-core';
 import { apiClient } from '../../services/api';
 import { useDailyStats } from '../../hooks/useDailyStats';
+import { useAuth } from '../../hooks/useAuth';
 import { HeroRing } from '../../components/HeroRing';
 import { AIInsightCard } from '../../components/AIInsightCard';
 import { HomeLoadingOverlay } from '../../components/HomeLoadingOverlay';
 import { RingExplainerSheet } from '../../components/RingExplainerSheet';
 import { SparkLine } from '../../components/charts/SparkLine';
 import { SparkBars } from '../../components/charts/SparkBars';
-import {
-  useMockFatigueLoad,
-  useMockFitnessLevel,
-  useMockTodayActivities,
-  useMockTrainingStatus,
-} from '../../mocks';
 import { SimpleMetricDetail } from './overview/details/SimpleMetricDetail';
 import { DailyActivityDetail } from './effort/DailyActivityDetail';
 import { WorkoutDetail, type TodayWorkout } from './effort/WorkoutDetail';
 import { colors, spacing, radii, typography, themedRefresh } from '../../theme';
 
-const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const WEEKDAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const weekdayLetter = (d: Date): string => WEEKDAY_LETTERS[d.getDay()]!;
+
+interface ActivityEntry {
+  kind: 'daily' | 'workout';
+  label: string;
+  earnedMinutes: number;
+  startTime?: Date;
+  endTime?: Date;
+  workoutLogId?: string;
+}
+
+const TRAINING_STATUS_LABEL: Record<string, string> = {
+  detrained: 'Detrained',
+  energetic: 'Energetic',
+  balanced: 'Balanced',
+  optimal: 'Optimal',
+  overreaching: 'Overreaching',
+};
 
 function formatTime(d: Date): string {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -51,13 +69,8 @@ type DetailKey = 'fatigue' | 'fitness' | 'trainingStatus' | 'daily' | 'workout' 
  */
 export function HomeEffort() {
   const { today, refetch, hasEverLoaded, healthConnectAvailable, permissionsGranted } = useDailyStats();
+  const { user } = useAuth();
   const [pulling, setPulling] = useState(false);
-  const fatigue = useMockFatigueLoad();
-  const fitness = useMockFitnessLevel();
-  const trainingStatus = useMockTrainingStatus();
-  const activities = useMockTodayActivities({
-    earnedMinutes: today?.effortEarnedMinutes ?? null,
-  });
 
   const [explainerOpen, setExplainerOpen] = useState(false);
   const [detail, setDetail] = useState<DetailKey>(null);
@@ -99,6 +112,54 @@ export function HomeEffort() {
   const earned = today?.effortEarnedMinutes ?? null;
   const target = today?.effortTargetMinutes ?? null;
   const score = today?.effortScore ?? null;
+
+  // Per-workout earned minutes via the same effortScore() used for today's
+  // total. The result mirrors what fed today.effortEarnedMinutes — workouts
+  // that ran for an hour at moderate intensity will carry most of the budget.
+  const restingHR = today?.heartRateResting ?? null;
+  const maxHR = user?.dateOfBirth
+    ? calculateMaxHR(ageYearsFromDob(new Date(user.dateOfBirth)))
+    : null;
+  const workoutEarned = todaysWorkouts.map((w) => {
+    if (!restingHR || !maxHR || !w.heartRateData?.length) return 0;
+    return effortScore({
+      samples: w.heartRateData.map((s) => ({
+        time: new Date(s.timestamp),
+        bpm: s.bpm,
+      })),
+      restingHR,
+      maxHR,
+    }).earnedMinutes;
+  });
+  const totalWorkoutEarned = workoutEarned.reduce((a, b) => a + b, 0);
+  const dailyEarned = Math.max(0, (earned ?? 0) - totalWorkoutEarned);
+
+  const activities: ActivityEntry[] = [
+    { kind: 'daily', label: 'Daily activity', earnedMinutes: dailyEarned },
+    ...todaysWorkouts.map<ActivityEntry>((w, i) => ({
+      kind: 'workout',
+      label: w.session?.name ?? typeNameFor(w.type),
+      earnedMinutes: workoutEarned[i] ?? 0,
+      startTime: new Date(w.startedAt),
+      endTime: w.completedAt ? new Date(w.completedAt) : undefined,
+      workoutLogId: w.id,
+    })),
+  ];
+
+  // 7-day PMC values: ATL = fatigue, CTL = fitness, TSB = training status.
+  const pmcSeries = today?.pmcSeries7Days ?? [];
+  const fatigueValues = pmcSeries.map((p) => Math.round(p.atl));
+  const fitnessValues = pmcSeries.map((p) => Math.round(p.ctl));
+  const tsbValues = pmcSeries.map((p) => Math.round(p.tsb));
+  const seriesLabels = pmcSeries.map((p) => weekdayLetter(p.date));
+
+  const fatigueNow = today?.atl != null ? Math.round(today.atl) : null;
+  const fitnessNow = today?.ctl != null ? Math.round(today.ctl) : null;
+  const tsbNow = today?.tsb != null ? Math.round(today.tsb) : null;
+  const tsbTier = today?.trainingStatusTier
+    ? TRAINING_STATUS_LABEL[today.trainingStatusTier]
+    : null;
+  const calibrating = today?.trainingStatusCalibrating ?? true;
   const tier =
     score == null
       ? 'WAITING'
@@ -147,12 +208,9 @@ export function HomeEffort() {
       <Text style={styles.sectionLabel}>Today's activities</Text>
       {activities.map((a, i) => {
         const isDaily = a.kind === 'daily';
-        const matchedLog =
-          !isDaily && a.label
-            ? todaysWorkouts.find(
-                (l) => (l.session?.name ?? typeNameFor(l.type)) === a.label,
-              ) ?? todaysWorkouts[0]
-            : null;
+        const matchedLog = isDaily
+          ? null
+          : todaysWorkouts.find((l) => l.id === a.workoutLogId) ?? null;
         return (
           <TouchableOpacity
             key={i}
@@ -162,7 +220,7 @@ export function HomeEffort() {
               if (isDaily) {
                 setDetail('daily');
               } else {
-                setActiveWorkout(matchedLog ?? null);
+                setActiveWorkout(matchedLog);
                 setDetail('workout');
               }
             }}
@@ -185,82 +243,62 @@ export function HomeEffort() {
         );
       })}
 
-      {/* If real workout logs exist beyond the mock activity, surface them. */}
-      {todaysWorkouts.length > 1
-        ? todaysWorkouts.slice(1).map((l) => (
-            <TouchableOpacity
-              key={l.id}
-              style={[styles.activityRow, styles.activityRowWorkout]}
-              activeOpacity={0.85}
-              onPress={() => {
-                setActiveWorkout(l);
-                setDetail('workout');
-              }}
-            >
-              <View style={styles.activityIconWrap}>
-                <Text style={styles.activityIcon}>⤬</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.activityLabel}>
-                  {l.session?.name ?? typeNameFor(l.type)}
-                </Text>
-                <Text style={styles.activityTime}>
-                  {formatTime(new Date(l.startedAt))}
-                </Text>
-              </View>
-              <Text style={styles.activityDelta}>
-                {l.caloriesBurned != null
-                  ? `${Math.round(l.caloriesBurned)} kcal`
-                  : '—'}
-              </Text>
-            </TouchableOpacity>
-          ))
-        : null}
-
       {/* 7-day series */}
-      <Text style={styles.sectionLabel}>Fatigue level — last 7 days</Text>
+      <Text style={styles.sectionLabel}>Fatigue (ATL) — last 7 days</Text>
       <TouchableOpacity
         style={styles.card}
         activeOpacity={0.85}
         onPress={() => setDetail('fatigue')}
       >
-        <SparkLine
-          values={fatigue.trend7Days.map((p) => p.value)}
-          color={colors.danger}
-          labels={WEEKDAYS}
-          showValues
-          height={140}
-        />
+        {fatigueValues.length > 0 ? (
+          <SparkLine
+            values={fatigueValues}
+            color={colors.danger}
+            labels={seriesLabels}
+            yAxis
+            height={140}
+          />
+        ) : (
+          <Text style={styles.empty}>Calibrating — no PMC history yet.</Text>
+        )}
       </TouchableOpacity>
 
-      <Text style={styles.sectionLabel}>Fitness level — last 7 days</Text>
+      <Text style={styles.sectionLabel}>Fitness (CTL) — last 7 days</Text>
       <TouchableOpacity
         style={styles.card}
         activeOpacity={0.85}
         onPress={() => setDetail('fitness')}
       >
-        <SparkLine
-          values={fitness.trend7Days.map((p) => p.value)}
-          color={colors.info}
-          labels={WEEKDAYS}
-          showValues
-          height={140}
-        />
+        {fitnessValues.length > 0 ? (
+          <SparkLine
+            values={fitnessValues}
+            color={colors.info}
+            labels={seriesLabels}
+            yAxis
+            height={140}
+          />
+        ) : (
+          <Text style={styles.empty}>Calibrating — no PMC history yet.</Text>
+        )}
       </TouchableOpacity>
 
-      <Text style={styles.sectionLabel}>Training status — last 7 days</Text>
+      <Text style={styles.sectionLabel}>Training status (TSB) — last 7 days</Text>
       <TouchableOpacity
         style={styles.card}
         activeOpacity={0.85}
         onPress={() => setDetail('trainingStatus')}
       >
-        <SparkBars
-          values={trainingStatus.trend7Days.map((p) => p.value)}
-          color={colors.sleep}
-          labels={WEEKDAYS}
-          showValues
-          height={140}
-        />
+        {tsbValues.length > 0 ? (
+          <SparkBars
+            values={tsbValues}
+            color={colors.sleep}
+            labels={seriesLabels}
+            showValues
+            height={140}
+          />
+        ) : (
+          <Text style={styles.empty}>Calibrating — no PMC history yet.</Text>
+        )}
       </TouchableOpacity>
 
       <View style={{ height: spacing.huge }} />
@@ -301,45 +339,59 @@ export function HomeEffort() {
         visible={detail === 'fatigue'}
         onClose={() => setDetail(null)}
         eyebrow="Effort"
-        title="Fatigue level"
-        value={`${fatigue.current}`}
-        status={fatigue.status.toUpperCase()}
-        trend={fatigue.trend7Days.map((p) => p.value)}
-        trendLabels={WEEKDAYS}
+        title="Fatigue (ATL)"
+        value={fatigueNow != null ? `${fatigueNow}` : '--'}
+        unit="TRIMP · 7d EMA"
+        status={
+          calibrating ? 'CALIBRATING' : fatigueNow == null ? 'NO DATA' : 'ACTIVE'
+        }
+        trend={fatigueValues}
+        trendLabels={seriesLabels}
         trendType="line"
         trendColor={colors.danger}
-        note="Acute fatigue index — a rolling sum of recent training stress that decays as you rest. Stays high during heavy weeks, drops fast on rest days."
+        trendEmpty="Wear your HR device and log workouts to start your fatigue trend."
+        note="Acute Training Load — 7-day exponentially-weighted average of daily Banister TRIMP. Climbs fast during hard weeks, decays fast during rest. Same metric Zepp surfaces as 'Niveau de fatigue' and TrainingPeaks calls 'fatigue'."
       />
       <SimpleMetricDetail
         visible={detail === 'fitness'}
         onClose={() => setDetail(null)}
         eyebrow="Effort"
-        title="Fitness level"
-        value={`${fitness.current}`}
-        trend={fitness.trend7Days.map((p) => p.value)}
-        trendLabels={WEEKDAYS}
+        title="Fitness (CTL)"
+        value={fitnessNow != null ? `${fitnessNow}` : '--'}
+        unit="TRIMP · 42d EMA"
+        status={calibrating ? 'CALIBRATING' : fitnessNow == null ? 'NO DATA' : 'ACTIVE'}
+        trend={fitnessValues}
+        trendLabels={seriesLabels}
         trendType="line"
         trendColor={colors.info}
-        note="Chronic training adaptation — moves slowly, climbs with consistent training, decays slowly when you stop. The diff vs fatigue tells you whether you're peaking or burning out."
+        trendEmpty="Wear your HR device and log workouts to start your fitness trend."
+        note="Chronic Training Load — 42-day exponentially-weighted average of daily Banister TRIMP. Moves slowly. The gap vs fatigue (CTL − ATL = TSB) tells you whether you're peaking or burning out. Same metric Zepp surfaces as 'Niveau de forme'."
       />
       <SimpleMetricDetail
         visible={detail === 'trainingStatus'}
         onClose={() => setDetail(null)}
         eyebrow="Effort"
-        title="Training status"
-        value={`${trainingStatus.current >= 0 ? '+' : ''}${trainingStatus.current}`}
-        status={trainingStatus.label.toUpperCase()}
-        trend={trainingStatus.trend7Days.map((p) => p.value)}
-        trendLabels={WEEKDAYS}
+        title="Training status (TSB)"
+        value={tsbNow != null ? `${tsbNow >= 0 ? '+' : ''}${tsbNow}` : '--'}
+        status={
+          calibrating
+            ? 'CALIBRATING'
+            : tsbTier
+              ? tsbTier.toUpperCase()
+              : 'NO DATA'
+        }
+        trend={tsbValues}
+        trendLabels={seriesLabels}
         trendType="bar"
         trendColor={colors.sleep}
-        note="Acute load minus 28-day chronic baseline. Negative = recovering, positive = loading. Aim to stay between −20 and +30 for sustainable progression."
+        trendEmpty="Wear your HR device and log workouts to start your training-status trend."
+        note="Training Stress Balance = CTL − ATL. Positive = freshness (rested / peaking); negative = productive overload (build phase). Tiers map to Zepp's Détendu / Énergique / Équilibré / Optimal / Surchargé."
       />
       <DailyActivityDetail
         visible={detail === 'daily'}
         onClose={() => setDetail(null)}
         today={today}
-        earnedMinutes={activities[0]?.earnedMinutes ?? 0}
+        earnedMinutes={dailyEarned}
       />
       <WorkoutDetail
         visible={detail === 'workout'}
@@ -348,7 +400,13 @@ export function HomeEffort() {
           setActiveWorkout(null);
         }}
         log={activeWorkout}
-        earnedMinutes={activities.find((a) => a.kind === 'workout')?.earnedMinutes}
+        earnedMinutes={
+          activeWorkout
+            ? activities.find(
+                (a) => a.kind === 'workout' && a.workoutLogId === activeWorkout.id,
+              )?.earnedMinutes
+            : undefined
+        }
       />
     </ScrollView>
   );
@@ -425,5 +483,11 @@ const styles = StyleSheet.create({
     fontSize: typography.size.lg,
     fontWeight: typography.weight.bold,
     color: colors.accent,
+  },
+  empty: {
+    fontSize: typography.size.sm,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    paddingVertical: spacing.lg,
   },
 });

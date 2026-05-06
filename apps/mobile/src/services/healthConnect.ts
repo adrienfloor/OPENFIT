@@ -109,6 +109,12 @@ export type TodayDailyStats = DailyHealth & {
   sleepRegularityPercent: number | null;
   /** 7-day series for the Sleep sub-tab charts. */
   sleepDashboardData: SleepDashboardData;
+  /**
+   * Last 7 days of PMC values (oldest → newest, today last). Drives the
+   * Effort sub-tab fatigue / fitness / training-status sparklines —
+   * `atl` = fatigue, `ctl` = fitness, `tsb` = training-status balance.
+   */
+  pmcSeries7Days: { date: Date; ctl: number; atl: number; tsb: number }[];
 };
 import {
   computeBMR,
@@ -475,6 +481,7 @@ export async function getDailyStats(
         sleepHRTrend: [],
         breathingTrend: [],
       },
+      pmcSeries7Days: [],
     });
 
     // Unused but available: avgSpO2
@@ -1245,6 +1252,21 @@ export async function getTodayDashboard(
     trimp: d.dailyTrimp,
   }));
 
+  // Last 7 days of PMC values for the Effort sub-tab. Map the rolling
+  // pmc.series (one entry per input TRIMP day) onto calendar dates by
+  // index from the trimpHistory42d source if supplied, else from `range`.
+  const pmcDates: Date[] =
+    trimpHistory42d && trimpHistory42d.length === pmc.series.length
+      ? trimpHistory42d.map((d) => new Date(d.date))
+      : range.map((d) => d.date);
+  const tail = Math.min(7, pmc.series.length);
+  const pmcSeries7Days = pmc.series.slice(-tail).map((s, i) => ({
+    date: pmcDates[pmcDates.length - tail + i] ?? new Date(),
+    ctl: s.ctl,
+    atl: s.atl,
+    tsb: s.tsb,
+  }));
+
   const paiHistory7Days = range.map((d) => ({
     date: d.date,
     pai: d.dailyPAI,
@@ -1293,6 +1315,7 @@ export async function getTodayDashboard(
     bioChargeEvents: events,
     recoveryHistory7Days,
     sleepDashboardData,
+    pmcSeries7Days,
   };
 }
 

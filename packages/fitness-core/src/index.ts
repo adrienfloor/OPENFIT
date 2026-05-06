@@ -1,3 +1,4 @@
+export * from './biocharge';
 export * from './bmr';
 export * from './calories';
 export * from './coach-adjust';

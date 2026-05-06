@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { DetailModal } from '../../../components/DetailModal';
 import { Hypnogram } from '../../../components/charts/Hypnogram';
-import type { SleepDashboard } from '../../../mocks';
+import type { SleepDashboard } from '../../../types/sleep';
 import { colors, spacing, radii, typography } from '../../../theme';
 
 interface Props {

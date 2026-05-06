@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Rect } from 'react-native-svg';
-import type { RegularityRange } from '../../mocks';
+import type { RegularityRange } from '../../types/sleep';
 import { colors, spacing, typography } from '../../theme';
 
 interface Props {

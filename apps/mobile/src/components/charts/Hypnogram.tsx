@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Rect } from 'react-native-svg';
-import type { SleepStage, SleepStageSegment } from '../../mocks';
+import type { SleepStage, SleepStageSegment } from '../../types/sleep';
 import { colors, spacing, typography } from '../../theme';
 
 interface Props {

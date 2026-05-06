@@ -90,6 +90,25 @@ export type TodayDailyStats = DailyHealth & {
     hrv: number | null;
     rhr: number | null;
   }[];
+  /** Last night's stage timeline (offsets in minutes since session start). */
+  sleepStageTimeline: {
+    stage: 'awake' | 'light' | 'deep' | 'rem';
+    startMinute: number;
+    endMinute: number;
+  }[];
+  /** Last night's sleep session bounds. */
+  sleepStartTime: Date | null;
+  sleepEndTime: Date | null;
+  /** Stage-level minute breakdown for last night. */
+  sleepDeepMinutes: number | null;
+  sleepRemMinutes: number | null;
+  sleepLightMinutes: number | null;
+  sleepAwakeMinutes: number | null;
+  sleepAwakeningCount: number | null;
+  /** 0-100 bedtime-regularity score over the last 7 days, or null when <3 nights. */
+  sleepRegularityPercent: number | null;
+  /** 7-day series for the Sleep sub-tab charts. */
+  sleepDashboardData: SleepDashboardData;
 };
 import {
   computeBMR,
@@ -182,6 +201,7 @@ const REQUIRED_PERMISSIONS = [
   { accessType: 'read', recordType: 'Distance' },
   { accessType: 'read', recordType: 'ElevationGained' },
   { accessType: 'read', recordType: 'Weight' },
+  { accessType: 'read', recordType: 'RespiratoryRate' },
   // ExerciseRoute is not a separately-requestable read permission in
   // react-native-health-connect — the manifest's READ_EXERCISE_ROUTE is
   // honored automatically alongside ExerciseSession reads, and listing it
@@ -440,6 +460,21 @@ export async function getDailyStats(
       bioChargeIntraday: [],
       bioChargeEvents: [],
       recoveryHistory7Days: [],
+      sleepStageTimeline: sleep?.stageTimeline ?? [],
+      sleepStartTime: sleep?.startTime ?? null,
+      sleepEndTime: sleep?.endTime ?? null,
+      sleepDeepMinutes: sleep?.deepMinutes ?? null,
+      sleepRemMinutes: sleep?.remMinutes ?? null,
+      sleepLightMinutes: sleep?.lightMinutes ?? null,
+      sleepAwakeMinutes: sleep?.awakeMinutes ?? null,
+      sleepAwakeningCount: sleep?.awakeningCount ?? null,
+      sleepRegularityPercent: regularity,
+      sleepDashboardData: {
+        durationTrend: [],
+        regularityTrend: [],
+        sleepHRTrend: [],
+        breathingTrend: [],
+      },
     });
 
     // Unused but available: avgSpO2
@@ -467,6 +502,9 @@ export async function getSleepSummary(
   awakeMinutes: number;
   /** Count of contiguous awake segments during the session. */
   awakeningCount: number;
+  /** Per-stage timeline (offsets in minutes since session start). Empty
+   *  array when the device only logged a coarse "asleep" segment. */
+  stageTimeline: SleepStageSegmentDTO[];
 } | null> {
   assertInitialized();
 
@@ -509,13 +547,17 @@ export async function getSleepSummary(
   let awakeMinutes = 0;
   let awakeningCount = 0;
   let prevAwake = false;
+  const stageTimeline: SleepStageSegmentDTO[] = [];
 
   if (session.stages) {
+    const sessionStartMs = start.getTime();
     for (const stage of session.stages) {
-      const stageMs =
-        new Date(stage.endTime).getTime() -
-        new Date(stage.startTime).getTime();
+      const stageStartMs = new Date(stage.startTime).getTime();
+      const stageEndMs = new Date(stage.endTime).getTime();
+      const stageMs = stageEndMs - stageStartMs;
       const stageMins = Math.round(stageMs / 60000);
+      const startMinute = Math.max(0, (stageStartMs - sessionStartMs) / 60000);
+      const endMinute = Math.max(startMinute, (stageEndMs - sessionStartMs) / 60000);
 
       // Health Connect sleep stage constants
       // 1 = Awake, 2 = Sleeping, 3 = Out of bed, 4 = Light, 5 = Deep, 6 = REM
@@ -523,20 +565,29 @@ export async function getSleepSummary(
       if (isAwake && !prevAwake) awakeningCount++;
       prevAwake = isAwake;
 
+      let stageKey: 'awake' | 'light' | 'deep' | 'rem' | null = null;
       switch (stage.stage) {
         case 1:
         case 3:
           awakeMinutes += stageMins;
+          stageKey = 'awake';
           break;
+        case 2:
         case 4:
           lightMinutes += stageMins;
+          stageKey = 'light';
           break;
         case 5:
           deepMinutes += stageMins;
+          stageKey = 'deep';
           break;
         case 6:
           remMinutes += stageMins;
+          stageKey = 'rem';
           break;
+      }
+      if (stageKey) {
+        stageTimeline.push({ stage: stageKey, startMinute, endMinute });
       }
     }
   }
@@ -555,7 +606,14 @@ export async function getSleepSummary(
     lightMinutes,
     awakeMinutes,
     awakeningCount,
+    stageTimeline,
   };
+}
+
+interface SleepStageSegmentDTO {
+  stage: 'awake' | 'light' | 'deep' | 'rem';
+  startMinute: number;
+  endMinute: number;
 }
 
 /**
@@ -613,6 +671,207 @@ export async function getSleepRegularity(
   const stdMinutes = Math.sqrt(variance);
 
   return Math.round(Math.max(0, Math.min(100, 100 * (1 - stdMinutes / 180))));
+}
+
+export interface SleepDashboardData {
+  durationTrend: {
+    date: Date;
+    deepMinutes: number;
+    remMinutes: number;
+    lightMinutes: number;
+    awakeMinutes: number;
+  }[];
+  regularityTrend: {
+    date: Date;
+    /** Bedtime as minutes since 21:00 prior. */
+    bedtimeMinutes: number;
+    /** Wake time as minutes since 21:00 prior. */
+    wakeMinutes: number;
+  }[];
+  sleepHRTrend: { date: Date; value: number }[];
+  breathingTrend: { date: Date; value: number }[];
+}
+
+/**
+ * Build the 7-day series powering the Sleep sub-tab charts. Reads sleep
+ * sessions, HR records, and respiratory-rate records over an 8-day window
+ * (to cover the previous night for the oldest entry), then buckets per
+ * night-of-sleep.
+ *
+ * Falls back to empty arrays when permissions aren't granted, no source
+ * is connected, or no data falls in the window. Each subarray is ordered
+ * oldest → newest with one entry per recorded night (≤ 7).
+ */
+export async function getSleepDashboardData(
+  endDate: Date = new Date(),
+): Promise<SleepDashboardData> {
+  assertInitialized();
+
+  const end = endOfDay(endDate);
+  const start = new Date(end);
+  start.setDate(start.getDate() - 7);
+  start.setHours(0, 0, 0, 0);
+
+  const [sleepRes, hrRes, respRes] = await Promise.all([
+    readRecords('SleepSession', {
+      timeRangeFilter: {
+        operator: 'between' as const,
+        startTime: start.toISOString(),
+        endTime: end.toISOString(),
+      },
+    }).catch(() => ({ records: [] as Array<{
+      startTime: string;
+      endTime: string;
+      stages?: Array<{ stage: number; startTime: string; endTime: string }>;
+    }> })),
+    readRecords('HeartRate', {
+      timeRangeFilter: {
+        operator: 'between' as const,
+        startTime: start.toISOString(),
+        endTime: end.toISOString(),
+      },
+    }).catch(() => ({ records: [] as Array<{
+      samples: Array<{ time: string; beatsPerMinute: number }>;
+    }> })),
+    readRecords('RespiratoryRate', {
+      timeRangeFilter: {
+        operator: 'between' as const,
+        startTime: start.toISOString(),
+        endTime: end.toISOString(),
+      },
+    }).catch(() => ({ records: [] as Array<{ time: string; rate: number }> })),
+  ]);
+
+  // Bucket sleep sessions by their wake date (one main session per night —
+  // pick the longest if multiple). Key on YYYY-MM-DD of session.endTime.
+  const sessionsByWakeDate = new Map<
+    string,
+    { startTime: Date; endTime: Date; stages: typeof sleepRes.records[number]['stages'] }
+  >();
+  for (const r of sleepRes.records) {
+    const sStart = new Date(r.startTime);
+    const sEnd = new Date(r.endTime);
+    const durationMs = sEnd.getTime() - sStart.getTime();
+    if (durationMs <= 0) continue;
+    const key = sEnd.toISOString().slice(0, 10);
+    const existing = sessionsByWakeDate.get(key);
+    if (!existing || durationMs > existing.endTime.getTime() - existing.startTime.getTime()) {
+      sessionsByWakeDate.set(key, { startTime: sStart, endTime: sEnd, stages: r.stages });
+    }
+  }
+
+  // Flatten HR samples once for night-window averaging.
+  const allHRSamples: { time: number; bpm: number }[] = [];
+  for (const rec of hrRes.records) {
+    for (const s of rec.samples) {
+      allHRSamples.push({ time: new Date(s.time).getTime(), bpm: s.beatsPerMinute });
+    }
+  }
+  allHRSamples.sort((a, b) => a.time - b.time);
+
+  const respSamples = respRes.records
+    .map((r) => ({ time: new Date(r.time).getTime(), rate: r.rate }))
+    .sort((a, b) => a.time - b.time);
+
+  const durationTrend: SleepDashboardData['durationTrend'] = [];
+  const regularityTrend: SleepDashboardData['regularityTrend'] = [];
+  const sleepHRTrend: SleepDashboardData['sleepHRTrend'] = [];
+  const breathingTrend: SleepDashboardData['breathingTrend'] = [];
+
+  const sortedKeys = [...sessionsByWakeDate.keys()].sort(); // oldest → newest
+
+  for (const key of sortedKeys) {
+    const session = sessionsByWakeDate.get(key)!;
+    const startMs = session.startTime.getTime();
+    const endMs = session.endTime.getTime();
+    const wakeDate = new Date(session.endTime);
+    wakeDate.setHours(0, 0, 0, 0);
+
+    // Stage minutes for the duration trend.
+    let deep = 0;
+    let rem = 0;
+    let light = 0;
+    let awake = 0;
+    if (session.stages) {
+      for (const stage of session.stages) {
+        const mins = Math.round(
+          (new Date(stage.endTime).getTime() - new Date(stage.startTime).getTime()) / 60000,
+        );
+        switch (stage.stage) {
+          case 1:
+          case 3:
+            awake += mins;
+            break;
+          case 2:
+          case 4:
+            light += mins;
+            break;
+          case 5:
+            deep += mins;
+            break;
+          case 6:
+            rem += mins;
+            break;
+        }
+      }
+    } else {
+      // No stage detail — count the whole session as light sleep.
+      light = Math.round((endMs - startMs) / 60000);
+    }
+    durationTrend.push({
+      date: wakeDate,
+      deepMinutes: deep,
+      remMinutes: rem,
+      lightMinutes: light,
+      awakeMinutes: awake,
+    });
+
+    // Bedtime / wake — minutes since 21:00 the prior evening.
+    const minutesSince21 = (d: Date): number => {
+      const hr = d.getHours();
+      const m = d.getMinutes();
+      // 21:00 previous evening = anchor. If d.hours >= 21 it's the same day,
+      // otherwise it's the morning side and we add 24h.
+      const offset = hr >= 21 ? 0 : 24 * 60;
+      return hr * 60 + m - 21 * 60 + offset;
+    };
+    regularityTrend.push({
+      date: wakeDate,
+      bedtimeMinutes: minutesSince21(session.startTime),
+      wakeMinutes: minutesSince21(session.endTime),
+    });
+
+    // Sleep HR average within the session window.
+    let hrSum = 0;
+    let hrCount = 0;
+    for (const s of allHRSamples) {
+      if (s.time < startMs) continue;
+      if (s.time > endMs) break;
+      hrSum += s.bpm;
+      hrCount++;
+    }
+    if (hrCount > 0) {
+      sleepHRTrend.push({ date: wakeDate, value: Math.round(hrSum / hrCount) });
+    }
+
+    // Breathing rate average within the same window.
+    let respSum = 0;
+    let respCount = 0;
+    for (const s of respSamples) {
+      if (s.time < startMs) continue;
+      if (s.time > endMs) break;
+      respSum += s.rate;
+      respCount++;
+    }
+    if (respCount > 0) {
+      breathingTrend.push({
+        date: wakeDate,
+        value: Math.round((respSum / respCount) * 10) / 10,
+      });
+    }
+  }
+
+  return { durationTrend, regularityTrend, sleepHRTrend, breathingTrend };
 }
 
 /**
@@ -999,6 +1258,16 @@ export async function getTodayDashboard(
       ? weightHistory30Days[weightHistory30Days.length - 1]!.kg
       : null;
 
+  // 7-day sleep dashboard (duration / regularity / sleep HR / breathing).
+  const sleepDashboardData = await getSleepDashboardData(today).catch(
+    () => ({
+      durationTrend: [],
+      regularityTrend: [],
+      sleepHRTrend: [],
+      breathingTrend: [],
+    } as SleepDashboardData),
+  );
+
   return {
     ...todayRecord,
     effortScore: rescaledEffortScore,
@@ -1023,6 +1292,7 @@ export async function getTodayDashboard(
     bioChargeIntraday: intraday,
     bioChargeEvents: events,
     recoveryHistory7Days,
+    sleepDashboardData,
   };
 }
 

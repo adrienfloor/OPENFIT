@@ -59,6 +59,12 @@ export type TodayDailyStats = DailyHealth & {
   trainingStatusCalibrating: boolean;
   /** Number of days with non-zero TRIMP data in the 42-day window — for "X/14 days" copy. */
   trainingStatusDaysWithData: number;
+  /** Today's PAI contribution (HUNT study indicator). */
+  dailyPAI: number | null;
+  /** Rolling 7-day PAI total. Target 100 (HUNT cardiovascular threshold). */
+  weeklyPAI: number | null;
+  /** Last 7 days of daily PAI (oldest → newest, today last). */
+  paiHistory7Days: { date: Date; pai: number | null }[];
 };
 import {
   computeBMR,
@@ -72,6 +78,8 @@ import {
   recentTrainingLoad,
   personalisedEffortTarget,
   dailyTrimp,
+  dailyPAI,
+  weeklyPAI,
   computePMC,
   dailyEffortTarget,
   type TrainingStatusTier,
@@ -349,6 +357,16 @@ export async function getDailyStats(
           })
         : null;
 
+    // HUNT PAI — same HR samples, public-health intensity tiers.
+    const paiToday =
+      latestRestingHR && maxHR !== null && hrSamples.length >= 2
+        ? dailyPAI({
+            samples: hrSamples,
+            restingHR: latestRestingHR,
+            maxHR,
+          })
+        : null;
+
     results.push({
       id: `hc-${dayStart.toISOString().slice(0, 10)}`,
       date: dayStart,
@@ -375,6 +393,9 @@ export async function getDailyStats(
       trainingStatusTier: null,
       trainingStatusCalibrating: true,
       trainingStatusDaysWithData: 0,
+      dailyPAI: paiToday,
+      weeklyPAI: null,
+      paiHistory7Days: [],
     });
 
     // Unused but available: avgSpO2
@@ -768,6 +789,12 @@ export async function getTodayDashboard(
     trimp: d.dailyTrimp,
   }));
 
+  const paiHistory7Days = range.map((d) => ({
+    date: d.date,
+    pai: d.dailyPAI,
+  }));
+  const paiTotal = weeklyPAI(paiHistory7Days.map((d) => d.pai));
+
   return {
     ...todayRecord,
     effortScore: rescaledEffortScore,
@@ -783,6 +810,8 @@ export async function getTodayDashboard(
     trainingStatusTier: pmc.tier,
     trainingStatusCalibrating: pmc.calibrating,
     trainingStatusDaysWithData: trimpSeries.filter((t) => t > 0).length,
+    weeklyPAI: paiTotal,
+    paiHistory7Days,
   };
 }
 

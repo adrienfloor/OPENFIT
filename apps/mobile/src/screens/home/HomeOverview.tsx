@@ -16,7 +16,7 @@ import { NutritionCard } from '../../components/NutritionCard';
 import { AIInsightCard } from '../../components/AIInsightCard';
 import { MetricRow } from '../../components/MetricRow';
 import { MetricCard } from '../../components/MetricCard';
-import { useMockPAI, useMockWeight } from '../../mocks';
+import { useMockWeight } from '../../mocks';
 import { computeEffortLoad } from '../../utils/effortLoad';
 import {
   computeTrainingStatus,
@@ -86,7 +86,8 @@ export function HomeOverview() {
     today?.trainingStatusCalibrating ?? false,
   );
   const trainingStatus: TrainingStatusView = computeTrainingStatus(today);
-  const pai = useMockPAI();
+  const weeklyPaiTotal = today?.weeklyPAI ?? null;
+  const todayPai = today?.dailyPAI ?? null;
   const weight = useMockWeight();
   const { data: fitnessAgeData } = useFitnessAge();
 
@@ -242,9 +243,15 @@ export function HomeOverview() {
       <MetricCard
         title="PAI"
         icon="●"
-        value={`${pai.current}`}
-        subtitle={`+${pai.todayDelta} PAI today`}
-        progress={Math.min(1, pai.current / 200)}
+        value={weeklyPaiTotal != null ? `${weeklyPaiTotal}` : '--'}
+        subtitle={
+          todayPai != null
+            ? `+${todayPai} PAI today · target 100/wk`
+            : 'HUNT cardiovascular indicator'
+        }
+        progress={
+          weeklyPaiTotal != null ? Math.min(1, weeklyPaiTotal / 200) : 0
+        }
         progressColor={colors.accent}
         onPress={() => setDetail('pai')}
       />
@@ -395,13 +402,26 @@ export function HomeOverview() {
         onClose={close}
         eyebrow="Activity"
         title="PAI"
-        value={`${pai.current}`}
-        status={`+${pai.todayDelta} TODAY`}
-        trend={pai.trend7Days.map((p) => p.value)}
+        value={weeklyPaiTotal != null ? `${weeklyPaiTotal}` : '--'}
+        unit="7d total"
+        status={
+          weeklyPaiTotal == null
+            ? 'NO DATA'
+            : weeklyPaiTotal >= 100
+              ? 'PROTECTIVE'
+              : weeklyPaiTotal >= 50
+                ? 'BUILDING'
+                : 'BELOW TARGET'
+        }
+        trend={
+          today?.paiHistory7Days?.map((p) => Math.round(p.pai ?? 0)) ?? []
+        }
         trendLabels={WEEKDAYS}
-        trendType="line"
+        trendType="bar"
         trendColor={colors.accent}
-        note="Personal Activity Intelligence — a 7-day rolling score weighting time spent in each HR zone. 100+ is the all-cause-mortality sweet spot."
+        trendTitle="Last 7 days"
+        trendEmpty="Wear your HR device — PAI accumulates with any activity above 50% HRR."
+        note="Personal Activity Intelligence — published by the HUNT Fitness Study (Nes et al., 230k participants). Weights minutes by intensity tier (light/moderate/vigorous) and rolls them up over 7 days. Maintaining ≥ 100 PAI/week is associated with substantially reduced cardiovascular mortality risk."
       />
       <WeightDetail visible={detail === 'weight'} onClose={close} />
       <FitnessAgeDetail

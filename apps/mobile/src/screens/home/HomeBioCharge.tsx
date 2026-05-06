@@ -17,10 +17,11 @@ import {
 } from '../../components/charts/IntradayLineChart';
 import { SparkBars } from '../../components/charts/SparkBars';
 import { SparkLine } from '../../components/charts/SparkLine';
-import { useMockBioCharge } from '../../mocks';
 import { colors, spacing, radii, typography, themedRefresh } from '../../theme';
 
-const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const WEEKDAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const weekdayLetter = (p: { date: Date }): string =>
+  WEEKDAY_LETTERS[p.date.getDay()]!;
 
 function bioChargeTier(score: number): string {
   if (score >= 80) return 'FULL';
@@ -50,7 +51,6 @@ function formatTime(d: Date): string {
  */
 export function HomeBioCharge() {
   const { today, refetch, hasEverLoaded, healthConnectAvailable, permissionsGranted } = useDailyStats();
-  const dashboard = useMockBioCharge(today?.recoveryScore ?? null);
   const [explainerOpen, setExplainerOpen] = useState(false);
   const [pulling, setPulling] = useState(false);
   const onPullRefresh = async () => {
@@ -62,11 +62,18 @@ export function HomeBioCharge() {
     return <HomeLoadingOverlay />;
   }
 
-  const tier = bioChargeTier(dashboard.current);
-  const lastUpdated = `Updated ${formatTime(dashboard.lastUpdated)}`;
+  const currentScore = today?.recoveryScore ?? 0;
+  const wakeScore = today?.wakeBioChargeScore ?? currentScore;
+  const sleepContributionPoints = today?.sleepContributionPoints ?? 0;
+  const events = today?.bioChargeEvents ?? [];
+  const intradayPoints = today?.bioChargeIntraday ?? [];
+  const recoveryHistory = today?.recoveryHistory7Days ?? [];
+
+  const tier = bioChargeTier(currentScore);
+  const lastUpdated = `Updated ${formatTime(new Date())}`;
 
   // Sleep + workout shading bands for the intraday chart.
-  const intradayWindows: IntradayWindow[] = dashboard.events.map((e) => ({
+  const intradayWindows: IntradayWindow[] = events.map((e) => ({
     startMinute: e.startTime.getHours() * 60 + e.startTime.getMinutes(),
     endMinute: e.endTime.getHours() * 60 + e.endTime.getMinutes(),
     tone: e.kind === 'sleep' ? 'sleep' : 'workout',
@@ -82,7 +89,7 @@ export function HomeBioCharge() {
       {/* Hero ring */}
       <View style={styles.heroWrap}>
         <HeroRing
-          score={dashboard.current}
+          score={currentScore}
           color={colors.bioCharge}
           tier={tier}
           subtitle={lastUpdated}
@@ -98,7 +105,7 @@ export function HomeBioCharge() {
       <Text style={styles.sectionLabel}>BioCharge through the day</Text>
       <View style={styles.card}>
         <IntradayLineChart
-          data={dashboard.intraday}
+          data={intradayPoints}
           windows={intradayWindows}
           color={colors.bioCharge}
           yMin={0}
@@ -114,21 +121,28 @@ export function HomeBioCharge() {
       <Text style={styles.sectionLabel}>Wake</Text>
       <View style={styles.wakeCard}>
         <View style={styles.wakeMain}>
-          <Text style={styles.wakeValue}>{dashboard.wakeScore}</Text>
-          <Text style={styles.wakeUnit}>OPTIMAL</Text>
+          <Text style={styles.wakeValue}>{wakeScore}</Text>
+          <Text style={styles.wakeUnit}>{bioChargeTier(wakeScore)}</Text>
         </View>
-        <View style={styles.wakeContribution}>
-          <View style={styles.contribDot} />
-          <Text style={styles.contribLabel}>Sleep</Text>
-          <Text style={styles.contribDelta}>
-            +{dashboard.sleepContribution}
-          </Text>
-        </View>
+        {sleepContributionPoints > 0 ? (
+          <View style={styles.wakeContribution}>
+            <View style={styles.contribDot} />
+            <Text style={styles.contribLabel}>Sleep</Text>
+            <Text style={styles.contribDelta}>+{sleepContributionPoints}</Text>
+          </View>
+        ) : null}
       </View>
 
       {/* Daily events */}
       <Text style={styles.sectionLabel}>Daily events</Text>
-      {dashboard.events.map((e, i) => {
+      {events.length === 0 ? (
+        <View style={styles.card}>
+          <Text style={styles.emptyEvents}>
+            No sleep or workouts logged yet today.
+          </Text>
+        </View>
+      ) : null}
+      {events.map((e, i) => {
         const positive = e.delta >= 0;
         return (
           <View key={i} style={[styles.eventRow, positive && styles.eventRowPositive]}>
@@ -158,9 +172,9 @@ export function HomeBioCharge() {
       <Text style={styles.sectionLabel}>Wake BioCharge — last 7 days</Text>
       <View style={styles.card}>
         <SparkBars
-          values={dashboard.wakeTrend7Days.map((p) => p.value)}
+          values={recoveryHistory.map((p) => Math.round(p.recoveryScore ?? 0))}
           color={colors.bioCharge}
-          labels={WEEKDAYS}
+          labels={recoveryHistory.map(weekdayLetter)}
           showValues
           height={120}
         />
@@ -169,9 +183,9 @@ export function HomeBioCharge() {
       <Text style={styles.sectionLabel}>Heart rate variability — last 7 days</Text>
       <View style={styles.card}>
         <SparkLine
-          values={dashboard.hrvTrend7Days.map((p) => p.value)}
+          values={recoveryHistory.map((p) => Math.round(p.hrv ?? 0))}
           color={colors.danger}
-          labels={WEEKDAYS}
+          labels={recoveryHistory.map(weekdayLetter)}
           showValues
           height={140}
         />
@@ -180,9 +194,9 @@ export function HomeBioCharge() {
       <Text style={styles.sectionLabel}>Resting heart rate — last 7 days</Text>
       <View style={styles.card}>
         <SparkLine
-          values={dashboard.rhrTrend7Days.map((p) => p.value)}
+          values={recoveryHistory.map((p) => Math.round(p.rhr ?? 0))}
           color={colors.accent}
-          labels={WEEKDAYS}
+          labels={recoveryHistory.map(weekdayLetter)}
           showValues
           height={140}
         />
@@ -343,5 +357,10 @@ const styles = StyleSheet.create({
   eventDelta: {
     fontSize: typography.size.lg,
     fontWeight: typography.weight.bold,
+  },
+  emptyEvents: {
+    fontSize: typography.size.sm,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
 });

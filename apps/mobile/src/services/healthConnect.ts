@@ -69,6 +69,27 @@ export type TodayDailyStats = DailyHealth & {
   latestWeightKg: number | null;
   /** Last 30 days of body-weight readings (oldest → newest). */
   weightHistory30Days: { time: Date; kg: number }[];
+  /** Today's BioCharge at wake (peak before training drain). */
+  wakeBioChargeScore: number | null;
+  /** Sleep contribution to today's wake score (sleepScore × 0.30, rounded). */
+  sleepContributionPoints: number | null;
+  /** 24-hour BioCharge curve sampled every 30 minutes. */
+  bioChargeIntraday: { minute: number; value: number }[];
+  /** Today's BioCharge events (last sleep + workouts) ordered by start time. */
+  bioChargeEvents: {
+    kind: 'sleep' | 'workout';
+    label: string;
+    delta: number;
+    startTime: Date;
+    endTime: Date;
+  }[];
+  /** Last 7 days of recovery / HRV / RHR for the BioCharge trend charts. */
+  recoveryHistory7Days: {
+    date: Date;
+    recoveryScore: number | null;
+    hrv: number | null;
+    rhr: number | null;
+  }[];
 };
 import {
   computeBMR,
@@ -86,9 +107,20 @@ import {
   weeklyPAI,
   computePMC,
   dailyEffortTarget,
+  cumulativeEffortMinutes,
+  intradayBioCharge,
+  sleepContribution,
   type TrainingStatusTier,
   type EffortHRSample,
 } from '@openfit/fitness-core';
+
+const WORKOUT_LABEL: Record<string, string> = {
+  strength: 'Strength',
+  run: 'Run',
+  jiu_jitsu: 'Jiu-Jitsu',
+  martial_arts: 'Martial arts',
+  hc_imported: 'Workout',
+};
 
 export class HealthConnectError extends Error {
   constructor(message: string) {
@@ -403,6 +435,11 @@ export async function getDailyStats(
       paiHistory7Days: [],
       latestWeightKg: null,
       weightHistory30Days: [],
+      wakeBioChargeScore: null,
+      sleepContributionPoints: null,
+      bioChargeIntraday: [],
+      bioChargeEvents: [],
+      recoveryHistory7Days: [],
     });
 
     // Unused but available: avgSpO2
@@ -743,6 +780,18 @@ export async function getTodayDashboard(
    * the latest data.
    */
   trimpHistory42d?: { date: string; dailyTrimp: number | null }[] | null,
+  /**
+   * Today's workouts (subset of WorkoutLog) — used to build the daily
+   * events list on the BioCharge sub-tab. Each event renders as a row with
+   * a -BioCharge delta proportional to the session.
+   */
+  todaysWorkouts?: {
+    type: string;
+    startedAt: Date;
+    completedAt: Date | null;
+    durationSeconds: number | null;
+    caloriesBurned: number | null;
+  }[],
 ): Promise<TodayDailyStats | null> {
   const today = new Date();
   const sixDaysAgo = new Date();
@@ -828,6 +877,110 @@ export async function getTodayDashboard(
     todayEarnedMinutes: todayRecord.effortEarnedMinutes,
   });
 
+  // ─────────── BioCharge sub-tab — wake score, intraday, events, history
+  const wakeReadiness = readinessScore({
+    hrvToday: todayRecord.hrvRmssd,
+    hrvBaseline,
+    rhrToday: todayRecord.heartRateResting,
+    rhrBaseline,
+    sleepScore: todayRecord.sleepScore,
+    recentLoad: load,
+    baselineDays,
+    todayEarnedMinutes: 0, // pre-drain — this is the morning peak
+  });
+
+  const sleepWindow = await getSleepSummary(today).catch(() => null);
+  const wakeMinute =
+    sleepWindow?.endTime != null
+      ? sleepWindow.endTime.getHours() * 60 + sleepWindow.endTime.getMinutes()
+      : 8 * 60; // sensible default if no sleep data
+  const todayHRSamples = userProfile
+    ? await getDayHRSamples(today).catch(() => [] as EffortHRSample[])
+    : [];
+  const todayMaxHR = userProfile
+    ? calculateMaxHR(ageYearsFromDob(userProfile.dateOfBirth))
+    : null;
+  const cumEffort =
+    todayHRSamples.length >= 2 &&
+    todayRecord.heartRateResting != null &&
+    todayMaxHR != null
+      ? cumulativeEffortMinutes({
+          samples: todayHRSamples,
+          restingHR: todayRecord.heartRateResting,
+          maxHR: todayMaxHR,
+        })
+      : [];
+  const now = new Date();
+  const nowMinute = now.getHours() * 60 + now.getMinutes();
+  const intraday =
+    wakeReadiness.score != null
+      ? intradayBioCharge({
+          wakeScore: wakeReadiness.score,
+          wakeMinute,
+          effortByMinute: cumEffort,
+          nowMinute,
+        })
+      : [];
+
+  // Build today's events — last sleep + workouts.
+  const events: TodayDailyStats['bioChargeEvents'] = [];
+  if (sleepWindow) {
+    events.push({
+      kind: 'sleep',
+      label: 'Sleep',
+      delta: sleepContribution(todayRecord.sleepScore),
+      startTime: sleepWindow.startTime,
+      endTime: sleepWindow.endTime,
+    });
+  }
+  for (const w of todaysWorkouts ?? []) {
+    if (w.completedAt == null) continue;
+    // Drain heuristic: 0.3 BioCharge per minute of session — calibrated so
+    // a 60-min session ≈ -18 points, matching the readiness-drain coefficient
+    // applied to a typical effort-minutes contribution.
+    const durationMin =
+      w.durationSeconds != null ? w.durationSeconds / 60 : 30;
+    const drain = Math.round(durationMin * 0.3);
+    events.push({
+      kind: 'workout',
+      label: WORKOUT_LABEL[w.type] ?? 'Workout',
+      delta: -drain,
+      startTime: w.startedAt,
+      endTime: w.completedAt,
+    });
+  }
+  events.sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
+
+  // 7-day recovery + HRV + RHR history. Recovery for historical days is
+  // re-computed using the same baselines as today (no per-day baseline
+  // back-projection — fine for charting, the trend is the signal anyway).
+  const recoveryHistory7Days = range.map((d) => {
+    if (d === todayRecord) {
+      return {
+        date: d.date,
+        recoveryScore: wakeReadiness.score,
+        hrv: d.hrvRmssd,
+        rhr: d.heartRateResting,
+      };
+    }
+    const r = readinessScore({
+      hrvToday: d.hrvRmssd,
+      hrvBaseline,
+      rhrToday: d.heartRateResting,
+      rhrBaseline,
+      sleepScore: d.sleepScore,
+      recentLoad: 0,
+      baselineDays,
+      todayEarnedMinutes: 0,
+    });
+    return {
+      date: d.date,
+      recoveryScore: r.score,
+      hrv: d.hrvRmssd,
+      rhr: d.heartRateResting,
+    };
+  });
+
   const effortLoad7Days = range.map((d) => ({
     date: d.date,
     trimp: d.dailyTrimp,
@@ -865,6 +1018,11 @@ export async function getTodayDashboard(
     paiHistory7Days,
     latestWeightKg,
     weightHistory30Days,
+    wakeBioChargeScore: wakeReadiness.score,
+    sleepContributionPoints: sleepContribution(todayRecord.sleepScore),
+    bioChargeIntraday: intraday,
+    bioChargeEvents: events,
+    recoveryHistory7Days,
   };
 }
 

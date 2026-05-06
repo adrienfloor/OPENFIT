@@ -114,8 +114,8 @@ export const useDailyStatsStore = create<DailyStatsState>((set, get) => ({
               dateOfBirth: new Date(user.dateOfBirth),
             }
           : undefined;
-        const workoutKcalByDate = await fetchWorkoutKcalByDate().catch(
-          () => ({} as Record<string, number>),
+        const { workoutKcalByDate, todaysWorkouts } = await fetchWorkoutKcalByDate().catch(
+          () => ({ workoutKcalByDate: {} as Record<string, number>, todaysWorkouts: [] }),
         );
         // VO₂max feeds the cold-start fallback for dailyEffortTarget when CTL
         // hasn't matured yet. Best-effort — null if /metrics/fitness-age fails
@@ -139,6 +139,7 @@ export const useDailyStatsStore = create<DailyStatsState>((set, get) => ({
           workoutKcalByDate,
           fitnessAge?.vo2max ?? null,
           trimpHistory,
+          todaysWorkouts,
         );
 
         // Persist the 7 freshly computed daily TRIMP values so the next
@@ -181,18 +182,42 @@ export const useDailyStatsStore = create<DailyStatsState>((set, get) => ({
   },
 }));
 
-async function fetchWorkoutKcalByDate(): Promise<Record<string, number>> {
+interface WorkoutFetchResult {
+  workoutKcalByDate: Record<string, number>;
+  todaysWorkouts: {
+    type: string;
+    startedAt: Date;
+    completedAt: Date | null;
+    durationSeconds: number | null;
+    caloriesBurned: number | null;
+  }[];
+}
+
+async function fetchWorkoutKcalByDate(): Promise<WorkoutFetchResult> {
   const res = await apiClient.get<WorkoutLog[]>('/workouts/logs');
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 7);
+  const todayKey = new Date().toISOString().slice(0, 10);
 
   const map: Record<string, number> = {};
+  const todays: WorkoutFetchResult['todaysWorkouts'] = [];
   for (const log of res.data) {
-    if (log.completedAt == null || log.caloriesBurned == null) continue;
+    if (log.completedAt == null) continue;
     const completed = new Date(log.completedAt);
     if (completed < cutoff) continue;
     const key = completed.toISOString().slice(0, 10);
-    map[key] = (map[key] ?? 0) + log.caloriesBurned;
+    if (log.caloriesBurned != null) {
+      map[key] = (map[key] ?? 0) + log.caloriesBurned;
+    }
+    if (key === todayKey) {
+      todays.push({
+        type: log.type,
+        startedAt: new Date(log.startedAt),
+        completedAt: completed,
+        durationSeconds: log.durationSeconds,
+        caloriesBurned: log.caloriesBurned,
+      });
+    }
   }
-  return map;
+  return { workoutKcalByDate: map, todaysWorkouts: todays };
 }

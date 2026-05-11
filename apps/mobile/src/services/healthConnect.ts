@@ -1123,12 +1123,22 @@ export async function getTodayDashboard(
     ageYears,
   });
 
-  // Rescale today's effort ring against the new TRIMP target.
+  // Banister TRIMP counts every minute of HR > resting, so a fully sedentary
+  // day with the strap on still accumulates ~25–30 TRIMP. Subtract that baseline
+  // before scoring against the target so "did nothing today" reads as ~0 instead
+  // of inflating the ring. 30 matches the upper bound documented in trimp.ts
+  // for a sedentary day.
+  const SEDENTARY_TRIMP_BASELINE = 30;
+  const exerciseTrimp =
+    todayRecord.dailyTrimp !== null
+      ? Math.max(0, todayRecord.dailyTrimp - SEDENTARY_TRIMP_BASELINE)
+      : null;
+
   const rescaledEffortScore =
-    todayRecord.dailyTrimp !== null && personalisedTarget > 0
+    exerciseTrimp !== null && personalisedTarget > 0
       ? Math.min(
           100,
-          Math.round((todayRecord.dailyTrimp / personalisedTarget) * 100),
+          Math.round((exerciseTrimp / personalisedTarget) * 100),
         )
       : null;
 
@@ -1301,6 +1311,10 @@ export async function getTodayDashboard(
   return {
     ...todayRecord,
     effortScore: rescaledEffortScore,
+    // Caption X / Y matches the ring's metric: (dailyTrimp − sedentary baseline)
+    // over the personalised target. Not the PAI earned minutes that ...todayRecord
+    // would otherwise spread in, which counts a different threshold entirely.
+    effortEarnedMinutes: exerciseTrimp,
     effortTargetMinutes: personalisedTarget,
     recoveryScore: readiness.score,
     readinessCalibrating: readiness.calibrating,

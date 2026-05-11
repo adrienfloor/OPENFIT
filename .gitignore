@@ -37,7 +37,6 @@ packages/db/node_modules/.prisma/
 # Mobile build artifacts
 apps/mobile/ios/
 apps/mobile/android/
-apps/mobile/assets/icon.png
 
 # Uploaded user content (food photos, etc.) — local dev only.
 apps/api/uploads/

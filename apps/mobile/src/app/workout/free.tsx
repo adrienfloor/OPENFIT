@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { apiClient } from '../../services/api';
 import { useAuthStore } from '../../stores/auth.store';
 import { useRealtimeHeartRate } from '../../hooks/useRealtimeHeartRate';
+import { BLEDevicePicker } from '../../components/BLEDevicePicker';
 import {
   calculateMaxHR,
   computeCaloriesFromHRSamples,
@@ -27,7 +28,8 @@ function HeartRateLive({
     samples: Array<{ timestamp: Date; bpm: number; zone: string }>;
   }>;
 }) {
-  const { bpm, zone, connectionState, samples } = useRealtimeHeartRate(maxHR);
+  const { bpm, zone, connectionState, samples, scannedDevices, pickDevice } =
+    useRealtimeHeartRate(maxHR);
 
   useEffect(() => {
     if (bpm !== null) {
@@ -52,7 +54,13 @@ function HeartRateLive({
     'Waiting...';
 
   return (
-    <View style={styles.hrSection}>
+    <>
+      <BLEDevicePicker
+        visible={scannedDevices.length >= 2 && connectionState === 'scanning'}
+        devices={scannedDevices}
+        onPick={pickDevice}
+      />
+      <View style={styles.hrSection}>
       <View style={styles.hrRow}>
         <View style={styles.hrStatBox}>
           <Text style={styles.hrStatLabel}>Current</Text>
@@ -86,7 +94,8 @@ function HeartRateLive({
       {connectionState !== 'connected' && (
         <Text style={styles.hrConnectionStatus}>{stateLabel}</Text>
       )}
-    </View>
+      </View>
+    </>
   );
 }
 

@@ -4,6 +4,7 @@ import { DetailModal } from '../../../../components/DetailModal';
 import { SparkLine } from '../../../../components/charts/SparkLine';
 import { useAuth } from '../../../../hooks/useAuth';
 import { useRealtimeHeartRate } from '../../../../hooks/useRealtimeHeartRate';
+import { BLEDevicePicker } from '../../../../components/BLEDevicePicker';
 import type { TodayDailyStats } from '../../../../services/healthConnect';
 import { colors, spacing, radii, typography } from '../../../../theme';
 
@@ -86,7 +87,8 @@ function LiveHRPanel() {
   const maxHR = user?.dateOfBirth
     ? calculateMaxHR(ageYearsFromDob(new Date(user.dateOfBirth)))
     : 190;
-  const { bpm, zone, connectionState } = useRealtimeHeartRate(maxHR);
+  const { bpm, zone, connectionState, scannedDevices, pickDevice } =
+    useRealtimeHeartRate(maxHR);
 
   const stateLabel =
     connectionState === 'scanning' ? 'Scanning for HR device…'
@@ -104,22 +106,29 @@ function LiveHRPanel() {
   const zoneLabel = zone ? zone.replace('_', ' ').toUpperCase() : null;
 
   return (
-    <View style={styles.liveCard}>
-      <View style={styles.liveHeader}>
-        <View style={styles.liveTitleRow}>
-          <View style={[styles.liveDot, { backgroundColor: dotColor }]} />
-          <Text style={styles.liveLabel}>Live heart rate</Text>
+    <>
+      <BLEDevicePicker
+        visible={scannedDevices.length >= 2 && connectionState === 'scanning'}
+        devices={scannedDevices}
+        onPick={pickDevice}
+      />
+      <View style={styles.liveCard}>
+        <View style={styles.liveHeader}>
+          <View style={styles.liveTitleRow}>
+            <View style={[styles.liveDot, { backgroundColor: dotColor }]} />
+            <Text style={styles.liveLabel}>Live heart rate</Text>
+          </View>
+          <Text style={styles.liveState}>{stateLabel}</Text>
         </View>
-        <Text style={styles.liveState}>{stateLabel}</Text>
+        <View style={styles.liveValueRow}>
+          <Text style={styles.liveValue}>{bpm ?? '--'}</Text>
+          <Text style={styles.liveUnit}>bpm</Text>
+          {zoneLabel ? (
+            <Text style={styles.liveZone}>{zoneLabel}</Text>
+          ) : null}
+        </View>
       </View>
-      <View style={styles.liveValueRow}>
-        <Text style={styles.liveValue}>{bpm ?? '--'}</Text>
-        <Text style={styles.liveUnit}>bpm</Text>
-        {zoneLabel ? (
-          <Text style={styles.liveZone}>{zoneLabel}</Text>
-        ) : null}
-      </View>
-    </View>
+    </>
   );
 }
 

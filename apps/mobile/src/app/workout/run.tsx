@@ -10,6 +10,7 @@ import { useRouter } from 'expo-router';
 import { apiClient } from '../../services/api';
 import { useAuthStore } from '../../stores/auth.store';
 import { useRealtimeHeartRate } from '../../hooks/useRealtimeHeartRate';
+import { BLEDevicePicker } from '../../components/BLEDevicePicker';
 import {
   calculateMaxHR,
   computeCaloriesFromHRSamples,
@@ -37,7 +38,8 @@ function formatPace(secondsPerKm: number): string {
 }
 
 function HeartRateDisplay({ maxHR, avgHrRef }: { maxHR: number; avgHrRef: React.MutableRefObject<{ total: number; count: number; samples: Array<{ timestamp: Date; bpm: number; zone: string }> }> }) {
-  const { bpm, zone, connectionState, samples } = useRealtimeHeartRate(maxHR);
+  const { bpm, zone, connectionState, samples, scannedDevices, pickDevice } =
+    useRealtimeHeartRate(maxHR);
 
   // Track average HR
   useEffect(() => {
@@ -61,7 +63,13 @@ function HeartRateDisplay({ maxHR, avgHrRef }: { maxHR: number; avgHrRef: React.
     '';
 
   return (
-    <View style={styles.hrSection}>
+    <>
+      <BLEDevicePicker
+        visible={scannedDevices.length >= 2 && connectionState === 'scanning'}
+        devices={scannedDevices}
+        onPick={pickDevice}
+      />
+      <View style={styles.hrSection}>
       <View style={styles.hrRow}>
         <View style={styles.hrStatBox}>
           <Text style={styles.hrStatLabel}>Current HR</Text>
@@ -83,7 +91,8 @@ function HeartRateDisplay({ maxHR, avgHrRef }: { maxHR: number; avgHrRef: React.
       {connectionState !== 'connected' && (
         <Text style={styles.hrConnectionStatus}>{stateLabel}</Text>
       )}
-    </View>
+      </View>
+    </>
   );
 }
 

@@ -17,6 +17,7 @@ import {
 } from '../../stores/workout.store';
 import { useAuthStore } from '../../stores/auth.store';
 import { useRealtimeHeartRate } from '../../hooks/useRealtimeHeartRate';
+import { BLEDevicePicker } from '../../components/BLEDevicePicker';
 import { useRestTimer } from '../../hooks/useRestTimer';
 import { AdjustForTodayBanner } from '../../components/AdjustForTodayBanner';
 import { formatDuration, calculateAge } from '../../utils';
@@ -79,7 +80,8 @@ function formatDate(iso: string): string {
 }
 
 function HeartRateCard({ maxHR, onSamplesRef }: { maxHR: number; onSamplesRef: React.MutableRefObject<() => Array<{ timestamp: Date; bpm: number; zone: string }>> }) {
-  const { bpm, zone, connectionState, samples } = useRealtimeHeartRate(maxHR);
+  const { bpm, zone, connectionState, samples, scannedDevices, pickDevice } =
+    useRealtimeHeartRate(maxHR);
 
   // Expose samples getter to parent
   onSamplesRef.current = () => samples;
@@ -93,16 +95,23 @@ function HeartRateCard({ maxHR, onSamplesRef }: { maxHR: number; onSamplesRef: R
     'Waiting...';
 
   return (
-    <View style={styles.hrCard}>
-      <View style={styles.hrCardLeft}>
-        <Text style={styles.hrBpm}>{bpm ?? '--'}</Text>
-        <Text style={styles.hrUnit}>bpm</Text>
+    <>
+      <BLEDevicePicker
+        visible={scannedDevices.length >= 2 && connectionState === 'scanning'}
+        devices={scannedDevices}
+        onPick={pickDevice}
+      />
+      <View style={styles.hrCard}>
+        <View style={styles.hrCardLeft}>
+          <Text style={styles.hrBpm}>{bpm ?? '--'}</Text>
+          <Text style={styles.hrUnit}>bpm</Text>
+        </View>
+        <View style={styles.hrCardRight}>
+          {zone && <Text style={styles.hrZone}>{zone.replace('_', ' ').toUpperCase()}</Text>}
+          <Text style={styles.hrState}>{stateLabel}</Text>
+        </View>
       </View>
-      <View style={styles.hrCardRight}>
-        {zone && <Text style={styles.hrZone}>{zone.replace('_', ' ').toUpperCase()}</Text>}
-        <Text style={styles.hrState}>{stateLabel}</Text>
-      </View>
-    </View>
+    </>
   );
 }
 
@@ -1068,8 +1077,8 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3,
     borderLeftColor: colors.accent,
   },
-  sessionName: { fontSize: 14, fontWeight: '500', color: colors.text },
-  sessionMeta: { fontSize: 12, color: colors.accent },
+  sessionName: { flex: 1, fontSize: 14, fontWeight: '500', color: colors.text, marginRight: 8 },
+  sessionMeta: { fontSize: 12, color: colors.accent, flexShrink: 0 },
   emptyText: { fontSize: 14, color: colors.textMuted, textAlign: 'center', marginTop: 40, paddingHorizontal: 24 },
   exercisePicker: { marginBottom: 16 },
   exerciseChip: {

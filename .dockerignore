@@ -1,0 +1,35 @@
+# Exclude everything Fly's build context doesn't need. Keeping the upload
+# small speeds up every `fly deploy` and avoids leaking host node_modules
+# (wrong arch) into the image.
+
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/coverage
+**/.cache
+
+# Mobile app — not part of the API image.
+apps/mobile
+apps/web
+
+# Local dev artefacts.
+**/.env
+**/.env.local
+**/.env.*.local
+**/.DS_Store
+.git
+.gitignore
+.vscode
+.idea
+
+# Uploads live on the Fly volume, never in the image.
+apps/api/uploads
+
+# Tests, docs, lockfile noise.
+**/__tests__
+**/*.test.ts
+**/*.spec.ts
+CLAUDE.md
+README.md
+.claude

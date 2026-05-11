@@ -1,0 +1,30 @@
+app = "openfit-api"
+primary_region = "cdg"
+
+[build]
+  dockerfile = "apps/api/Dockerfile"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/healthz"
+
+# Nutrition photos. The Fly volume persists across deploys; the destination
+# matches the path the NutritionService writes to (relative to /app/apps/api,
+# our WORKDIR in the Dockerfile).
+[[mounts]]
+  source = "openfit_uploads"
+  destination = "/app/apps/api/uploads"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

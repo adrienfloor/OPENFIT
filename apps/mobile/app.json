@@ -5,13 +5,16 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
     "splash": {
+      "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#22c55e"
+      "backgroundColor": "#0b0b0d"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#22c55e"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0b0b0d"
       },
       "package": "dev.openfit.app",
       "minSdkVersion": 26,

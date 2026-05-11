@@ -14,10 +14,10 @@ interface Props {
   readinessBaselineDays?: number;
 }
 
-const BIG_R = 78;
-const BIG_STROKE = 12;
-const SIDE_STROKE = 11;
-const RING_GAP = 12; // visual gap between BioCharge outer edge and side arc inner edge
+const BIG_R = 68;
+const BIG_STROKE = 11;
+const SIDE_STROKE = 10;
+const RING_GAP = 11; // visual gap between BioCharge outer edge and side arc inner edge
 // SIDE_R kept at 93.5 (same as before the BIG_R bump) so the side arcs don't move.
 const SIDE_R = BIG_R + BIG_STROKE / 2 + RING_GAP + SIDE_STROKE / 2;
 const SIDE_ARC_DEG = 130;
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     backgroundColor: colors.surface,
     borderRadius: radii.xl,
-    paddingVertical: spacing.xl,
+    paddingVertical: spacing.sm,
     paddingHorizontal: spacing.xl,
     marginBottom: spacing.lg,
   },
